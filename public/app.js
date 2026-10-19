@@ -33,6 +33,41 @@ function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
 
+function closePopup() {
+  document.removeEventListener('keydown', popupKey);
+  $('popup')?.remove();
+}
+
+function popupKey(event) {
+  if (event.key === 'Escape') closePopup();
+}
+
+function openPopup(title, body, onSave, saveLabel = 'บันทึก') {
+  closePopup();
+  const node = document.createElement('div');
+  node.className = 'popup-back';
+  node.id = 'popup';
+  node.innerHTML = `<section class="popup" role="dialog" aria-modal="true">
+    <div class="popup-title">${title}</div>
+    <div class="popup-fields">${body}</div>
+    <div class="popup-actions">
+      <button class="btn btn-secondary" type="button" id="popup-cancel">ยกเลิก</button>
+      <button class="btn ${saveLabel === 'ลบ' ? 'btn-danger' : 'btn-primary'}" type="button" id="popup-save">${saveLabel}</button>
+    </div>
+  </section>`;
+  document.body.appendChild(node);
+  document.addEventListener('keydown', popupKey);
+  $('popup-cancel').onclick = closePopup;
+  node.addEventListener('click', (event) => { if (event.target === node) closePopup(); });
+  $('popup-save').onclick = () => Promise.resolve(onSave()).catch((err) => toast(err.message, 'error'));
+  const first = node.querySelector('input:not([readonly]):not([disabled]),select,textarea');
+  first?.focus();
+}
+
+function confirmPopup(title, text, onYes, saveLabel = 'ลบ') {
+  openPopup(title, `<p class="sum-meta">${text}</p>`, async () => { await onYes(); closePopup(); }, saveLabel);
+}
+
 function toast(message, kind = 'success') {
   const node = document.createElement('div');
   node.className = `toast ${kind}`;
@@ -221,7 +256,6 @@ async function renderSystem(target) {
         <button class="btn btn-danger" type="button" id="sys-del" disabled>ลบ</button>
       </div>
     </div>
-    <div id="sys-form"></div>
     <div class="table-wrap" id="sys-rows"></div>
     <div class="table-foot">
       <div class="sum-meta" id="sys-count"></div>
@@ -234,19 +268,16 @@ async function renderSystem(target) {
   const choices = { status: ['Active', 'Inactive'], group: ['Factory', 'Non', 'Center'], usage: ['viewer', 'user', 'admin'], req: ['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'] };
   const drawForm = () => {
     const table = tableOf();
-    const box = $('sys-form');
-    if (!box.dataset.open) { box.innerHTML = ''; return; }
-    box.innerHTML = `<section class="card"><div class="card-title">${editing ? 'แก้ไขแถว' : 'เพิ่มแถว'} ${esc(table.name)}</div><div class="toolbar">${table.columns.map((column) => {
+    const fields = table.columns.map((column) => {
       if (column.type === 'read') return '';
       const value = editing ? editing[column.name] : '';
       if (column.type === 'password') return `<label class="field">${column.name}<input id="sys-${column.name}" type="password" autocomplete="new-password"></label>`;
       if (column.type === 'bool') return `<label class="field">${column.name}<select id="sys-${column.name}"><option value="false">false</option><option value="true" ${value ? 'selected' : ''}>true</option></select></label>`;
       if (choices[column.type]) return `<label class="field">${column.name}<select id="sys-${column.name}">${choices[column.type].map((option) => `<option ${String(value) === option ? 'selected' : ''}>${esc(option)}</option>`).join('')}</select></label>`;
       const number = ['int', 'qty', 'money'].includes(column.type);
-      return `<label class="field">${esc(column.name)}<input id="sys-${column.name}" ${number ? `type="number" step="${column.type === 'int' ? '1' : '0.001'}"` : ''} value="${esc(value ?? '')}" ${editing && column.pk ? 'disabled' : ''}></label>`;
-    }).join('')}</div><div class="form-actions"><button class="btn btn-primary" type="button" id="sys-save">บันทึก</button><button class="btn btn-secondary" type="button" id="sys-cancel">ยกเลิก</button></div></section>`;
-    $('sys-cancel').onclick = () => { editing = null; delete box.dataset.open; drawForm(); };
-    $('sys-save').onclick = saveRow;
+      return `<label class="field">${esc(column.name)}<input id="sys-${column.name}" ${number ? `type="number" step="${column.type === 'int' ? '1' : '0.001'}"` : ''} value="${esc(value ?? '')}" ${editing && column.pk ? 'readonly' : ''}></label>`;
+    }).join('');
+    openPopup(`${editing ? 'แก้ไขแถว' : 'เพิ่มแถว'} ${esc(table.name)}`, fields, saveRow);
   };
   const loadRows = async () => {
     const table = tableOf();
@@ -285,8 +316,7 @@ async function renderSystem(target) {
       }
       toast('บันทึกแล้ว');
       editing = null;
-      delete $('sys-form').dataset.open;
-      drawForm();
+      closePopup();
       await loadRows();
     } catch (err) { toast(err.message, 'error'); }
   };
@@ -294,20 +324,18 @@ async function renderSystem(target) {
     const table = tableOf();
     const key = {};
     table.pk.forEach((column) => { key[column] = row[column]; });
-    if (!confirm(`ลบแถวใน ${table.name}?`)) return;
-    try {
+    confirmPopup(`ลบแถว ${esc(table.name)}`, 'ตรวจแถวที่เลือกอีกครั้งก่อนลบ', async () => {
       await api(`/api/system/tables/${encodeURIComponent(table.name)}`, { method: 'DELETE', body: { key } });
       toast('ลบแล้ว');
       await loadRows();
-    } catch (err) { toast(err.message, 'error'); }
+    });
   };
-  $('sys-table').onchange = () => { offset = 0; editing = null; delete $('sys-form').dataset.open; drawForm(); loadRows().catch((err) => toast(err.message, 'error')); };
+  $('sys-table').onchange = () => { offset = 0; editing = null; closePopup(); loadRows().catch((err) => toast(err.message, 'error')); };
   $('sys-search').onclick = () => { offset = 0; loadRows().catch((err) => toast(err.message, 'error')); };
-  $('sys-add').onclick = () => { editing = null; $('sys-form').dataset.open = '1'; drawForm(); };
+  $('sys-add').onclick = () => { editing = null; drawForm(); };
   $('sys-edit').onclick = () => {
     if (!selected) return toast('เลือกแถวก่อน', 'error');
     editing = selected;
-    $('sys-form').dataset.open = '1';
     drawForm();
   };
   $('sys-del').onclick = () => {
@@ -388,7 +416,6 @@ async function renderRequisition(target) {
       ${cart ? `
         <div class="toolbar">
           <label class="field">ค้นหารายการ<input id="item-q" placeholder="รหัสหรือชื่อรายการ"></label>
-          <label class="field">จำนวน<input id="item-qty" type="number" min="0.001" step="0.001" value="1"></label>
           <button class="btn btn-primary" type="button" id="search-item">ค้นหา</button>
         </div>
         <div id="item-results"></div>
@@ -426,10 +453,12 @@ function drawLines(cart) {
     ${cart.lines.map((line) => `<tr data-pick="${esc(line.id)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${Number(line.qty)} ${esc(line.bun)}</td></tr>`).join('')}
   </tbody></table></div>`;
   bindRowSelect(box, (id) => { picked = id; $('line-remove').disabled = !id; });
-  $('line-remove').onclick = async () => {
+  $('line-remove').onclick = () => {
     if (!picked) return toast('เลือกแถวก่อน', 'error');
-    await api(`/api/requisitions/${cart.id}/lines/${picked}`, { method: 'DELETE' });
-    openView('requisition');
+    confirmPopup('เอาออกจากตะกร้า', 'ตรวจรายการที่เลือกอีกครั้งก่อนเอาออก', async () => {
+      await api(`/api/requisitions/${cart.id}/lines/${picked}`, { method: 'DELETE' });
+      openView('requisition');
+    });
   };
   $('submit-cart').onclick = () => changeStatus(cart.id, 'submitted');
 }
@@ -445,14 +474,16 @@ async function searchItems(cartId) {
   </tbody></table></div>` : '<p class="empty">ไม่พบรายการ</p>';
   if (!data.materials.length) return;
   bindRowSelect($('item-results'), (id) => { picked = id; $('item-add').disabled = !id; });
-  $('item-add').onclick = async () => {
+  $('item-add').onclick = () => {
     if (!picked) return toast('เลือกแถวก่อน', 'error');
-    try {
-      await api(`/api/requisitions/${cartId}/lines`, { method: 'POST', body: { material: picked, qty: Number($('item-qty').value) } });
+    const material = picked;
+    openPopup('ใส่ตะกร้า', `<label class="field">รหัส<input value="${esc(material)}" readonly></label><label class="field">จำนวน<input id="item-qty" type="number" min="0.001" step="0.001" value="1"></label>`, async () => {
+      await api(`/api/requisitions/${cartId}/lines`, { method: 'POST', body: { material, qty: Number($('item-qty').value) } });
       const detail = await api(`/api/requisitions/${cartId}`);
+      closePopup();
       drawLines(detail.requisition);
       toast('ใส่ตะกร้าแล้ว');
-    } catch (err) { toast(err.message, 'error'); }
+    });
   };
 }
 
@@ -510,11 +541,17 @@ async function showDetail(id) {
 }
 
 async function changeStatus(id, status) {
-  try {
+  const run = async () => {
     await api(`/api/requisitions/${id}/status`, { method: 'POST', body: { status } });
     toast(status === 'received' ? 'ยืนยันแล้ว และตัดยอด Current' : 'อัปเดตสถานะแล้ว');
+    closePopup();
     openView(view);
-  } catch (err) { toast(err.message, 'error'); }
+  };
+  if (status === 'cancelled') {
+    confirmPopup('ยกเลิกใบเบิก', `ตรวจใบเบิก #${id} อีกครั้งก่อนยกเลิก`, run, 'ยกเลิกใบเบิก');
+    return;
+  }
+  try { await run(); } catch (err) { toast(err.message, 'error'); }
 }
 
 async function renderQueue(target) {
@@ -545,22 +582,16 @@ async function renderStock(target) {
         <label class="field">ค้นหารายการ<input id="stock-q"></label>
         <button class="btn btn-secondary" type="button" id="stock-load">แสดง</button>
       </div>
-      <div class="toolbar">
-        <label class="field">รหัสวัสดุ<input id="stock-material"></label>
-        <label class="field">Min<input id="stock-min" type="number" min="0" step="0.001" value="0"></label>
-        <label class="field">Current<input id="stock-current" type="number" min="0" step="0.001" value="0"></label>
-        <label class="field">Max<input id="stock-max" type="number" min="0" step="0.001" value="0"></label>
-        <div class="action-bar">
-          <button class="btn btn-secondary" type="button" id="stock-edit" disabled>แก้ไข</button>
-          <button class="btn btn-primary" type="button" id="stock-save">บันทึกยอด</button>
-        </div>
+      <div class="action-bar">
+        <button class="btn btn-primary" type="button" id="stock-save">บันทึกยอด</button>
+        <button class="btn btn-secondary" type="button" id="stock-edit" disabled>แก้ไข</button>
       </div>
       <div class="table-wrap" id="stock-table"></div>
     </section>
     </div>`;
   $('cc-search').onclick = searchCenters;
   $('stock-load').onclick = loadStock;
-  $('stock-save').onclick = saveStock;
+  $('stock-save').onclick = () => openStockPopup();
   let buyer = null;
   bindRowSelect($('buyer-table'), (id, row) => {
     buyer = { costcenter: id, next: row.dataset.next };
@@ -609,11 +640,17 @@ async function loadStock() {
   });
   $('stock-edit').onclick = () => {
     if (!picked) return toast('เลือกแถวก่อน', 'error');
-    $('stock-material').value = picked.dataset.pick;
-    $('stock-min').value = picked.dataset.min;
-    $('stock-current').value = picked.dataset.current;
-    $('stock-max').value = picked.dataset.max;
+    openStockPopup(picked);
   };
+}
+
+function openStockPopup(row) {
+  openPopup(row ? 'แก้ไขยอด' : 'บันทึกยอด', `
+    <label class="field">รหัสวัสดุ<input id="stock-material" value="${esc(row?.dataset.pick || '')}" ${row ? 'readonly' : ''}></label>
+    <label class="field">Min<input id="stock-min" type="number" min="0" step="0.001" value="${row?.dataset.min ?? 0}"></label>
+    <label class="field">Current<input id="stock-current" type="number" min="0" step="0.001" value="${row?.dataset.current ?? 0}"></label>
+    <label class="field">Max<input id="stock-max" type="number" min="0" step="0.001" value="${row?.dataset.max ?? 0}"></label>
+  `, saveStock);
 }
 
 async function saveStock() {
@@ -629,6 +666,7 @@ async function saveStock() {
       }
     });
     toast('บันทึกยอดแล้ว');
+    closePopup();
     loadStock();
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -652,7 +690,6 @@ async function renderUsers(target) {
         <button class="btn btn-danger" type="button" id="usage-del" disabled>ลบ</button>
       </div>
     </div>
-    <div id="usage-form"></div>
     <div class="table-wrap" id="usage-rows"></div>
     <div class="table-foot">
       <div class="sum-meta" id="usage-count"></div>
@@ -662,36 +699,30 @@ async function renderUsers(target) {
       </div>
     </div>`;
   const kind = () => $('usage-table').value;
-  const closeForm = () => { delete $('usage-form').dataset.open; drawForm(); };
+  let formMode = 'add';
   const drawForm = () => {
-    const box = $('usage-form');
-    if (!box.dataset.open) { box.innerHTML = ''; return; }
     if (kind() === 'materials') {
-      const row = box.dataset.mode === 'edit' && selected ? selected : {};
-      box.innerHTML = `<section class="card"><div class="card-title">${row.material ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_usage</div><div class="toolbar">
+      const row = formMode === 'edit' && selected ? selected : {};
+      openPopup(`${row.material ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_usage`, `
         <label class="field">รหัส<input id="mat-code" value="${esc(row.material || '')}" ${row.material ? 'readonly' : ''}></label>
-        <label class="field grow">ชื่อรายการ<input id="mat-name" value="${esc(row.material_description || '')}"></label>
+        <label class="field">ชื่อรายการ<input id="mat-name" value="${esc(row.material_description || '')}"></label>
         <label class="field">หน่วย<input id="mat-bun" value="${esc(row.bun || '')}"></label>
         <label class="field">ราคา<input id="mat-price" type="number" min="0" step="0.01" value="${row.price ?? ''}"></label>
         <label class="field">สกุลเงิน<input id="mat-crcy" value="${esc(row.crcy || 'THB')}"></label>
         <label class="field">สถานะ<select id="mat-status"><option ${row.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
-      </div><div class="form-actions"><button class="btn btn-primary" type="button" id="usage-save">บันทึก</button><button class="btn btn-secondary" type="button" id="usage-cancel">ยกเลิก</button></div></section>`;
-    } else {
-      const row = box.dataset.mode === 'edit' && selected ? selected : null;
-      box.innerHTML = `<section class="card"><div class="card-title">${row ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_user</div>
-        ${row ? '' : `<div class="toolbar"><label class="field grow">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อจาก mt_main_employee"></label><button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button></div><div id="emp-results"></div>`}
-        <div class="toolbar">
-          <label class="field">รหัสพนักงาน<input id="user-id" readonly value="${esc(row?.employeeId || '')}" placeholder="เลือกจากรายชื่อพนักงาน"></label>
-          <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8" autocomplete="new-password"></label>
-          <label class="field">บทบาท<select id="user-role"><option value="viewer" ${row?.role === 'viewer' ? 'selected' : ''}>Viewer</option><option value="user" ${row?.role === 'user' ? 'selected' : ''}>User</option><option value="admin" ${row?.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>
-          <label class="field">สถานะ<select id="user-status"><option ${row?.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row?.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
-        </div>
-        <p class="sum-meta" id="user-centers">${row ? esc(`${row.department || '-'}: ${centerText(row) || 'ไม่มีศูนย์ต้นทุน'}`) : ''}</p>
-        <div class="form-actions"><button class="btn btn-primary" type="button" id="usage-save">บันทึก</button><button class="btn btn-secondary" type="button" id="usage-cancel">ยกเลิก</button></div></section>`;
-      if ($('emp-search')) $('emp-search').onclick = searchEmployees;
+      `, saveRow);
+      return;
     }
-    $('usage-cancel').onclick = closeForm;
-    $('usage-save').onclick = saveRow;
+    const row = formMode === 'edit' && selected ? selected : null;
+    openPopup(`${row ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_user`, `
+      ${row ? '' : `<label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อจาก mt_main_employee"></label><button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button><div id="emp-results"></div>`}
+      <label class="field">รหัสพนักงาน<input id="user-id" readonly value="${esc(row?.employeeId || '')}" placeholder="เลือกจากรายชื่อพนักงาน"></label>
+      <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8" autocomplete="new-password"></label>
+      <label class="field">บทบาท<select id="user-role"><option value="viewer" ${row?.role === 'viewer' ? 'selected' : ''}>Viewer</option><option value="user" ${row?.role === 'user' ? 'selected' : ''}>User</option><option value="admin" ${row?.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>
+      <label class="field">สถานะ<select id="user-status"><option ${row?.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row?.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
+      <p class="sum-meta" id="user-centers">${row ? esc(`${row.department || '-'}: ${centerText(row) || 'ไม่มีศูนย์ต้นทุน'}`) : ''}</p>
+    `, saveRow);
+    if ($('emp-search')) $('emp-search').onclick = searchEmployees;
   };
   const searchEmployees = async () => {
     const data = await api(`/api/employees?q=${encodeURIComponent($('emp-q').value.trim())}`);
@@ -737,39 +768,39 @@ async function renderUsers(target) {
     try {
       if (kind() === 'materials') {
         const body = { material: $('mat-code').value.trim(), materialDescription: $('mat-name').value.trim(), bun: $('mat-bun').value.trim(), price: Number($('mat-price').value), crcy: $('mat-crcy').value.trim(), status: $('mat-status').value };
-        if ($('usage-form').dataset.mode === 'edit' && selected) await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'PATCH', body });
+        if (formMode === 'edit' && selected) await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'PATCH', body });
         else await api('/api/usage-materials', { method: 'POST', body });
-      } else if ($('usage-form').dataset.mode === 'edit' && selected) {
+      } else if (formMode === 'edit' && selected) {
         await api(`/api/users/${encodeURIComponent(selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value } });
       } else {
         if (!$('user-id').value.trim()) return toast('เลือกพนักงานจากรายชื่อก่อน', 'error');
         await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value } });
       }
       toast('บันทึกแล้ว');
-      closeForm();
+      closePopup();
       await loadRows();
     } catch (err) { toast(err.message, 'error'); }
   };
   const removeRow = async () => {
     if (!selected) return toast('เลือกแถวก่อน', 'error');
-    if (kind() === 'materials') {
-      if (!confirm(`ลบรายการ ${selected.material}?`)) return;
-      await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'DELETE' });
-      toast('ลบแล้ว');
-    } else {
-      if (!confirm(`นำ ${selected.employeeId} ออกจาก Usage?`)) return;
-      const result = await api(`/api/users/${encodeURIComponent(selected.employeeId)}`, { method: 'DELETE' });
-      toast(result.inactive ? 'มีประวัติแล้ว จึงปิดเป็น Inactive' : 'นำออกจาก Usage แล้ว');
-    }
-    await loadRows();
+    const label = kind() === 'materials' ? selected.material : selected.employeeId;
+    confirmPopup('ลบแถว', `ตรวจ ${esc(label)} อีกครั้งก่อนลบ`, async () => {
+      if (kind() === 'materials') {
+        await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'DELETE' });
+        toast('ลบแล้ว');
+      } else {
+        const result = await api(`/api/users/${encodeURIComponent(selected.employeeId)}`, { method: 'DELETE' });
+        toast(result.inactive ? 'มีประวัติแล้ว จึงปิดเป็น Inactive' : 'นำออกจาก Usage แล้ว');
+      }
+      await loadRows();
+    });
   };
-  $('usage-table').onchange = () => { offset = 0; $('usage-q').value = ''; closeForm(); loadRows().catch((err) => toast(err.message, 'error')); };
+  $('usage-table').onchange = () => { offset = 0; $('usage-q').value = ''; closePopup(); loadRows().catch((err) => toast(err.message, 'error')); };
   $('usage-search').onclick = () => { offset = 0; loadRows().catch((err) => toast(err.message, 'error')); };
-  $('usage-add').onclick = () => { selected = null; $('usage-form').dataset.open = '1'; $('usage-form').dataset.mode = 'add'; drawForm(); };
+  $('usage-add').onclick = () => { selected = null; formMode = 'add'; drawForm(); };
   $('usage-edit').onclick = () => {
     if (!selected) return toast('เลือกแถวก่อน', 'error');
-    $('usage-form').dataset.open = '1';
-    $('usage-form').dataset.mode = 'edit';
+    formMode = 'edit';
     drawForm();
   };
   $('usage-del').onclick = () => { removeRow().catch((err) => toast(err.message, 'error')); };
