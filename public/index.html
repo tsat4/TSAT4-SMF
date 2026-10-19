@@ -7,58 +7,112 @@
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <section class="login" id="login">
+  <section class="login-shell" id="login">
+    <button class="theme-toggle login-theme" type="button" data-theme-login title="สลับโหมดมืด/สว่าง" aria-label="สลับธีม">
+      <span class="material-symbols-rounded login-theme-icon">light_mode</span>
+    </button>
     <form class="login-card" id="login-form">
-      <p class="eyebrow">TSAT4 SMF</p>
-      <h1>เข้าสู่ระบบเบิก Usage</h1>
-      <p class="muted">ใช้รหัสพนักงานเป็นชื่อผู้ใช้ รหัสผ่านครบ 90 วันต้องเปลี่ยน</p>
-      <label>รหัสพนักงาน<input name="employeeId" autocomplete="username" required></label>
-      <label>รหัสผ่าน<input name="password" type="password" autocomplete="current-password" required></label>
-      <button class="btn btn-primary" type="submit">เข้าสู่ระบบ</button>
+      <div class="login-head">
+        <div class="login-mark material-symbols-rounded">inventory_2</div>
+        <h1>TSAT4 SMF</h1>
+        <p>ระบบเบิก Usage</p>
+      </div>
+      <div class="field"><label class="required">รหัสพนักงาน</label><input name="employeeId" autocomplete="username" required></div>
+      <div class="field"><label class="required">รหัสผ่าน</label>
+        <div class="pw-wrap">
+          <input name="password" type="password" autocomplete="current-password" required>
+          <button class="icon-btn pw-toggle" type="button" data-pw-toggle title="แสดงรหัสผ่าน" aria-label="แสดงรหัสผ่าน"><span class="material-symbols-rounded">visibility</span></button>
+        </div>
+      </div>
       <p class="form-error" id="login-error"></p>
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">เข้าสู่ระบบ</button>
+      </div>
     </form>
   </section>
 
-  <section class="login d-none" id="password-gate">
+  <section class="login-shell d-none" id="password-gate">
+    <button class="theme-toggle login-theme" type="button" data-theme-login title="สลับโหมดมืด/สว่าง" aria-label="สลับธีม">
+      <span class="material-symbols-rounded login-theme-icon">light_mode</span>
+    </button>
     <form class="login-card" id="password-form">
-      <p class="eyebrow">เปลี่ยนรหัสผ่าน</p>
-      <h1>ครบกำหนด 90 วัน</h1>
-      <p class="muted">ตั้งรหัสผ่านใหม่ก่อนใช้งานต่อ อย่างน้อย 8 ตัว</p>
-      <label>รหัสผ่านเดิม<input name="current" type="password" autocomplete="current-password" required></label>
-      <label>รหัสผ่านใหม่<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
-      <button class="btn btn-primary" type="submit">บันทึกรหัสใหม่</button>
-      <button class="btn btn-secondary" type="button" id="password-logout">ออกจากระบบ</button>
+      <div class="login-head">
+        <div class="login-mark material-symbols-rounded">lock_reset</div>
+        <h1>เปลี่ยนรหัสผ่าน</h1>
+        <p>ครบกำหนด 90 วัน ตั้งรหัสใหม่ก่อนใช้งานต่อ อย่างน้อย 8 ตัว</p>
+      </div>
+      <div class="field"><label class="required">รหัสผ่านเดิม</label>
+        <div class="pw-wrap">
+          <input name="current" type="password" autocomplete="current-password" required>
+          <button class="icon-btn pw-toggle" type="button" data-pw-toggle title="แสดงรหัสผ่าน" aria-label="แสดงรหัสผ่าน"><span class="material-symbols-rounded">visibility</span></button>
+        </div>
+      </div>
+      <div class="field"><label class="required">รหัสผ่านใหม่</label>
+        <div class="pw-wrap">
+          <input name="password" type="password" autocomplete="new-password" minlength="8" required>
+          <button class="icon-btn pw-toggle" type="button" data-pw-toggle title="แสดงรหัสผ่าน" aria-label="แสดงรหัสผ่าน"><span class="material-symbols-rounded">visibility</span></button>
+        </div>
+      </div>
       <p class="form-error" id="password-error"></p>
+      <div class="form-actions">
+        <button class="btn btn-secondary" type="button" id="password-logout">ออกจากระบบ</button>
+        <button class="btn btn-primary" type="submit">บันทึกรหัสใหม่</button>
+      </div>
     </form>
   </section>
 
-  <div class="shell d-none" id="shell">
+  <div class="d-none" id="shell">
     <header class="app-header">
       <div class="header-left">
-        <button class="icon-btn" type="button" id="sidebar-toggle" aria-label="เมนู">
-          <span class="material-symbols-rounded">menu</span>
+        <button class="icon-btn sidebar-toggle" type="button" id="sidebar-toggle" aria-label="ย่อ/ขยายเมนู" title="ย่อ/ขยายเมนู">
+          <span id="sidebar-toggle-icon" class="material-symbols-rounded">left_panel_close</span>
         </button>
-        <div class="brand">TSAT4 SMF</div>
+        <div class="brand"><span>TSAT4 SMF</span></div>
       </div>
       <div class="header-page">
         <strong id="header-page-title">ภาพรวม</strong>
         <span id="header-page-subtitle">ระบบเบิก Usage</span>
       </div>
-      <button class="icon-btn" type="button" id="theme-toggle" aria-label="สลับธีม">
-        <span class="material-symbols-rounded" id="theme-icon">light_mode</span>
-      </button>
-      <div class="user-chip">
-        <strong id="header-user"></strong>
-        <span id="header-role"></span>
+      <div class="header-right">
+        <button class="theme-toggle" type="button" id="theme-toggle" title="สลับโหมดมืด/สว่าง" aria-label="สลับธีม">
+          <span id="theme-icon" class="material-symbols-rounded">light_mode</span>
+        </button>
+        <div class="user-menu" id="user-menu">
+          <button class="user-avatar" type="button" id="user-menu-btn" aria-label="ผู้ใช้">
+            <span class="material-symbols-rounded">person</span>
+          </button>
+          <div class="user-pop">
+            <strong id="header-user"></strong>
+            <span id="header-role"></span>
+            <button class="btn btn-secondary" type="button" id="logout">ออกจากระบบ</button>
+          </div>
+        </div>
       </div>
-      <button class="btn btn-secondary" type="button" id="logout">ออกจากระบบ</button>
     </header>
     <aside class="sidebar" id="sidebar">
-      <button class="nav-btn" data-view="home"><span class="material-symbols-rounded">space_dashboard</span><span>ภาพรวม</span></button>
-      <button class="nav-btn" data-view="requisition"><span class="material-symbols-rounded">shopping_cart</span><span>เบิก</span></button>
-      <button class="nav-btn" data-view="queue" data-staff="1"><span class="material-symbols-rounded">inventory</span><span>คิวจัดของ</span></button>
-      <button class="nav-btn" data-view="stock" data-staff="1"><span class="material-symbols-rounded">tune</span><span>Min / Current / Max</span></button>
-      <button class="nav-btn" data-view="users" data-supervisor="1"><span class="material-symbols-rounded">group</span><span>ผู้ใช้</span></button>
+      <div class="nav-acc" data-nav-acc="work">
+        <button class="nav-btn nav-parent" type="button" data-nav-toggle="work" title="งาน" aria-expanded="true">
+          <span class="material-symbols-rounded">inventory_2</span>
+          <span>งาน</span>
+          <span class="material-symbols-rounded nav-caret">expand_more</span>
+        </button>
+        <div class="nav-sub" data-nav-panel="work">
+          <button class="nav-btn" data-view="home" title="ภาพรวม"><span class="material-symbols-rounded">monitoring</span><span>ภาพรวม</span></button>
+          <button class="nav-btn" data-view="requisition" title="เบิก"><span class="material-symbols-rounded">shopping_cart</span><span>เบิก</span></button>
+          <button class="nav-btn" data-view="queue" data-staff="1" title="คิวจัดของ"><span class="material-symbols-rounded">inventory</span><span>คิวจัดของ</span></button>
+          <button class="nav-btn" data-view="stock" data-staff="1" title="Min / Current / Max"><span class="material-symbols-rounded">tune</span><span>Min / Current / Max</span></button>
+        </div>
+      </div>
+      <div class="nav-acc" data-supervisor="1" data-nav-acc="admin">
+        <button class="nav-btn nav-parent" type="button" data-nav-toggle="admin" title="ระบบ" aria-expanded="true">
+          <span class="material-symbols-rounded">admin_panel_settings</span>
+          <span>ระบบ</span>
+          <span class="material-symbols-rounded nav-caret">expand_more</span>
+        </button>
+        <div class="nav-sub" data-nav-panel="admin">
+          <button class="nav-btn" data-view="users" title="ผู้ใช้"><span class="material-symbols-rounded">group</span><span>ผู้ใช้</span></button>
+        </div>
+      </div>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <main class="main">
