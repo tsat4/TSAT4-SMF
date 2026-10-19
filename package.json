@@ -1,0 +1,16 @@
+{
+  "name": "tsat4-smf",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2"
+  }
+}

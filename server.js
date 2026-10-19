@@ -1,0 +1,613 @@
+import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import { createClient } from '@supabase/supabase-js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PORT = Number(process.env.PORT || 3000);
+const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
+const STAFF = new Set(['supervisor', 'officer']);
+
+function db(url, key) {
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
+const mx = db(process.env.MX_SUPABASE_URL, process.env.MX_SUPABASE_SECRET_KEY);
+const tx = db(process.env.TX_SUPABASE_URL, process.env.TX_SUPABASE_SECRET_KEY);
+
+function sign(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', process.env.SESSION_SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+function readSession(token) {
+  if (!token || !process.env.SESSION_SECRET) return null;
+  const [body, sig] = String(token).split('.');
+  if (!body || !sig) return null;
+  const expected = crypto.createHmac('sha256', process.env.SESSION_SECRET).update(body).digest('base64url');
+  const a = Buffer.from(sig);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  const data = JSON.parse(Buffer.from(body, 'base64url').toString());
+  if (!data?.employeeId || !data.exp || data.exp < Date.now()) return null;
+  return data;
+}
+
+function cookies(req) {
+  const out = {};
+  for (const part of String(req.headers.cookie || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return out;
+}
+
+function setSession(res, employeeId) {
+  const token = employeeId
+    ? sign({ employeeId, exp: Date.now() + SESSION_MS })
+    : '';
+  const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+  res.setHeader('Set-Cookie', `smf_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${employeeId ? SESSION_MS / 1000 : 0}${secure}`);
+}
+
+function qtyOf(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 1000) / 1000;
+}
+
+function amountOf(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.round(n * 1000) / 1000;
+}
+
+function cleanTerm(value) {
+  return String(value || '').trim().replace(/[%_,]/g, '').slice(0, 40);
+}
+
+function fail(res, status, error) {
+  res.status(status).json({ error });
+}
+
+function wrap(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch((err) => {
+    console.error(err);
+    if (!res.headersSent) fail(res, 500, 'ระบบขัดข้อง');
+  });
+}
+
+function nameOf(employee) {
+  if (!employee) return '';
+  return [employee.prefix, employee.first_name, employee.last_name].filter(Boolean).join(' ');
+}
+
+async function loadUser(employeeId) {
+  const { data, error } = await mx
+    .from('mt_main_user')
+    .select('employee_id,role,status,password_expires_at,password_hash,mt_main_employee(prefix,first_name,last_name,department,position,status)')
+    .eq('employee_id', employeeId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+function publicUser(row) {
+  const employee = row.mt_main_employee || {};
+  return {
+    employeeId: row.employee_id,
+    role: row.role,
+    status: row.status,
+    name: nameOf(employee),
+    department: employee.department || '',
+    position: employee.position || '',
+    passwordExpiresAt: row.password_expires_at,
+    passwordExpired: new Date(row.password_expires_at).getTime() <= Date.now()
+  };
+}
+
+async function requireUser(req, res, next) {
+  if (!mx || !tx || !process.env.SESSION_SECRET) return fail(res, 503, 'ยังไม่ได้ตั้งค่าการเชื่อมฐานข้อมูล');
+  const session = readSession(cookies(req).smf_session);
+  if (!session) return fail(res, 401, 'กรุณาเข้าสู่ระบบ');
+  const row = await loadUser(session.employeeId);
+  if (!row || row.status !== 'Active' || row.mt_main_employee?.status !== 'Active') {
+    setSession(res, '');
+    return fail(res, 401, 'บัญชีนี้ใช้งานไม่ได้');
+  }
+  req.user = publicUser(row);
+  req.userHash = row.password_hash;
+  const open = req.path === '/api/me' || req.path === '/api/logout' || req.path === '/api/password';
+  if (req.user.passwordExpired && !open) return fail(res, 403, 'ครบกำหนด 90 วัน ต้องเปลี่ยนรหัสผ่าน');
+  next();
+}
+
+function staffOnly(req, res, next) {
+  if (!STAFF.has(req.user.role)) return fail(res, 403, 'เฉพาะผู้ดูแลหรือเจ้าหน้าที่');
+  next();
+}
+
+function supervisorOnly(req, res, next) {
+  if (req.user.role !== 'supervisor') return fail(res, 403, 'เฉพาะผู้ดูแล');
+  next();
+}
+
+async function adjustStock(costcenter, material, delta) {
+  const { error } = await mx.rpc('mt_sto_stock_adjust', {
+    p_costcenter: costcenter,
+    p_material: material,
+    p_delta: delta
+  });
+  if (error) {
+    const text = error.message || '';
+    if (text.includes('not enough')) throw new Error('ยอดคงเหลือไม่พอ');
+    throw new Error('ปรับยอดคงเหลือไม่ได้');
+  }
+}
+
+async function materialMap(codes) {
+  const unique = [...new Set(codes.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const { data, error } = await mx
+    .from('mt_sto_usage')
+    .select('material,material_description,bun')
+    .in('material', unique);
+  if (error) throw error;
+  return new Map((data || []).map((row) => [row.material, row]));
+}
+
+async function costcenterMap(codes) {
+  const unique = [...new Set(codes.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const { data, error } = await mx
+    .from('mt_main_costcenter')
+    .select('costcenter,object_name,department')
+    .in('costcenter', unique);
+  if (error) throw error;
+  return new Map((data || []).map((row) => [row.costcenter, row]));
+}
+
+async function decorate(headers, linesById = new Map()) {
+  const centers = await costcenterMap(headers.map((row) => row.costcenter));
+  const materials = await materialMap([...linesById.values()].flat().map((line) => line.material));
+  return headers.map((row) => ({
+    ...row,
+    costcenterName: centers.get(row.costcenter)?.object_name || '',
+    department: centers.get(row.costcenter)?.department || '',
+    lines: (linesById.get(row.id) || []).map((line) => ({
+      ...line,
+      materialDescription: materials.get(line.material)?.material_description || '',
+      bun: materials.get(line.material)?.bun || ''
+    }))
+  }));
+}
+
+const app = express();
+app.disable('x-powered-by');
+app.use(express.json({ limit: '32kb' }));
+
+app.get('/api/health', (_req, res) => {
+  res.json({ ok: true, database: Boolean(mx && tx && process.env.SESSION_SECRET) });
+});
+
+app.post('/api/login', wrap(async (req, res) => {
+  if (!mx || !process.env.SESSION_SECRET) return fail(res, 503, 'ยังไม่ได้ตั้งค่าการเชื่อมฐานข้อมูล');
+  const employeeId = String(req.body.employeeId || '').trim();
+  const password = String(req.body.password || '');
+  const row = employeeId ? await loadUser(employeeId) : null;
+  const match = row && await bcrypt.compare(password, row.password_hash);
+  if (!row || row.status !== 'Active' || row.mt_main_employee?.status !== 'Active' || !match) {
+    return fail(res, 401, 'รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง');
+  }
+  setSession(res, row.employee_id);
+  res.json({ user: publicUser(row) });
+}));
+
+app.post('/api/logout', (req, res) => {
+  setSession(res, '');
+  res.json({ ok: true });
+});
+
+app.get('/api/me', wrap(requireUser), wrap(async (req, res) => {
+  res.json({ user: req.user });
+}));
+
+app.post('/api/password', wrap(requireUser), wrap(async (req, res) => {
+  const current = String(req.body.current || '');
+  const next = String(req.body.password || '');
+  if (next.length < 8) return fail(res, 400, 'รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัว');
+  if (!(await bcrypt.compare(current, req.userHash))) return fail(res, 401, 'รหัสผ่านเดิมไม่ถูกต้อง');
+  if (await bcrypt.compare(next, req.userHash)) return fail(res, 400, 'รหัสผ่านใหม่ต้องไม่ซ้ำรหัสเดิม');
+  const { error } = await mx.from('mt_main_user').update({
+    password_hash: await bcrypt.hash(next, 10),
+    password_changed_at: new Date().toISOString()
+  }).eq('employee_id', req.user.employeeId);
+  if (error) return fail(res, 400, 'เปลี่ยนรหัสผ่านไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.get('/api/summary', wrap(requireUser), wrap(async (req, res) => {
+  const open = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+    .eq('requested_by', req.user.employeeId)
+    .in('status', ['cart', 'submitted', 'accepted', 'preparing', 'ready']);
+  const ready = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+    .eq('requested_by', req.user.employeeId)
+    .eq('status', 'ready');
+  let queue = 0;
+  if (STAFF.has(req.user.role)) {
+    const rows = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+      .in('status', ['submitted', 'accepted', 'preparing']);
+    queue = rows.count || 0;
+  }
+  res.json({ open: open.count || 0, ready: ready.count || 0, queue });
+}));
+
+app.get('/api/employees', wrap(requireUser), wrap(supervisorOnly), wrap(async (req, res) => {
+  const term = cleanTerm(req.query.q);
+  let query = mx.from('mt_main_employee')
+    .select('employee_id,prefix,first_name,last_name,position,department,status')
+    .eq('status', 'Active')
+    .order('employee_id')
+    .limit(20);
+  if (term) query = query.or(`employee_id.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
+  const { data, error } = await query;
+  if (error) return fail(res, 400, 'ค้นหาพนักงานไม่ได้');
+  res.json({ employees: (data || []).map((row) => ({ ...row, name: nameOf(row) })) });
+}));
+
+app.get('/api/users', wrap(requireUser), wrap(supervisorOnly), wrap(async (req, res) => {
+  const { data, error } = await mx.from('mt_main_user')
+    .select('employee_id,role,status,password_changed_at,password_expires_at,mt_main_employee(prefix,first_name,last_name,department,position)')
+    .order('employee_id');
+  if (error) return fail(res, 400, 'อ่านผู้ใช้ไม่ได้');
+  res.json({
+    users: (data || []).map((row) => ({
+      ...publicUser(row),
+      passwordChangedAt: row.password_changed_at
+    }))
+  });
+}));
+
+app.post('/api/users', wrap(requireUser), wrap(supervisorOnly), wrap(async (req, res) => {
+  const employeeId = String(req.body.employeeId || '').trim();
+  const password = String(req.body.password || '');
+  const role = STAFF.has(req.body.role) || req.body.role === 'employee' ? req.body.role : '';
+  if (!employeeId || !role) return fail(res, 400, 'ระบุพนักงานและบทบาท');
+  if (password.length < 8) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
+  const { data: employee, error: employeeError } = await mx.from('mt_main_employee')
+    .select('employee_id,status').eq('employee_id', employeeId).maybeSingle();
+  if (employeeError || !employee || employee.status !== 'Active') return fail(res, 400, 'พนักงานนี้ใช้งานไม่ได้');
+  const { error } = await mx.from('mt_main_user').insert({
+    employee_id: employeeId,
+    password_hash: await bcrypt.hash(password, 10),
+    role,
+    password_changed_at: new Date().toISOString()
+  });
+  if (error) return fail(res, 400, 'เพิ่มผู้ใช้ไม่ได้ อาจมีบัญชีอยู่แล้ว');
+  res.status(201).json({ ok: true });
+}));
+
+app.patch('/api/users/:employeeId', wrap(requireUser), wrap(supervisorOnly), wrap(async (req, res) => {
+  const employeeId = req.params.employeeId;
+  const patch = {};
+  if (req.body.role) {
+    if (![...STAFF, 'employee'].includes(req.body.role)) return fail(res, 400, 'บทบาทไม่ถูกต้อง');
+    patch.role = req.body.role;
+  }
+  if (req.body.status) {
+    if (!['Active', 'Inactive'].includes(req.body.status)) return fail(res, 400, 'สถานะไม่ถูกต้อง');
+    patch.status = req.body.status;
+  }
+  if (req.body.password) {
+    if (String(req.body.password).length < 8) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
+    patch.password_hash = await bcrypt.hash(String(req.body.password), 10);
+    patch.password_changed_at = new Date().toISOString();
+  }
+  if (!Object.keys(patch).length) return fail(res, 400, 'ไม่มีข้อมูลให้แก้ไข');
+  const { data, error } = await mx.from('mt_main_user').update(patch).eq('employee_id', employeeId).select('employee_id');
+  if (error || !data?.length) return fail(res, 400, 'แก้ไขผู้ใช้ไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.delete('/api/users/:employeeId', wrap(requireUser), wrap(supervisorOnly), wrap(async (req, res) => {
+  const employeeId = req.params.employeeId;
+  if (!/^[A-Za-z0-9]+$/.test(employeeId)) return fail(res, 400, 'รหัสพนักงานไม่ถูกต้อง');
+  if (employeeId === req.user.employeeId) return fail(res, 400, 'ลบบัญชีที่กำลังใช้งานอยู่ไม่ได้');
+  const used = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+    .or(`requested_by.eq.${employeeId},accepted_by.eq.${employeeId},received_by.eq.${employeeId}`);
+  if (used.count) {
+    const { error } = await mx.from('mt_main_user').update({ status: 'Inactive' }).eq('employee_id', employeeId);
+    if (error) return fail(res, 400, 'ปิดบัญชีไม่ได้');
+    return res.json({ ok: true, inactive: true });
+  }
+  const { error } = await mx.from('mt_main_user').delete().eq('employee_id', employeeId);
+  if (error) return fail(res, 400, 'ลบผู้ใช้ไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.get('/api/costcenters', wrap(requireUser), wrap(staffOnly), wrap(async (req, res) => {
+  const term = cleanTerm(req.query.q);
+  let query = mx.from('mt_main_costcenter')
+    .select('costcenter,object_name,department,status')
+    .eq('status', 'Active')
+    .order('costcenter')
+    .limit(30);
+  if (term) query = query.or(`costcenter.ilike.%${term}%,object_name.ilike.%${term}%,department.ilike.%${term}%`);
+  const { data, error } = await query;
+  if (error) return fail(res, 400, 'อ่านศูนย์ต้นทุนไม่ได้');
+  res.json({ costcenters: data || [] });
+}));
+
+app.get('/api/buyers', wrap(requireUser), wrap(async (req, res) => {
+  const { data, error } = await mx.from('mt_sto_buyer')
+    .select('costcenter,status,mt_main_costcenter(object_name,department)')
+    .order('costcenter');
+  if (error) return fail(res, 400, 'อ่านศูนย์ต้นทุนที่สั่งซื้อไม่ได้');
+  const rows = (req.user.role === 'employee' ? (data || []).filter((row) => row.status === 'Active') : data || [])
+    .map((row) => ({
+      costcenter: row.costcenter,
+      status: row.status,
+      objectName: row.mt_main_costcenter?.object_name || '',
+      department: row.mt_main_costcenter?.department || ''
+    }));
+  res.json({ buyers: rows });
+}));
+
+app.post('/api/buyers', wrap(requireUser), wrap(staffOnly), wrap(async (req, res) => {
+  const costcenter = String(req.body.costcenter || '').trim();
+  const { data: center } = await mx.from('mt_main_costcenter').select('costcenter,status').eq('costcenter', costcenter).maybeSingle();
+  if (!center || center.status !== 'Active') return fail(res, 400, 'ศูนย์ต้นทุนนี้ใช้งานไม่ได้');
+  const { error } = await mx.from('mt_sto_buyer').insert({ costcenter });
+  if (error) return fail(res, 400, 'เพิ่มศูนย์ต้นทุนที่สั่งซื้อไม่ได้');
+  res.status(201).json({ ok: true });
+}));
+
+app.patch('/api/buyers/:costcenter', wrap(requireUser), wrap(staffOnly), wrap(async (req, res) => {
+  if (!['Active', 'Inactive'].includes(req.body.status)) return fail(res, 400, 'สถานะไม่ถูกต้อง');
+  const { data, error } = await mx.from('mt_sto_buyer').update({ status: req.body.status })
+    .eq('costcenter', req.params.costcenter).select('costcenter');
+  if (error || !data?.length) return fail(res, 400, 'แก้ไขศูนย์ต้นทุนไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.get('/api/materials', wrap(requireUser), wrap(async (req, res) => {
+  const term = cleanTerm(req.query.q);
+  let query = mx.from('mt_sto_usage')
+    .select('material,material_description,bun,status')
+    .eq('status', 'Active')
+    .order('material')
+    .limit(20);
+  if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%`);
+  const { data, error } = await query;
+  if (error) return fail(res, 400, 'ค้นหารายการไม่ได้');
+  res.json({ materials: data || [] });
+}));
+
+app.get('/api/stock', wrap(requireUser), wrap(staffOnly), wrap(async (req, res) => {
+  const costcenter = String(req.query.costcenter || '').trim();
+  if (!costcenter) return fail(res, 400, 'เลือกศูนย์ต้นทุน');
+  const term = cleanTerm(req.query.q);
+  let query = mx.from('mt_sto_stock')
+    .select('costcenter,material,min_qty,current_qty,max_qty,mt_sto_usage(material_description,bun,status)')
+    .eq('costcenter', costcenter)
+    .order('material')
+    .limit(100);
+  if (term) {
+    const found = await mx.from('mt_sto_usage').select('material').or(`material.ilike.%${term}%,material_description.ilike.%${term}%`).limit(100);
+    const codes = (found.data || []).map((row) => row.material);
+    if (!codes.length) return res.json({ stock: [] });
+    query = query.in('material', codes);
+  }
+  const { data, error } = await query;
+  if (error) return fail(res, 400, 'อ่านยอดคงเหลือไม่ได้');
+  res.json({
+    stock: (data || []).map((row) => ({
+      costcenter: row.costcenter,
+      material: row.material,
+      minQty: Number(row.min_qty),
+      currentQty: Number(row.current_qty),
+      maxQty: Number(row.max_qty),
+      materialDescription: row.mt_sto_usage?.material_description || '',
+      bun: row.mt_sto_usage?.bun || '',
+      low: Number(row.current_qty) <= Number(row.min_qty)
+    }))
+  });
+}));
+
+app.put('/api/stock', wrap(requireUser), wrap(staffOnly), wrap(async (req, res) => {
+  const costcenter = String(req.body.costcenter || '').trim();
+  const material = String(req.body.material || '').trim();
+  const minQty = amountOf(req.body.minQty);
+  const currentQty = amountOf(req.body.currentQty);
+  const maxQty = amountOf(req.body.maxQty);
+  if (!costcenter || !material || minQty == null || currentQty == null || maxQty == null) return fail(res, 400, 'ระบุยอดให้ครบ');
+  if (maxQty < minQty) return fail(res, 400, 'Max ต้องไม่ต่ำกว่า Min');
+  const buyer = await mx.from('mt_sto_buyer').select('status').eq('costcenter', costcenter).maybeSingle();
+  if (!buyer.data || buyer.data.status !== 'Active') return fail(res, 400, 'ศูนย์ต้นทุนนี้ยังไม่เปิดให้สั่งซื้อ');
+  const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
+  if (!item.data || item.data.status !== 'Active') return fail(res, 400, 'รายการนี้ใช้งานไม่ได้');
+  const { error } = await mx.from('mt_sto_stock').upsert({
+    costcenter,
+    material,
+    min_qty: minQty,
+    current_qty: currentQty,
+    max_qty: maxQty
+  }, { onConflict: 'costcenter,material' });
+  if (error) return fail(res, 400, 'บันทึกยอดไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.get('/api/requisitions', wrap(requireUser), wrap(async (req, res) => {
+  const scope = req.query.scope === 'queue' ? 'queue' : 'mine';
+  if (scope === 'queue' && !STAFF.has(req.user.role)) return fail(res, 403, 'เฉพาะผู้ดูแลหรือเจ้าหน้าที่');
+  let query = tx.from('tx_sto_requisition').select('*').order('created_at', { ascending: false }).limit(50);
+  if (scope === 'mine') query = query.eq('requested_by', req.user.employeeId);
+  else query = query.in('status', ['submitted', 'accepted', 'preparing', 'ready']);
+  if (req.query.status) query = query.eq('status', String(req.query.status));
+  const { data, error } = await query;
+  if (error) return fail(res, 400, 'อ่านใบเบิกไม่ได้');
+  const rows = await decorate(data || []);
+  res.json({ requisitions: rows });
+}));
+
+app.get('/api/requisitions/:id', wrap(requireUser), wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  const { data: header, error } = await tx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
+  if (error || !header) return fail(res, 404, 'ไม่พบใบเบิก');
+  if (header.requested_by !== req.user.employeeId && !STAFF.has(req.user.role)) return fail(res, 403, 'เปิดใบเบิกนี้ไม่ได้');
+  const { data: lines, error: lineError } = await tx.from('tx_sto_requisition_line').select('*').eq('requisition_id', id).order('id');
+  if (lineError) return fail(res, 400, 'อ่านรายการไม่ได้');
+  const [row] = await decorate([header], new Map([[id, lines || []]]));
+  res.json({ requisition: row });
+}));
+
+app.post('/api/requisitions', wrap(requireUser), wrap(async (req, res) => {
+  const costcenter = String(req.body.costcenter || '').trim();
+  const buyer = await mx.from('mt_sto_buyer').select('status').eq('costcenter', costcenter).eq('status', 'Active').maybeSingle();
+  if (!buyer.data) return fail(res, 400, 'เลือกศูนย์ต้นทุนที่สั่งซื้อ');
+  const { data, error } = await tx.from('tx_sto_requisition')
+    .insert({ requested_by: req.user.employeeId, costcenter })
+    .select('id')
+    .single();
+  if (error) return fail(res, 400, 'เปิดตะกร้าไม่ได้');
+  res.status(201).json({ id: data.id });
+}));
+
+app.post('/api/requisitions/:id/lines', wrap(requireUser), wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  const material = String(req.body.material || '').trim();
+  const qty = qtyOf(req.body.qty);
+  const header = await ownCart(req, id);
+  if (!header) return fail(res, 400, 'แก้ได้เฉพาะตะกร้าของตนเอง');
+  if (!material || !qty) return fail(res, 400, 'เลือกรายการและจำนวน');
+  const stock = await mx.from('mt_sto_stock').select('material').eq('costcenter', header.costcenter).eq('material', material).maybeSingle();
+  if (!stock.data) return fail(res, 400, 'ศูนย์ต้นทุนนี้ยังไม่มียอดของรายการนี้');
+  const existing = await tx.from('tx_sto_requisition_line').select('id,qty').eq('requisition_id', id).eq('material', material).maybeSingle();
+  if (existing.data) {
+    const { error } = await tx.from('tx_sto_requisition_line').update({ qty: qtyOf(Number(existing.data.qty) + qty) }).eq('id', existing.data.id);
+    if (error) return fail(res, 400, 'เพิ่มจำนวนไม่ได้');
+  } else {
+    const { error } = await tx.from('tx_sto_requisition_line').insert({
+      requisition_id: id,
+      costcenter: header.costcenter,
+      material,
+      qty
+    });
+    if (error) return fail(res, 400, 'ใส่ตะกร้าไม่ได้');
+  }
+  res.json({ ok: true });
+}));
+
+app.patch('/api/requisitions/:id/lines/:lineId', wrap(requireUser), wrap(async (req, res) => {
+  const qty = qtyOf(req.body.qty);
+  const header = await ownCart(req, Number(req.params.id));
+  if (!header || !qty) return fail(res, 400, 'แก้จำนวนในตะกร้าไม่ได้');
+  const { data, error } = await tx.from('tx_sto_requisition_line').update({ qty })
+    .eq('id', Number(req.params.lineId)).eq('requisition_id', header.id).select('id');
+  if (error || !data?.length) return fail(res, 400, 'แก้จำนวนไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.delete('/api/requisitions/:id/lines/:lineId', wrap(requireUser), wrap(async (req, res) => {
+  const header = await ownCart(req, Number(req.params.id));
+  if (!header) return fail(res, 400, 'เอาออกจากตะกร้าไม่ได้');
+  const { error } = await tx.from('tx_sto_requisition_line').delete()
+    .eq('id', Number(req.params.lineId)).eq('requisition_id', header.id);
+  if (error) return fail(res, 400, 'เอาออกจากตะกร้าไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res) => {
+  const id = Number(req.params.id);
+  const status = String(req.body.status || '');
+  const { data: header, error } = await tx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
+  if (error || !header) return fail(res, 404, 'ไม่พบใบเบิก');
+  const mine = header.requested_by === req.user.employeeId;
+  const staff = STAFF.has(req.user.role);
+  try {
+    if (status === 'submitted' && mine && header.status === 'cart') {
+      await move(id, 'cart', { status: 'submitted' });
+    } else if (status === 'cancelled' && (mine || staff) && ['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(header.status)) {
+      if (header.status !== 'cart' && !staff && !mine) return fail(res, 403, 'ยกเลิกใบเบิกนี้ไม่ได้');
+      await move(id, header.status, { status: 'cancelled' });
+    } else if (status === 'accepted' && staff && header.status === 'submitted') {
+      await move(id, 'submitted', { status: 'accepted', accepted_by: req.user.employeeId });
+    } else if (status === 'preparing' && staff && header.status === 'accepted') {
+      await move(id, 'accepted', { status: 'preparing' });
+    } else if (status === 'ready' && staff && header.status === 'preparing') {
+      await move(id, 'preparing', { status: 'ready' });
+    } else if (status === 'received' && mine && header.status === 'ready') {
+      await receive(header);
+    } else {
+      return fail(res, 400, 'เปลี่ยนสถานะนี้ไม่ได้');
+    }
+  } catch (err) {
+    return fail(res, 400, err.message || 'เปลี่ยนสถานะไม่ได้');
+  }
+  res.json({ ok: true });
+}));
+
+async function ownCart(req, id) {
+  const { data } = await tx.from('tx_sto_requisition').select('id,requested_by,costcenter,status').eq('id', id).maybeSingle();
+  if (!data || data.requested_by !== req.user.employeeId || data.status !== 'cart') return null;
+  return data;
+}
+
+async function move(id, from, patch) {
+  const { data, error } = await tx.from('tx_sto_requisition').update(patch).eq('id', id).eq('status', from).select('id');
+  if (error || !data?.length) throw new Error('เปลี่ยนสถานะไม่ได้');
+}
+
+async function receive(header) {
+  const { data: lines, error } = await tx.from('tx_sto_requisition_line')
+    .select('costcenter,material,qty').eq('requisition_id', header.id);
+  if (error || !lines?.length) throw new Error('ใบเบิกไม่มีรายการ');
+  const done = [];
+  try {
+    for (const line of lines) {
+      await adjustStock(line.costcenter, line.material, -Number(line.qty));
+      done.push(line);
+    }
+    await move(header.id, 'ready', { status: 'received', received_by: header.requested_by });
+  } catch (err) {
+    for (const line of done) {
+      try {
+        await adjustStock(line.costcenter, line.material, Number(line.qty));
+      } catch (restoreErr) {
+        console.error(restoreErr);
+      }
+    }
+    throw err;
+  }
+}
+
+app.use(express.static(path.join(__dirname, 'public')));
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) return fail(res, 404, 'ไม่พบ');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+async function bootstrap() {
+  const employeeId = process.env.BOOTSTRAP_EMPLOYEE_ID;
+  const password = process.env.BOOTSTRAP_PASSWORD;
+  if (!mx || !employeeId || !password) return;
+  const { count } = await mx.from('mt_main_user').select('employee_id', { count: 'exact', head: true });
+  if (count) return;
+  const { error } = await mx.from('mt_main_user').insert({
+    employee_id: employeeId,
+    password_hash: await bcrypt.hash(password, 10),
+    role: 'supervisor',
+    password_changed_at: new Date().toISOString()
+  });
+  if (error) console.error('bootstrap failed');
+  else console.log('bootstrap user created');
+}
+
+app.listen(PORT, async () => {
+  console.log(`SMF listening on ${PORT}`);
+  await bootstrap();
+});

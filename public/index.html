@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TSAT4 SMF</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <section class="login" id="login">
+    <form class="login-card" id="login-form">
+      <p class="eyebrow">TSAT4 SMF</p>
+      <h1>เข้าสู่ระบบเบิก Usage</h1>
+      <p class="muted">ใช้รหัสพนักงานเป็นชื่อผู้ใช้ รหัสผ่านครบ 90 วันต้องเปลี่ยน</p>
+      <label>รหัสพนักงาน<input name="employeeId" autocomplete="username" required></label>
+      <label>รหัสผ่าน<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn btn-primary" type="submit">เข้าสู่ระบบ</button>
+      <p class="form-error" id="login-error"></p>
+    </form>
+  </section>
+
+  <section class="login d-none" id="password-gate">
+    <form class="login-card" id="password-form">
+      <p class="eyebrow">เปลี่ยนรหัสผ่าน</p>
+      <h1>ครบกำหนด 90 วัน</h1>
+      <p class="muted">ตั้งรหัสผ่านใหม่ก่อนใช้งานต่อ อย่างน้อย 8 ตัว</p>
+      <label>รหัสผ่านเดิม<input name="current" type="password" autocomplete="current-password" required></label>
+      <label>รหัสผ่านใหม่<input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <button class="btn btn-primary" type="submit">บันทึกรหัสใหม่</button>
+      <button class="btn btn-secondary" type="button" id="password-logout">ออกจากระบบ</button>
+      <p class="form-error" id="password-error"></p>
+    </form>
+  </section>
+
+  <div class="shell d-none" id="shell">
+    <header class="app-header">
+      <div class="header-left">
+        <button class="icon-btn" type="button" id="sidebar-toggle" aria-label="เมนู">
+          <span class="material-symbols-rounded">menu</span>
+        </button>
+        <div class="brand">TSAT4 SMF</div>
+      </div>
+      <div class="header-page">
+        <strong id="header-page-title">ภาพรวม</strong>
+        <span id="header-page-subtitle">ระบบเบิก Usage</span>
+      </div>
+      <button class="icon-btn" type="button" id="theme-toggle" aria-label="สลับธีม">
+        <span class="material-symbols-rounded" id="theme-icon">light_mode</span>
+      </button>
+      <div class="user-chip">
+        <strong id="header-user"></strong>
+        <span id="header-role"></span>
+      </div>
+      <button class="btn btn-secondary" type="button" id="logout">ออกจากระบบ</button>
+    </header>
+    <aside class="sidebar" id="sidebar">
+      <button class="nav-btn" data-view="home"><span class="material-symbols-rounded">space_dashboard</span><span>ภาพรวม</span></button>
+      <button class="nav-btn" data-view="requisition"><span class="material-symbols-rounded">shopping_cart</span><span>เบิก</span></button>
+      <button class="nav-btn" data-view="queue" data-staff="1"><span class="material-symbols-rounded">inventory</span><span>คิวจัดของ</span></button>
+      <button class="nav-btn" data-view="stock" data-staff="1"><span class="material-symbols-rounded">tune</span><span>Min / Current / Max</span></button>
+      <button class="nav-btn" data-view="users" data-supervisor="1"><span class="material-symbols-rounded">group</span><span>ผู้ใช้</span></button>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <main class="main">
+      <div class="app-view" id="app-view"></div>
+    </main>
+  </div>
+  <div class="toast-stack" id="toasts"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
