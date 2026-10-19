@@ -638,210 +638,144 @@ function centerText(row) {
 }
 
 async function renderUsers(target) {
-  target.innerHTML = `
-    <div class="toolbar">
-      <button class="btn btn-secondary" type="button" data-panel="members">mt_sto_user</button>
-      <button class="btn btn-secondary" type="button" data-panel="materials">mt_sto_usage</button>
-    </div>
-    <div id="setting-panel"></div>`;
-  const openPanel = async (panel) => {
-    target.querySelectorAll('[data-panel]').forEach((node) => {
-      node.classList.toggle('btn-primary', node.dataset.panel === panel);
-      node.classList.toggle('btn-secondary', node.dataset.panel !== panel);
-    });
-    const box = $('setting-panel');
-    box.innerHTML = '<div class="empty">กำลังโหลด...</div>';
-    await { members: renderMembers, materials: renderMaterials }[panel](box);
-  };
-  target.querySelectorAll('[data-panel]').forEach((node) => { node.onclick = () => openPanel(node.dataset.panel); });
-  await openPanel('members');
-}
-
-async function renderMembers(target) {
-  const data = await api('/api/users');
-  target.innerHTML = `
-    <p class="sum-meta">รายชื่อมาจากพนักงานใน mt_main_employee ศูนย์ต้นทุนที่เบิกจ่ายได้คือศูนย์ต้นทุนที่หน่วยงานตรงกัน</p>
-    <div class="toolbar">
-      <label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อ"></label>
-      <button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button>
-    </div>
-    <div id="emp-results"></div>
-    <div class="toolbar">
-      <label class="field">รหัสพนักงาน<input id="user-id" readonly placeholder="เลือกจากรายชื่อพนักงาน"></label>
-      <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8" autocomplete="new-password"></label>
-      <label class="field">บทบาท<select id="user-role"><option value="viewer">Viewer</option><option value="user">User</option><option value="admin">Admin</option></select></label>
-      <label class="field">สถานะ<select id="user-status"><option>Active</option><option>Inactive</option></select></label>
-    </div>
-    <p class="sum-meta" id="user-centers"></p>
-    <div class="action-bar">
-      <button class="btn btn-primary" type="button" id="user-save">เพิ่ม</button>
-      <button class="btn btn-secondary" type="button" id="user-edit" disabled>แก้ไข</button>
-      <button class="btn btn-danger" type="button" id="user-del" disabled>ลบ</button>
-    </div>
-    <div class="table-wrap" id="user-table"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th><th>ศูนย์ต้นทุน</th><th>บทบาท</th><th>สถานะ</th></tr></thead><tbody>
-      ${data.users.map((row) => `<tr data-pick="${esc(row.employeeId)}" data-creator="${row.creator ? '1' : '0'}">
-        <td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td>
-        <td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td>
-      </tr>`).join('')}
-    </tbody></table></div>`;
-  $('emp-search').onclick = searchEmployees;
-  $('user-save').onclick = () => { if ($('user-save').dataset.mode === 'edit') editUser(); else createUser(); };
-  let picked = null;
-  bindRowSelect($('user-table'), (id, row) => {
-    picked = data.users.find((user) => user.employeeId === id) || null;
-    const locked = !picked || row.dataset.creator === '1';
-    $('user-edit').disabled = locked;
-    $('user-del').disabled = locked;
-  });
-  $('user-edit').onclick = () => {
-    if (!picked) return toast('เลือกแถวก่อน', 'error');
-    $('user-id').value = picked.employeeId;
-    $('user-role').value = picked.role;
-    $('user-status').value = picked.status;
-    $('user-password').value = '';
-    $('user-centers').textContent = picked.department ? `${picked.department}: ${centerText(picked) || 'ไม่มีศูนย์ต้นทุน'}` : '';
-    $('user-save').textContent = 'บันทึก';
-    $('user-save').dataset.mode = 'edit';
-  };
-  $('user-del').onclick = () => {
-    if (!picked) return toast('เลือกแถวก่อน', 'error');
-    deleteUser(picked.employeeId);
-  };
-}
-
-async function renderMaterials(target) {
   let offset = 0;
   let selected = null;
   let rows = [];
   target.innerHTML = `
     <div class="toolbar">
-      <label class="field grow">ค้นหา<input id="mat-q" placeholder="รหัสหรือชื่อรายการ"></label>
-      <button class="btn btn-secondary" type="button" id="mat-search">ค้นหา</button>
+      <label class="field grow">ตาราง<select id="usage-table"><option value="members">mt_sto_user</option><option value="materials">mt_sto_usage</option></select></label>
+      <label class="field grow">ค้นหา<input id="usage-q"></label>
+      <button class="btn btn-secondary" type="button" id="usage-search">ค้นหา</button>
       <div class="action-bar">
-        <button class="btn btn-primary" type="button" id="mat-add">เพิ่ม</button>
-        <button class="btn btn-secondary" type="button" id="mat-edit" disabled>แก้ไข</button>
-        <button class="btn btn-danger" type="button" id="mat-del" disabled>ลบ</button>
+        <button class="btn btn-primary" type="button" id="usage-add">เพิ่ม</button>
+        <button class="btn btn-secondary" type="button" id="usage-edit" disabled>แก้ไข</button>
+        <button class="btn btn-danger" type="button" id="usage-del" disabled>ลบ</button>
       </div>
     </div>
-    <div id="mat-form"></div>
-    <div class="table-wrap" id="mat-rows"></div>
-    <div class="table-foot"><div class="sum-meta" id="mat-count"></div><div class="action-bar"><button class="btn btn-secondary" type="button" id="mat-prev">ก่อนหน้า</button><button class="btn btn-secondary" type="button" id="mat-next">ถัดไป</button></div></div>`;
+    <div id="usage-form"></div>
+    <div class="table-wrap" id="usage-rows"></div>
+    <div class="table-foot">
+      <div class="sum-meta" id="usage-count"></div>
+      <div class="action-bar">
+        <button class="btn btn-secondary" type="button" id="usage-prev">ก่อนหน้า</button>
+        <button class="btn btn-secondary" type="button" id="usage-next">ถัดไป</button>
+      </div>
+    </div>`;
+  const kind = () => $('usage-table').value;
+  const closeForm = () => { delete $('usage-form').dataset.open; drawForm(); };
   const drawForm = () => {
-    const box = $('mat-form');
+    const box = $('usage-form');
     if (!box.dataset.open) { box.innerHTML = ''; return; }
-    const row = selected && box.dataset.mode === 'edit' ? selected : {};
-    box.innerHTML = `<section class="card"><div class="toolbar">
-      <label class="field">รหัส<input id="mat-code" value="${esc(row.material || '')}" ${row.material ? 'readonly' : ''}></label>
-      <label class="field grow">ชื่อรายการ<input id="mat-name" value="${esc(row.material_description || '')}"></label>
-      <label class="field">หน่วย<input id="mat-bun" value="${esc(row.bun || '')}"></label>
-      <label class="field">ราคา<input id="mat-price" type="number" min="0" step="0.01" value="${row.price ?? ''}"></label>
-      <label class="field">สกุลเงิน<input id="mat-crcy" value="${esc(row.crcy || 'THB')}"></label>
-      <label class="field">สถานะ<select id="mat-status"><option ${row.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
-    </div><div class="form-actions"><button class="btn btn-primary" type="button" id="mat-save">บันทึก</button><button class="btn btn-secondary" type="button" id="mat-cancel">ยกเลิก</button></div></section>`;
-    $('mat-cancel').onclick = () => { delete box.dataset.open; drawForm(); };
-    $('mat-save').onclick = saveMaterial;
+    if (kind() === 'materials') {
+      const row = box.dataset.mode === 'edit' && selected ? selected : {};
+      box.innerHTML = `<section class="card"><div class="card-title">${row.material ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_usage</div><div class="toolbar">
+        <label class="field">รหัส<input id="mat-code" value="${esc(row.material || '')}" ${row.material ? 'readonly' : ''}></label>
+        <label class="field grow">ชื่อรายการ<input id="mat-name" value="${esc(row.material_description || '')}"></label>
+        <label class="field">หน่วย<input id="mat-bun" value="${esc(row.bun || '')}"></label>
+        <label class="field">ราคา<input id="mat-price" type="number" min="0" step="0.01" value="${row.price ?? ''}"></label>
+        <label class="field">สกุลเงิน<input id="mat-crcy" value="${esc(row.crcy || 'THB')}"></label>
+        <label class="field">สถานะ<select id="mat-status"><option ${row.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
+      </div><div class="form-actions"><button class="btn btn-primary" type="button" id="usage-save">บันทึก</button><button class="btn btn-secondary" type="button" id="usage-cancel">ยกเลิก</button></div></section>`;
+    } else {
+      const row = box.dataset.mode === 'edit' && selected ? selected : null;
+      box.innerHTML = `<section class="card"><div class="card-title">${row ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_user</div>
+        ${row ? '' : `<div class="toolbar"><label class="field grow">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อจาก mt_main_employee"></label><button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button></div><div id="emp-results"></div>`}
+        <div class="toolbar">
+          <label class="field">รหัสพนักงาน<input id="user-id" readonly value="${esc(row?.employeeId || '')}" placeholder="เลือกจากรายชื่อพนักงาน"></label>
+          <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8" autocomplete="new-password"></label>
+          <label class="field">บทบาท<select id="user-role"><option value="viewer" ${row?.role === 'viewer' ? 'selected' : ''}>Viewer</option><option value="user" ${row?.role === 'user' ? 'selected' : ''}>User</option><option value="admin" ${row?.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>
+          <label class="field">สถานะ<select id="user-status"><option ${row?.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row?.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
+        </div>
+        <p class="sum-meta" id="user-centers">${row ? esc(`${row.department || '-'}: ${centerText(row) || 'ไม่มีศูนย์ต้นทุน'}`) : ''}</p>
+        <div class="form-actions"><button class="btn btn-primary" type="button" id="usage-save">บันทึก</button><button class="btn btn-secondary" type="button" id="usage-cancel">ยกเลิก</button></div></section>`;
+      if ($('emp-search')) $('emp-search').onclick = searchEmployees;
+    }
+    $('usage-cancel').onclick = closeForm;
+    $('usage-save').onclick = saveRow;
   };
-  const loadRows = async () => {
-    const data = await api(`/api/usage-materials?q=${encodeURIComponent($('mat-q').value.trim())}&offset=${offset}`);
-    rows = data.materials;
-    selected = null;
-    $('mat-edit').disabled = true;
-    $('mat-del').disabled = true;
-    $('mat-count').textContent = `แสดง ${rows.length} จาก ${data.total} แถว`;
-    $('mat-rows').innerHTML = rows.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อรายการ</th><th>หน่วย</th><th>ราคา</th><th>สกุลเงิน</th><th>สถานะ</th></tr></thead><tbody>
-      ${rows.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td><td>${Number(row.price)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join('')}
-    </tbody></table>` : '<p class="empty">ไม่มีรายการ</p>';
-    bindRowSelect($('mat-rows'), (pick) => {
-      selected = rows[Number(pick)];
-      $('mat-edit').disabled = false;
-      $('mat-del').disabled = false;
+  const searchEmployees = async () => {
+    const data = await api(`/api/employees?q=${encodeURIComponent($('emp-q').value.trim())}`);
+    $('emp-results').innerHTML = data.employees.length ? `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th><th>ศูนย์ต้นทุน</th></tr></thead><tbody>
+      ${data.employees.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.employee_id)}</td><td>${esc(row.name)}</td><td>${esc(row.department || '')}</td><td>${esc(centerText(row))}</td></tr>`).join('')}
+    </tbody></table></div>` : '<p class="empty">ไม่พบพนักงาน</p>';
+    bindRowSelect($('emp-results'), (index) => {
+      const person = data.employees[Number(index)];
+      $('user-id').value = person.employee_id;
+      $('user-centers').textContent = `${person.department || '-'}: ${centerText(person) || 'ไม่มีศูนย์ต้นทุน'}`;
     });
   };
-  const saveMaterial = async () => {
-    const body = {
-      material: $('mat-code').value.trim(),
-      materialDescription: $('mat-name').value.trim(),
-      bun: $('mat-bun').value.trim(),
-      price: Number($('mat-price').value),
-      crcy: $('mat-crcy').value.trim(),
-      status: $('mat-status').value
-    };
+  const loadRows = async () => {
+    selected = null;
+    $('usage-edit').disabled = true;
+    $('usage-del').disabled = true;
+    if (kind() === 'materials') {
+      const data = await api(`/api/usage-materials?q=${encodeURIComponent($('usage-q').value.trim())}&offset=${offset}`);
+      rows = data.materials;
+      $('usage-count').textContent = `แสดง ${rows.length} จาก ${data.total} แถว`;
+      $('usage-rows').innerHTML = rows.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อรายการ</th><th>หน่วย</th><th>ราคา</th><th>สกุลเงิน</th><th>สถานะ</th></tr></thead><tbody>
+        ${rows.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td><td>${Number(row.price)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join('')}
+      </tbody></table>` : '<p class="empty">ไม่มีรายการ</p>';
+    } else {
+      const data = await api('/api/users');
+      const term = $('usage-q').value.trim().toLowerCase();
+      const filtered = data.users.filter((row) => !term || [row.employeeId, row.name, row.department, centerText(row), row.role].join(' ').toLowerCase().includes(term));
+      const page = filtered.slice(offset, offset + 50);
+      rows = page;
+      $('usage-count').textContent = `แสดง ${page.length} จาก ${filtered.length} แถว`;
+      $('usage-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th><th>ศูนย์ต้นทุน</th><th>บทบาท</th><th>สถานะ</th></tr></thead><tbody>
+        ${page.map((row, index) => `<tr data-pick="${index}" data-creator="${row.creator ? '1' : '0'}"><td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td></tr>`).join('')}
+      </tbody></table>` : '<p class="empty">ไม่มีแถว</p>';
+    }
+    bindRowSelect($('usage-rows'), (pick, row) => {
+      selected = rows[Number(pick)];
+      const locked = kind() === 'members' && row.dataset.creator === '1';
+      $('usage-edit').disabled = locked;
+      $('usage-del').disabled = locked;
+    });
+  };
+  const saveRow = async () => {
     try {
-      if ($('mat-form').dataset.mode === 'edit' && selected) {
-        await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'PATCH', body });
+      if (kind() === 'materials') {
+        const body = { material: $('mat-code').value.trim(), materialDescription: $('mat-name').value.trim(), bun: $('mat-bun').value.trim(), price: Number($('mat-price').value), crcy: $('mat-crcy').value.trim(), status: $('mat-status').value };
+        if ($('usage-form').dataset.mode === 'edit' && selected) await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'PATCH', body });
+        else await api('/api/usage-materials', { method: 'POST', body });
+      } else if ($('usage-form').dataset.mode === 'edit' && selected) {
+        await api(`/api/users/${encodeURIComponent(selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value } });
       } else {
-        await api('/api/usage-materials', { method: 'POST', body });
+        if (!$('user-id').value.trim()) return toast('เลือกพนักงานจากรายชื่อก่อน', 'error');
+        await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value } });
       }
       toast('บันทึกแล้ว');
-      delete $('mat-form').dataset.open;
-      drawForm();
+      closeForm();
       await loadRows();
     } catch (err) { toast(err.message, 'error'); }
   };
-  $('mat-search').onclick = () => { offset = 0; loadRows().catch((err) => toast(err.message, 'error')); };
-  $('mat-add').onclick = () => { selected = null; $('mat-form').dataset.open = '1'; $('mat-form').dataset.mode = 'add'; drawForm(); };
-  $('mat-edit').onclick = () => {
+  const removeRow = async () => {
     if (!selected) return toast('เลือกแถวก่อน', 'error');
-    $('mat-form').dataset.open = '1';
-    $('mat-form').dataset.mode = 'edit';
-    drawForm();
-  };
-  $('mat-del').onclick = async () => {
-    if (!selected) return toast('เลือกแถวก่อน', 'error');
-    if (!confirm(`ลบรายการ ${selected.material}?`)) return;
-    try {
+    if (kind() === 'materials') {
+      if (!confirm(`ลบรายการ ${selected.material}?`)) return;
       await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'DELETE' });
       toast('ลบแล้ว');
-      await loadRows();
-    } catch (err) { toast(err.message, 'error'); }
+    } else {
+      if (!confirm(`นำ ${selected.employeeId} ออกจาก Usage?`)) return;
+      const result = await api(`/api/users/${encodeURIComponent(selected.employeeId)}`, { method: 'DELETE' });
+      toast(result.inactive ? 'มีประวัติแล้ว จึงปิดเป็น Inactive' : 'นำออกจาก Usage แล้ว');
+    }
+    await loadRows();
   };
-  $('mat-prev').onclick = () => { offset = Math.max(0, offset - 50); loadRows().catch((err) => toast(err.message, 'error')); };
-  $('mat-next').onclick = () => { offset += 50; loadRows().catch((err) => toast(err.message, 'error')); };
+  $('usage-table').onchange = () => { offset = 0; $('usage-q').value = ''; closeForm(); loadRows().catch((err) => toast(err.message, 'error')); };
+  $('usage-search').onclick = () => { offset = 0; loadRows().catch((err) => toast(err.message, 'error')); };
+  $('usage-add').onclick = () => { selected = null; $('usage-form').dataset.open = '1'; $('usage-form').dataset.mode = 'add'; drawForm(); };
+  $('usage-edit').onclick = () => {
+    if (!selected) return toast('เลือกแถวก่อน', 'error');
+    $('usage-form').dataset.open = '1';
+    $('usage-form').dataset.mode = 'edit';
+    drawForm();
+  };
+  $('usage-del').onclick = () => { removeRow().catch((err) => toast(err.message, 'error')); };
+  $('usage-prev').onclick = () => { offset = Math.max(0, offset - 50); loadRows().catch((err) => toast(err.message, 'error')); };
+  $('usage-next').onclick = () => { offset += 50; loadRows().catch((err) => toast(err.message, 'error')); };
   await loadRows();
-}
-
-async function searchEmployees() {
-  const data = await api(`/api/employees?q=${encodeURIComponent($('emp-q').value.trim())}`);
-  let picked = null;
-  $('emp-results').innerHTML = data.employees.length ? `
-    <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th><th>ศูนย์ต้นทุน</th></tr></thead><tbody>
-    ${data.employees.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.employee_id)}</td><td>${esc(row.name)}</td><td>${esc(row.department || '')}</td><td>${esc(centerText(row))}</td></tr>`).join('')}
-  </tbody></table></div>` : '<p class="empty">ไม่พบพนักงาน</p>';
-  if (!data.employees.length) return;
-  bindRowSelect($('emp-results'), (index) => {
-    picked = data.employees[Number(index)];
-    $('user-id').value = picked.employee_id;
-    $('user-centers').textContent = `${picked.department || '-'}: ${centerText(picked) || 'ไม่มีศูนย์ต้นทุน'}`;
-    $('user-save').textContent = 'เพิ่ม';
-    delete $('user-save').dataset.mode;
-  });
-}
-
-async function createUser() {
-  if (!$('user-id').value.trim()) return toast('เลือกพนักงานจากรายชื่อก่อน', 'error');
-  try {
-    await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value } });
-    toast('เพิ่มรายชื่อ Usage แล้ว');
-    openView('setting');
-  } catch (err) { toast(err.message, 'error'); }
-}
-
-async function editUser() {
-  const employeeId = $('user-id').value.trim();
-  try {
-    await api(`/api/users/${encodeURIComponent(employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value } });
-    toast('แก้ไขแล้ว');
-    openView('setting');
-  } catch (err) { toast(err.message, 'error'); }
-}
-
-async function deleteUser(employeeId) {
-  if (!confirm(`นำ ${employeeId} ออกจาก Usage?`)) return;
-  try {
-    const result = await api(`/api/users/${encodeURIComponent(employeeId)}`, { method: 'DELETE' });
-    toast(result.inactive ? 'มีประวัติแล้ว จึงปิดเป็น Inactive' : 'นำออกจาก Usage แล้ว');
-    openView('setting');
-  } catch (err) { toast(err.message, 'error'); }
 }
 
 $('login-form').onsubmit = async (event) => {
