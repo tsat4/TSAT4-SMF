@@ -15,7 +15,7 @@
       <div class="login-head">
         <div class="login-mark material-symbols-rounded">inventory_2</div>
         <h1>TSAT4 SMF</h1>
-        <p>ระบบเบิก Usage</p>
+        <p>ระบบงานและกิจกรรม</p>
       </div>
       <div class="field"><label class="required">รหัสพนักงาน</label><input name="employeeId" autocomplete="username" required></div>
       <div class="field"><label class="required">รหัสผ่าน</label>
@@ -90,29 +90,49 @@
       </div>
     </header>
     <aside class="sidebar" id="sidebar">
+      <button class="nav-btn" data-view="main" title="TSAT4 SMF"><span class="material-symbols-rounded">home</span><span>หน้าหลัก</span></button>
       <div class="nav-acc" data-nav-acc="work">
-        <button class="nav-btn nav-parent" type="button" data-nav-toggle="work" title="งาน" aria-expanded="true">
-          <span class="material-symbols-rounded">inventory_2</span>
-          <span>งาน</span>
-          <span class="material-symbols-rounded nav-caret">expand_more</span>
-        </button>
+        <div class="nav-split">
+          <button class="nav-btn nav-parent" type="button" data-view="work" title="Work System">
+            <span class="material-symbols-rounded">work</span><span>ระบบงาน</span>
+          </button>
+          <button class="nav-caret-btn" type="button" data-nav-toggle="work" aria-expanded="true" aria-label="ย่อระบบงาน" title="ย่อ/ขยาย">
+            <span class="material-symbols-rounded nav-caret">expand_more</span>
+          </button>
+        </div>
         <div class="nav-sub" data-nav-panel="work">
-          <button class="nav-btn" data-view="home" title="ภาพรวม"><span class="material-symbols-rounded">monitoring</span><span>ภาพรวม</span></button>
-          <button class="nav-btn" data-view="requisition" title="เบิก"><span class="material-symbols-rounded">shopping_cart</span><span>เบิก</span></button>
-          <button class="nav-btn" data-view="queue" data-staff="1" title="คิวจัดของ"><span class="material-symbols-rounded">inventory</span><span>คิวจัดของ</span></button>
-          <button class="nav-btn" data-view="stock" data-staff="1" title="Min / Current / Max"><span class="material-symbols-rounded">tune</span><span>Min / Current / Max</span></button>
+          <div class="nav-acc" data-nav-acc="store">
+            <div class="nav-split">
+              <button class="nav-btn nav-parent" type="button" data-view="store" title="Store">
+                <span class="material-symbols-rounded">warehouse</span><span>Store</span>
+              </button>
+              <button class="nav-caret-btn" type="button" data-nav-toggle="store" aria-expanded="true" aria-label="ย่อ Store" title="ย่อ/ขยาย">
+                <span class="material-symbols-rounded nav-caret">expand_more</span>
+              </button>
+            </div>
+            <div class="nav-sub" data-nav-panel="store">
+              <div class="nav-acc" data-nav-acc="usage">
+                <div class="nav-split">
+                  <button class="nav-btn nav-parent" type="button" data-view="home" title="Usage">
+                    <span class="material-symbols-rounded">inventory_2</span><span>Usage</span>
+                  </button>
+                  <button class="nav-caret-btn" type="button" data-nav-toggle="usage" aria-expanded="true" aria-label="ย่อ Usage" title="ย่อ/ขยาย">
+                    <span class="material-symbols-rounded nav-caret">expand_more</span>
+                  </button>
+                </div>
+                <div class="nav-sub" data-nav-panel="usage">
+                  <button class="nav-btn" data-view="home" title="ภาพรวม"><span class="material-symbols-rounded">monitoring</span><span>ภาพรวม</span></button>
+                  <button class="nav-btn" data-view="requisition" title="เบิก"><span class="material-symbols-rounded">shopping_cart</span><span>เบิก</span></button>
+                  <button class="nav-btn" data-view="queue" data-staff="1" title="คิวจัดของ"><span class="material-symbols-rounded">inventory</span><span>คิวจัดของ</span></button>
+                  <button class="nav-btn" data-view="stock" data-staff="1" title="Min / Current / Max"><span class="material-symbols-rounded">tune</span><span>Min / Current / Max</span></button>
+                  <button class="nav-btn" data-view="users" data-supervisor="1" title="ผู้ใช้"><span class="material-symbols-rounded">group</span><span>ผู้ใช้</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="nav-acc" data-supervisor="1" data-nav-acc="admin">
-        <button class="nav-btn nav-parent" type="button" data-nav-toggle="admin" title="ระบบ" aria-expanded="true">
-          <span class="material-symbols-rounded">admin_panel_settings</span>
-          <span>ระบบ</span>
-          <span class="material-symbols-rounded nav-caret">expand_more</span>
-        </button>
-        <div class="nav-sub" data-nav-panel="admin">
-          <button class="nav-btn" data-view="users" title="ผู้ใช้"><span class="material-symbols-rounded">group</span><span>ผู้ใช้</span></button>
-        </div>
-      </div>
+      <button class="nav-btn" data-view="activity" title="Activity"><span class="material-symbols-rounded">event</span><span>ระบบกิจกรรม</span></button>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <main class="main">

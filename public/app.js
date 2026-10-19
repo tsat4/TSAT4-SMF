@@ -8,16 +8,21 @@ const STATUS = {
   cancelled: 'ยกเลิก'
 };
 const ROLE = { employee: 'ผู้เบิก', supervisor: 'ผู้ดูแล', officer: 'เจ้าหน้าที่' };
+const USAGE = 'ระบบงาน > Store > Usage';
 const TITLES = {
-  home: ['ภาพรวม', 'ระบบเบิก Usage'],
-  requisition: ['เบิก', 'เลือกรายการ ใส่ตะกร้า แล้วเลือกศูนย์ต้นทุนที่จ่าย'],
-  queue: ['คิวจัดของ', 'รับออร์เดอร์ จัดเตรียม และบอกเวลาที่พร้อมรับ'],
-  stock: ['Min / Current / Max', 'ยอดของศูนย์ต้นทุนที่มีการสั่งซื้อ'],
-  users: ['ผู้ใช้', 'เพิ่ม แก้ไข และลบบัญชีจากรายชื่อพนักงาน']
+  main: ['TSAT4 SMF', 'หน้าหลัก'],
+  work: ['ระบบงาน', 'Work System'],
+  store: ['Store', 'ระบบงาน > Store'],
+  activity: ['ระบบกิจกรรม', 'Activity'],
+  home: ['ภาพรวม', USAGE],
+  requisition: ['เบิก', USAGE],
+  queue: ['คิวจัดของ', USAGE],
+  stock: ['Min / Current / Max', USAGE],
+  users: ['ผู้ใช้', USAGE]
 };
 
 let me = null;
-let view = 'home';
+let view = 'main';
 
 const $ = (id) => document.getElementById(id);
 
@@ -89,12 +94,89 @@ function openView(name) {
   const [title, subtitle] = TITLES[name];
   $('header-page-title').textContent = title;
   $('header-page-subtitle').textContent = subtitle;
-  document.querySelectorAll('.nav-btn').forEach((node) => node.classList.toggle('active', node.dataset.view === name));
+  document.querySelectorAll('.nav-btn').forEach((node) => node.classList.toggle('active', node.dataset.view === name && !node.classList.contains('nav-parent')));
+  document.querySelectorAll('.nav-acc').forEach((acc) => {
+    if (!acc.querySelector(`.nav-btn[data-view="${name}"]`)) return;
+    acc.classList.remove('is-collapsed');
+    acc.querySelector('[data-nav-toggle]')?.setAttribute('aria-expanded', 'true');
+  });
   document.body.classList.remove('sidebar-open');
   const target = $('app-view');
   target.innerHTML = '<div class="empty">กำลังโหลด...</div>';
-  const render = { home: renderHome, requisition: renderRequisition, queue: renderQueue, stock: renderStock, users: renderUsers }[name];
+  const render = {
+    main: renderMain,
+    work: renderWork,
+    store: renderStore,
+    activity: renderActivity,
+    home: renderHome,
+    requisition: renderRequisition,
+    queue: renderQueue,
+    stock: renderStock,
+    users: renderUsers
+  }[name];
   render(target).catch((err) => { target.innerHTML = `<p class="form-error">${esc(err.message)}</p>`; });
+}
+
+function moduleCard(viewName, icon, title, text) {
+  return `<button class="card module-card" type="button" data-go="${viewName}"><span class="material-symbols-rounded">${icon}</span><div class="card-title">${title}</div><div class="sum-meta">${text}</div></button>`;
+}
+
+function bindGo(target) {
+  target.querySelectorAll('[data-go]').forEach((node) => { node.onclick = () => openView(node.dataset.go); });
+}
+
+async function renderMain(target) {
+  target.innerHTML = `
+    <div class="view-body">
+      <section class="card">
+        <div class="card-title">TSAT4 SMF</div>
+        <p class="sum-meta">เลือกส่วนที่ต้องการเข้า ตอนนี้มี 2 ส่วน และเพิ่มส่วนใหม่ได้ภายหลัง</p>
+        <div class="module-grid">
+          ${moduleCard('work', 'work', 'ระบบงาน', 'Work System')}
+          ${moduleCard('activity', 'event', 'ระบบกิจกรรม', 'Activity')}
+        </div>
+      </section>
+    </div>`;
+  bindGo(target);
+}
+
+async function renderWork(target) {
+  target.innerHTML = `
+    <div class="view-body">
+      <section class="card">
+        <div class="card-title">ระบบงาน</div>
+        <p class="sum-meta">Work System</p>
+        <div class="module-grid">
+          ${moduleCard('store', 'warehouse', 'Store', 'คลังและรายการใช้งาน')}
+        </div>
+      </section>
+    </div>`;
+  bindGo(target);
+}
+
+async function renderStore(target) {
+  target.innerHTML = `
+    <div class="view-body">
+      <section class="card">
+        <div class="card-title">Store</div>
+        <p class="sum-meta">ระบบงาน > Store</p>
+        <div class="module-grid">
+          ${moduleCard('home', 'inventory_2', 'Usage', 'เบิกของ ยอด Min / Current / Max และผู้ใช้')}
+        </div>
+      </section>
+    </div>`;
+  bindGo(target);
+}
+
+async function renderActivity(target) {
+  target.innerHTML = `
+    <div class="view-body">
+      <section class="card">
+        <div class="card-title">ระบบกิจกรรม</div>
+        <p class="sum-meta">Activity</p>
+        <p class="empty">ยังไม่มีกิจกรรมในส่วนนี้</p>
+      </section>
+    </div>`;
 }
 
 async function renderHome(target) {
@@ -112,7 +194,7 @@ async function renderHome(target) {
         <button class="btn btn-primary" type="button" data-go="requisition">ไปที่ใบเบิก</button>
       </section>
     </div>`;
-  target.querySelector('[data-go]').onclick = () => openView('requisition');
+  bindGo(target);
 }
 
 async function renderRequisition(target) {
