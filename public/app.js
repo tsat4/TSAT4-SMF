@@ -20,7 +20,8 @@ const TITLES = {
   requisition: ['เบิก', USAGE],
   queue: ['คิวจัดของ', USAGE],
   stock: ['Min / Current / Max', USAGE],
-  setting: ['Setting', USAGE]
+  setting: ['Setting', USAGE],
+  system: ['Setting', 'ตารางทั้งระบบ']
 };
 
 let me = null;
@@ -92,12 +93,14 @@ function showShell() {
   const access = me.creator ? 'ผู้สร้างระบบ' : (USAGE_ROLE[me.usageRole] || 'ยังไม่เข้า Usage');
   $('header-role').textContent = `${access} · ${me.employeeId}`;
   document.querySelectorAll('[data-usage]').forEach((node) => node.classList.toggle('d-none', Number(node.dataset.usage) > rankOf()));
+  document.querySelectorAll('[data-system]').forEach((node) => node.classList.toggle('d-none', !me.creator));
   openView(view);
 }
 
 function openView(name) {
   const need = { home: 1, edit: 2, requisition: 2, queue: 2, stock: 2, setting: 3 }[name] || 0;
   if (need && rankOf() < need) name = 'locked';
+  if (name === 'system' && !me.creator) name = 'main';
   view = name;
   const [title, subtitle] = TITLES[name];
   $('header-page-title').textContent = title;
@@ -122,7 +125,8 @@ function openView(name) {
     requisition: renderRequisition,
     queue: renderQueue,
     stock: renderStock,
-    setting: renderUsers
+    setting: renderUsers,
+    system: renderSystem
   }[name];
   render(target).catch((err) => { target.innerHTML = `<p class="form-error">${esc(err.message)}</p>`; });
 }
@@ -187,6 +191,95 @@ async function renderActivity(target) {
         <p class="empty">ยังไม่มีกิจกรรมในส่วนนี้</p>
       </section>
     </div>`;
+}
+
+async function renderSystem(target) {
+  const catalog = await api('/api/system/tables');
+  let offset = 0;
+  let editing = null;
+  let rows = [];
+  target.innerHTML = `
+    <div class="toolbar">
+      <label class="field grow">ตาราง<select id="sys-table">${catalog.tables.map((table) => `<option value="${esc(table.name)}">${esc(table.name)}</option>`).join('')}</select></label>
+      <label class="field grow">ค้นหา<input id="sys-q"></label>
+      <button class="btn btn-secondary" type="button" id="sys-search">ค้นหา</button>
+      <button class="btn btn-primary" type="button" id="sys-add">เพิ่มแถว</button>
+    </div>
+    <div id="sys-form"></div>
+    <div class="sum-meta" id="sys-count"></div>
+    <div class="table-wrap" id="sys-rows"></div>
+    <div class="actions"><button class="btn btn-secondary" type="button" id="sys-prev">ก่อนหน้า</button><button class="btn btn-secondary" type="button" id="sys-next">ถัดไป</button></div>`;
+  const tableOf = () => catalog.tables.find((table) => table.name === $('sys-table').value);
+  const choices = { status: ['Active', 'Inactive'], group: ['Factory', 'Non', 'Center'], usage: ['viewer', 'user', 'admin'], req: ['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'] };
+  const drawForm = () => {
+    const table = tableOf();
+    const box = $('sys-form');
+    if (!box.dataset.open) { box.innerHTML = ''; return; }
+    box.innerHTML = `<section class="card"><div class="card-title">${editing ? 'แก้ไขแถว' : 'เพิ่มแถว'} ${esc(table.name)}</div><div class="toolbar">${table.columns.map((column) => {
+      if (column.type === 'read') return '';
+      const value = editing ? editing[column.name] : '';
+      if (column.type === 'password') return `<label class="field">${column.name}<input id="sys-${column.name}" type="password" autocomplete="new-password"></label>`;
+      if (column.type === 'bool') return `<label class="field">${column.name}<select id="sys-${column.name}"><option value="false">false</option><option value="true" ${value ? 'selected' : ''}>true</option></select></label>`;
+      if (choices[column.type]) return `<label class="field">${column.name}<select id="sys-${column.name}">${choices[column.type].map((option) => `<option ${String(value) === option ? 'selected' : ''}>${esc(option)}</option>`).join('')}</select></label>`;
+      const number = ['int', 'qty', 'money'].includes(column.type);
+      return `<label class="field">${esc(column.name)}<input id="sys-${column.name}" ${number ? `type="number" step="${column.type === 'int' ? '1' : '0.001'}"` : ''} value="${esc(value ?? '')}" ${editing && column.pk ? 'disabled' : ''}></label>`;
+    }).join('')}</div><div class="actions"><button class="btn btn-primary" type="button" id="sys-save">บันทึก</button><button class="btn btn-secondary" type="button" id="sys-cancel">ยกเลิก</button></div></section>`;
+    $('sys-cancel').onclick = () => { editing = null; delete box.dataset.open; drawForm(); };
+    $('sys-save').onclick = saveRow;
+  };
+  const loadRows = async () => {
+    const table = tableOf();
+    const data = await api(`/api/system/tables/${encodeURIComponent(table.name)}?q=${encodeURIComponent($('sys-q').value.trim())}&offset=${offset}`);
+    rows = data.rows;
+    $('sys-count').textContent = `แสดง ${rows.length} จาก ${data.total} แถว`;
+    const visible = table.columns.filter((column) => column.type !== 'password');
+    $('sys-rows').innerHTML = rows.length ? `<table class="mo-data-table"><thead><tr>${visible.map((column) => `<th>${esc(column.name)}</th>`).join('')}<th></th></tr></thead><tbody>${rows.map((row, index) => `<tr>${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}<td class="actions"><button class="btn btn-secondary" data-sys-edit="${index}">แก้ไข</button><button class="btn btn-danger" data-sys-del="${index}">ลบ</button></td></tr>`).join('')}</tbody></table>` : '<p class="empty">ไม่มีแถว</p>';
+    $('sys-rows').querySelectorAll('[data-sys-edit]').forEach((node) => { node.onclick = () => { editing = rows[Number(node.dataset.sysEdit)]; $('sys-form').dataset.open = '1'; drawForm(); }; });
+    $('sys-rows').querySelectorAll('[data-sys-del]').forEach((node) => { node.onclick = () => removeRow(rows[Number(node.dataset.sysDel)]); });
+  };
+  const saveRow = async () => {
+    const table = tableOf();
+    const values = {};
+    for (const column of table.columns) {
+      if (column.type === 'read') continue;
+      const input = $(`sys-${column.name}`);
+      if (!input || input.disabled) continue;
+      if (column.type === 'password') { if (input.value) values.password = input.value; continue; }
+      if (column.type === 'bool') { values[column.name] = input.value === 'true'; continue; }
+      values[column.name] = input.value;
+    }
+    try {
+      if (editing) {
+        const key = {};
+        table.pk.forEach((column) => { key[column] = editing[column]; });
+        await api(`/api/system/tables/${encodeURIComponent(table.name)}`, { method: 'PATCH', body: { key, values } });
+      } else {
+        await api(`/api/system/tables/${encodeURIComponent(table.name)}`, { method: 'POST', body: values });
+      }
+      toast('บันทึกแล้ว');
+      editing = null;
+      delete $('sys-form').dataset.open;
+      drawForm();
+      await loadRows();
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  const removeRow = async (row) => {
+    const table = tableOf();
+    const key = {};
+    table.pk.forEach((column) => { key[column] = row[column]; });
+    if (!confirm(`ลบแถวใน ${table.name}?`)) return;
+    try {
+      await api(`/api/system/tables/${encodeURIComponent(table.name)}`, { method: 'DELETE', body: { key } });
+      toast('ลบแล้ว');
+      await loadRows();
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  $('sys-table').onchange = () => { offset = 0; editing = null; delete $('sys-form').dataset.open; drawForm(); loadRows().catch((err) => toast(err.message, 'error')); };
+  $('sys-search').onclick = () => { offset = 0; loadRows().catch((err) => toast(err.message, 'error')); };
+  $('sys-add').onclick = () => { editing = null; $('sys-form').dataset.open = '1'; drawForm(); };
+  $('sys-prev').onclick = () => { offset = Math.max(0, offset - 50); loadRows().catch((err) => toast(err.message, 'error')); };
+  $('sys-next').onclick = () => { offset += 50; loadRows().catch((err) => toast(err.message, 'error')); };
+  await loadRows();
 }
 
 async function renderLocked(target) {

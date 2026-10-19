@@ -631,6 +631,178 @@ async function receive(header) {
   }
 }
 
+const ADMIN_TABLES = {
+  mt_main_employee: { db: 'mx', pk: ['employee_id'], columns: [
+    ['employee_id', 'text', true], ['prefix', 'text'], ['first_name', 'text', true], ['last_name', 'text', true],
+    ['position', 'text'], ['level', 'text'], ['department', 'text'], ['status', 'status', true]
+  ] },
+  mt_main_costcenter: { db: 'mx', pk: ['costcenter'], columns: [
+    ['costcenter', 'text', true], ['object_name', 'text', true], ['group_name', 'group', true], ['department', 'text', true], ['status', 'status', true]
+  ] },
+  mt_sto_usage: { db: 'mx', pk: ['material'], columns: [
+    ['no', 'int'], ['material', 'text', true], ['material_description', 'text', true], ['bun', 'text', true],
+    ['price', 'money', true], ['crcy', 'text', true], ['status', 'status', true]
+  ] },
+  mt_main_user: { db: 'mx', pk: ['employee_id'], columns: [
+    ['employee_id', 'text', true], ['password', 'password'], ['creator', 'bool'], ['status', 'status', true], ['password_expires_at', 'read']
+  ] },
+  mt_sto_user: { db: 'mx', pk: ['employee_id'], columns: [
+    ['employee_id', 'text', true], ['role', 'usage', true], ['status', 'status', true]
+  ] },
+  mt_sto_buyer: { db: 'mx', pk: ['costcenter'], columns: [
+    ['costcenter', 'text', true], ['status', 'status', true]
+  ] },
+  mt_sto_stock: { db: 'mx', pk: ['costcenter', 'material'], columns: [
+    ['costcenter', 'text', true], ['material', 'text', true], ['min_qty', 'qty', true], ['current_qty', 'qty', true], ['max_qty', 'qty', true]
+  ] },
+  tx_sto_requisition: { db: 'tx', pk: ['id'], columns: [
+    ['id', 'read'], ['requested_by', 'text', true], ['costcenter', 'text', true],
+    ['status', 'req', true], ['note', 'text'], ['accepted_by', 'text'], ['received_by', 'text']
+  ] },
+  tx_sto_requisition_line: { db: 'tx', pk: ['id'], columns: [
+    ['id', 'read'], ['requisition_id', 'int', true], ['costcenter', 'text', true], ['material', 'text', true], ['qty', 'qty', true]
+  ] },
+  tx_sto_issue: { db: 'tx', pk: ['id'], columns: [
+    ['id', 'read'], ['requisition_id', 'int', true], ['requisition_line_id', 'int', true],
+    ['costcenter', 'text', true], ['material', 'text', true], ['qty', 'qty', true], ['issued_at', 'read']
+  ] }
+};
+
+function adminSpec(name) {
+  const spec = ADMIN_TABLES[name];
+  if (!spec) return null;
+  return {
+    ...spec,
+    columns: spec.columns.map(([name, type, required]) => ({ name, type, required: Boolean(required), pk: spec.pk.includes(name) }))
+  };
+}
+
+function creatorOnly(req, res, next) {
+  if (!req.user?.creator) return fail(res, 403, 'เฉพาะผู้ดูแลระบบ');
+  next();
+}
+
+function adminValue(column, raw, { insert }) {
+  if (column.type === 'read') return undefined;
+  if (column.type === 'password') {
+    const password = String(raw ?? '');
+    if (!password) return insert && column.required ? null : undefined;
+    if (password.length < 8) return null;
+    return password;
+  }
+  if (raw == null || raw === '') return column.required ? null : undefined;
+  if (column.type === 'bool') return raw === true || raw === 'true';
+  if (column.type === 'int') {
+    const n = Number(raw);
+    return Number.isInteger(n) ? n : null;
+  }
+  if (column.type === 'qty' || column.type === 'money') {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    return Math.round(n * 1000) / 1000;
+  }
+  if (column.type === 'status' && !['Active', 'Inactive'].includes(raw)) return null;
+  if (column.type === 'group' && !['Factory', 'Non', 'Center'].includes(raw)) return null;
+  if (column.type === 'usage' && !['viewer', 'user', 'admin'].includes(raw)) return null;
+  if (column.type === 'req' && !['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'].includes(raw)) return null;
+  return String(raw).trim();
+}
+
+async function adminPayload(spec, body, { insert }) {
+  const out = {};
+  for (const column of spec.columns) {
+    if (column.type === 'read') continue;
+    if (column.type === 'password') {
+      const password = adminValue(column, body.password, { insert });
+      if (password === null) return { error: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว' };
+      if (password) out.password_hash = await bcrypt.hash(password, 10);
+      if (password && !insert) out.password_changed_at = new Date().toISOString();
+      continue;
+    }
+    const value = adminValue(column, body[column.name], { insert });
+    if (value === null) return { error: `ข้อมูล ${column.name} ไม่ถูกต้อง` };
+    if (value !== undefined) out[column.name] = value;
+  }
+  return { out };
+}
+
+app.get('/api/system/tables', wrap(requireUser), creatorOnly, (_req, res) => {
+  res.json({
+    tables: Object.entries(ADMIN_TABLES).map(([name, spec]) => ({
+      name,
+      pk: spec.pk,
+      columns: spec.columns.map(([column, type, required]) => ({ name: column, type, required: Boolean(required), pk: spec.pk.includes(column) }))
+    }))
+  });
+});
+
+app.get('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
+  const spec = adminSpec(req.params.name);
+  const client = spec && (spec.db === 'tx' ? tx : mx);
+  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const term = cleanTerm(req.query.q);
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  const readable = spec.columns.filter((column) => column.type !== 'password').map((column) => column.name);
+  let query = client.from(req.params.name).select(readable.join(','), { count: 'exact' }).range(offset, offset + 49);
+  const order = spec.pk[0];
+  query = query.order(order, { ascending: true });
+  if (term) {
+    const filters = spec.columns.filter((column) => ['text', 'status', 'group', 'usage', 'req'].includes(column.type)).map((column) => `${column.name}.ilike.%${term}%`);
+    if (filters.length) query = query.or(filters.join(','));
+  }
+  const { data, error, count } = await query;
+  if (error) return fail(res, 400, 'อ่านตารางไม่ได้');
+  res.json({ rows: data || [], total: count || 0 });
+}));
+
+app.post('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
+  const spec = adminSpec(req.params.name);
+  const client = spec && (spec.db === 'tx' ? tx : mx);
+  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const { out, error: invalid } = await adminPayload(spec, req.body || {}, { insert: true });
+  if (invalid) return fail(res, 400, invalid);
+  if (req.params.name === 'mt_main_user' && out.creator && out.employee_id !== CREATOR_ID) return fail(res, 400, 'กำหนดผู้สร้างระบบเพิ่มไม่ได้');
+  if (req.params.name === 'mt_sto_user' && out.employee_id === CREATOR_ID && out.role && out.role !== 'admin') return fail(res, 400, 'ผู้สร้างระบบเป็น Admin เสมอ');
+  if (req.params.name === 'mt_main_user' && !out.password_hash) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
+  if (req.params.name === 'mt_main_user') out.role = 'employee';
+  const { error } = await client.from(req.params.name).insert(out);
+  if (error) return fail(res, 400, 'เพิ่มแถวไม่ได้');
+  res.status(201).json({ ok: true });
+}));
+
+app.patch('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
+  const spec = adminSpec(req.params.name);
+  const client = spec && (spec.db === 'tx' ? tx : mx);
+  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const key = req.body?.key || {};
+  if (!spec.pk.every((column) => key[column] != null && String(key[column]) !== '')) return fail(res, 400, 'ไม่พบแถวที่แก้');
+  const { out, error: invalid } = await adminPayload(spec, req.body?.values || {}, { insert: false });
+  if (invalid) return fail(res, 400, invalid);
+  for (const column of spec.pk) delete out[column];
+  if (req.params.name === 'mt_main_user' && String(key.employee_id) === CREATOR_ID && out.creator === false) return fail(res, 400, 'ปิดผู้สร้างระบบไม่ได้');
+  if (req.params.name === 'mt_sto_user' && String(key.employee_id) === CREATOR_ID && (out.role && out.role !== 'admin' || out.status === 'Inactive')) return fail(res, 400, 'ผู้สร้างระบบเป็น Admin เสมอ');
+  if (!Object.keys(out).length) return fail(res, 400, 'ไม่มีข้อมูลให้แก้ไข');
+  let query = client.from(req.params.name).update(out);
+  for (const column of spec.pk) query = query.eq(column, key[column]);
+  const { data, error } = await query.select(spec.pk.join(','));
+  if (error || !data?.length) return fail(res, 400, 'แก้ไขแถวไม่ได้');
+  res.json({ ok: true });
+}));
+
+app.delete('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
+  const spec = adminSpec(req.params.name);
+  const client = spec && (spec.db === 'tx' ? tx : mx);
+  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const key = req.body?.key || {};
+  if (!spec.pk.every((column) => key[column] != null && String(key[column]) !== '')) return fail(res, 400, 'ไม่พบแถวที่ลบ');
+  if ((req.params.name === 'mt_main_user' || req.params.name === 'mt_sto_user') && String(key.employee_id) === CREATOR_ID) return fail(res, 400, 'ลบผู้สร้างระบบไม่ได้');
+  let query = client.from(req.params.name).delete();
+  for (const column of spec.pk) query = query.eq(column, key[column]);
+  const { error } = await query;
+  if (error) return fail(res, 400, 'ลบแถวไม่ได้');
+  res.json({ ok: true });
+}));
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) return fail(res, 404, 'ไม่พบ');
