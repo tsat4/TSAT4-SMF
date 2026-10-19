@@ -369,8 +369,8 @@ async function renderHome(target) {
 }
 
 async function renderRequisition(target) {
-  const [buyers, mine] = await Promise.all([
-    api('/api/buyers'),
+  const [pay, mine] = await Promise.all([
+    api('/api/pay-centers'),
     api('/api/requisitions?scope=mine')
   ]);
   const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
@@ -381,9 +381,9 @@ async function renderRequisition(target) {
       <div class="card-title">${cart ? `ตะกร้า #${cart.id}` : 'เปิดตะกร้า'}</div>
       <div class="toolbar">
         <label class="field">ศูนย์ต้นทุนที่จ่าย
-          <select id="buyer">${buyers.buyers.map((row) => `<option value="${esc(row.costcenter)}" ${cart && cart.costcenter === row.costcenter ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>
+          <select id="buyer">${pay.costcenters.map((row) => `<option value="${esc(row.costcenter)}" ${cart && cart.costcenter === row.costcenter ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>
         </label>
-        ${cart ? '' : '<button class="btn btn-primary" type="button" id="new-cart">เปิดตะกร้า</button>'}
+        ${cart || !pay.costcenters.length ? '' : '<button class="btn btn-primary" type="button" id="new-cart">เปิดตะกร้า</button>'}
       </div>
       ${cart ? `
         <div class="toolbar">
@@ -392,12 +392,13 @@ async function renderRequisition(target) {
           <button class="btn btn-primary" type="button" id="search-item">ค้นหา</button>
         </div>
         <div id="item-results"></div>
-        <div id="cart-lines"></div>` : '<p class="empty">ยังไม่มีตะกร้า</p>'}
+        <div id="cart-lines"></div>` : `<p class="empty">${pay.costcenters.length ? 'ยังไม่มีตะกร้า' : 'หน่วยงานนี้ยังไม่มีศูนย์ต้นทุนสำหรับเบิกจ่าย'}</p>`}
     </section>
     <section class="card"><div class="card-title-row"><div class="card-title">ใบเบิกของฉัน</div><div class="action-bar" id="mine-bar"></div></div><div class="table-wrap" id="mine-table">${orderTable(mine.requisitions.filter((row) => row.status !== 'cart'), true)}</div></section>
     </div>`;
   mountOrderBar($('mine-table'), $('mine-bar'));
   if (!cart) {
+    if (!$('new-cart')) return;
     $('new-cart').onclick = async () => {
       try {
         await api('/api/requisitions', { method: 'POST', body: { costcenter: $('buyer').value } });
@@ -523,7 +524,7 @@ async function renderQueue(target) {
 }
 
 async function renderStock(target) {
-  const buyers = await api('/api/buyers');
+  const [buyers, pay] = await Promise.all([api('/api/buyers'), api('/api/pay-centers')]);
   target.innerHTML = `
     <div class="view-body">
     <section class="card">
@@ -540,7 +541,7 @@ async function renderStock(target) {
     <section class="card">
       <div class="card-title">ยอดรายการ</div>
       <div class="toolbar">
-        <label class="field">ศูนย์ต้นทุน<select id="stock-cc">${buyers.buyers.filter((row) => row.status === 'Active').map((row) => `<option value="${esc(row.costcenter)}">${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select></label>
+        <label class="field">ศูนย์ต้นทุน<select id="stock-cc">${pay.costcenters.map((row) => `<option value="${esc(row.costcenter)}">${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select></label>
         <label class="field">ค้นหารายการ<input id="stock-q"></label>
         <button class="btn btn-secondary" type="button" id="stock-load">แสดง</button>
       </div>
@@ -632,33 +633,59 @@ async function saveStock() {
   } catch (err) { toast(err.message, 'error'); }
 }
 
+function centerText(row) {
+  return (row.costcenters || []).map((center) => center.costcenter).join(', ');
+}
+
 async function renderUsers(target) {
+  target.innerHTML = `
+    <div class="toolbar">
+      <button class="btn btn-secondary" type="button" data-panel="members">mt_sto_user</button>
+      <button class="btn btn-secondary" type="button" data-panel="materials">mt_sto_usage</button>
+    </div>
+    <div id="setting-panel"></div>`;
+  const openPanel = async (panel) => {
+    target.querySelectorAll('[data-panel]').forEach((node) => {
+      node.classList.toggle('btn-primary', node.dataset.panel === panel);
+      node.classList.toggle('btn-secondary', node.dataset.panel !== panel);
+    });
+    const box = $('setting-panel');
+    box.innerHTML = '<div class="empty">กำลังโหลด...</div>';
+    await { members: renderMembers, materials: renderMaterials }[panel](box);
+  };
+  target.querySelectorAll('[data-panel]').forEach((node) => { node.onclick = () => openPanel(node.dataset.panel); });
+  await openPanel('members');
+}
+
+async function renderMembers(target) {
   const data = await api('/api/users');
   target.innerHTML = `
-    <div class="view-body">
-    <section class="card">
-      <div class="card-title">รายชื่อ Usage</div>
-      <p class="sum-meta">Viewer เห็น Dashboard · User เห็น Dashboard กับ Edit Data · Admin เห็นครบรวม Setting ถ้ายังไม่มีบัญชีเข้าสู่ระบบ ให้ตั้งรหัสผ่านอย่างน้อย 8 ตัว</p>
-      <div class="toolbar">
-        <label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อ"></label>
-        <button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button>
-      </div>
-      <div id="emp-results"></div>
-      <div class="toolbar">
-        <label class="field">รหัสพนักงาน<input id="user-id" required></label>
-        <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8"></label>
-        <label class="field">บทบาท<select id="user-role"><option value="viewer">Viewer</option><option value="user">User</option><option value="admin">Admin</option></select></label>
-      </div>
-    </section>
-    <section class="card"><div class="card-title-row"><div class="card-title">บัญชีผู้ใช้</div><div class="action-bar"><button class="btn btn-primary" type="button" id="user-save">เพิ่ม</button><button class="btn btn-secondary" type="button" id="user-edit" disabled>แก้ไข</button><button class="btn btn-danger" type="button" id="user-del" disabled>นำออก</button></div></div><div class="table-wrap" id="user-table"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th><th>หมดอายุรหัส</th></tr></thead><tbody>
+    <p class="sum-meta">รายชื่อมาจากพนักงานใน mt_main_employee ศูนย์ต้นทุนที่เบิกจ่ายได้คือศูนย์ต้นทุนที่หน่วยงานตรงกัน</p>
+    <div class="toolbar">
+      <label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อ"></label>
+      <button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button>
+    </div>
+    <div id="emp-results"></div>
+    <div class="toolbar">
+      <label class="field">รหัสพนักงาน<input id="user-id" readonly placeholder="เลือกจากรายชื่อพนักงาน"></label>
+      <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8" autocomplete="new-password"></label>
+      <label class="field">บทบาท<select id="user-role"><option value="viewer">Viewer</option><option value="user">User</option><option value="admin">Admin</option></select></label>
+      <label class="field">สถานะ<select id="user-status"><option>Active</option><option>Inactive</option></select></label>
+    </div>
+    <p class="sum-meta" id="user-centers"></p>
+    <div class="action-bar">
+      <button class="btn btn-primary" type="button" id="user-save">เพิ่ม</button>
+      <button class="btn btn-secondary" type="button" id="user-edit" disabled>แก้ไข</button>
+      <button class="btn btn-danger" type="button" id="user-del" disabled>ลบ</button>
+    </div>
+    <div class="table-wrap" id="user-table"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th><th>ศูนย์ต้นทุน</th><th>บทบาท</th><th>สถานะ</th></tr></thead><tbody>
       ${data.users.map((row) => `<tr data-pick="${esc(row.employeeId)}" data-creator="${row.creator ? '1' : '0'}">
-        <td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td>
-        <td>${row.passwordExpired ? '<span class="badge badge-danger">ครบ 90 วัน</span>' : esc(new Date(row.passwordExpiresAt).toLocaleDateString('th-TH'))}</td>
-        </tr>`).join('')}
-    </tbody></table></div></section>
-    </div>`;
+        <td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td>
+        <td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td>
+      </tr>`).join('')}
+    </tbody></table></div>`;
   $('emp-search').onclick = searchEmployees;
-  $('user-save').onclick = createUser;
+  $('user-save').onclick = () => { if ($('user-save').dataset.mode === 'edit') editUser(); else createUser(); };
   let picked = null;
   bindRowSelect($('user-table'), (id, row) => {
     picked = data.users.find((user) => user.employeeId === id) || null;
@@ -668,7 +695,13 @@ async function renderUsers(target) {
   });
   $('user-edit').onclick = () => {
     if (!picked) return toast('เลือกแถวก่อน', 'error');
-    editUser(picked.employeeId, picked.role, picked.status);
+    $('user-id').value = picked.employeeId;
+    $('user-role').value = picked.role;
+    $('user-status').value = picked.status;
+    $('user-password').value = '';
+    $('user-centers').textContent = picked.department ? `${picked.department}: ${centerText(picked) || 'ไม่มีศูนย์ต้นทุน'}` : '';
+    $('user-save').textContent = 'บันทึก';
+    $('user-save').dataset.mode = 'edit';
   };
   $('user-del').onclick = () => {
     if (!picked) return toast('เลือกแถวก่อน', 'error');
@@ -676,38 +709,128 @@ async function renderUsers(target) {
   };
 }
 
+async function renderMaterials(target) {
+  let offset = 0;
+  let selected = null;
+  let rows = [];
+  target.innerHTML = `
+    <div class="toolbar">
+      <label class="field grow">ค้นหา<input id="mat-q" placeholder="รหัสหรือชื่อรายการ"></label>
+      <button class="btn btn-secondary" type="button" id="mat-search">ค้นหา</button>
+      <div class="action-bar">
+        <button class="btn btn-primary" type="button" id="mat-add">เพิ่ม</button>
+        <button class="btn btn-secondary" type="button" id="mat-edit" disabled>แก้ไข</button>
+        <button class="btn btn-danger" type="button" id="mat-del" disabled>ลบ</button>
+      </div>
+    </div>
+    <div id="mat-form"></div>
+    <div class="table-wrap" id="mat-rows"></div>
+    <div class="table-foot"><div class="sum-meta" id="mat-count"></div><div class="action-bar"><button class="btn btn-secondary" type="button" id="mat-prev">ก่อนหน้า</button><button class="btn btn-secondary" type="button" id="mat-next">ถัดไป</button></div></div>`;
+  const drawForm = () => {
+    const box = $('mat-form');
+    if (!box.dataset.open) { box.innerHTML = ''; return; }
+    const row = selected && box.dataset.mode === 'edit' ? selected : {};
+    box.innerHTML = `<section class="card"><div class="toolbar">
+      <label class="field">รหัส<input id="mat-code" value="${esc(row.material || '')}" ${row.material ? 'readonly' : ''}></label>
+      <label class="field grow">ชื่อรายการ<input id="mat-name" value="${esc(row.material_description || '')}"></label>
+      <label class="field">หน่วย<input id="mat-bun" value="${esc(row.bun || '')}"></label>
+      <label class="field">ราคา<input id="mat-price" type="number" min="0" step="0.01" value="${row.price ?? ''}"></label>
+      <label class="field">สกุลเงิน<input id="mat-crcy" value="${esc(row.crcy || 'THB')}"></label>
+      <label class="field">สถานะ<select id="mat-status"><option ${row.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
+    </div><div class="form-actions"><button class="btn btn-primary" type="button" id="mat-save">บันทึก</button><button class="btn btn-secondary" type="button" id="mat-cancel">ยกเลิก</button></div></section>`;
+    $('mat-cancel').onclick = () => { delete box.dataset.open; drawForm(); };
+    $('mat-save').onclick = saveMaterial;
+  };
+  const loadRows = async () => {
+    const data = await api(`/api/usage-materials?q=${encodeURIComponent($('mat-q').value.trim())}&offset=${offset}`);
+    rows = data.materials;
+    selected = null;
+    $('mat-edit').disabled = true;
+    $('mat-del').disabled = true;
+    $('mat-count').textContent = `แสดง ${rows.length} จาก ${data.total} แถว`;
+    $('mat-rows').innerHTML = rows.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อรายการ</th><th>หน่วย</th><th>ราคา</th><th>สกุลเงิน</th><th>สถานะ</th></tr></thead><tbody>
+      ${rows.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td><td>${Number(row.price)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join('')}
+    </tbody></table>` : '<p class="empty">ไม่มีรายการ</p>';
+    bindRowSelect($('mat-rows'), (pick) => {
+      selected = rows[Number(pick)];
+      $('mat-edit').disabled = false;
+      $('mat-del').disabled = false;
+    });
+  };
+  const saveMaterial = async () => {
+    const body = {
+      material: $('mat-code').value.trim(),
+      materialDescription: $('mat-name').value.trim(),
+      bun: $('mat-bun').value.trim(),
+      price: Number($('mat-price').value),
+      crcy: $('mat-crcy').value.trim(),
+      status: $('mat-status').value
+    };
+    try {
+      if ($('mat-form').dataset.mode === 'edit' && selected) {
+        await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'PATCH', body });
+      } else {
+        await api('/api/usage-materials', { method: 'POST', body });
+      }
+      toast('บันทึกแล้ว');
+      delete $('mat-form').dataset.open;
+      drawForm();
+      await loadRows();
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  $('mat-search').onclick = () => { offset = 0; loadRows().catch((err) => toast(err.message, 'error')); };
+  $('mat-add').onclick = () => { selected = null; $('mat-form').dataset.open = '1'; $('mat-form').dataset.mode = 'add'; drawForm(); };
+  $('mat-edit').onclick = () => {
+    if (!selected) return toast('เลือกแถวก่อน', 'error');
+    $('mat-form').dataset.open = '1';
+    $('mat-form').dataset.mode = 'edit';
+    drawForm();
+  };
+  $('mat-del').onclick = async () => {
+    if (!selected) return toast('เลือกแถวก่อน', 'error');
+    if (!confirm(`ลบรายการ ${selected.material}?`)) return;
+    try {
+      await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'DELETE' });
+      toast('ลบแล้ว');
+      await loadRows();
+    } catch (err) { toast(err.message, 'error'); }
+  };
+  $('mat-prev').onclick = () => { offset = Math.max(0, offset - 50); loadRows().catch((err) => toast(err.message, 'error')); };
+  $('mat-next').onclick = () => { offset += 50; loadRows().catch((err) => toast(err.message, 'error')); };
+  await loadRows();
+}
+
 async function searchEmployees() {
   const data = await api(`/api/employees?q=${encodeURIComponent($('emp-q').value.trim())}`);
-  let picked = '';
+  let picked = null;
   $('emp-results').innerHTML = data.employees.length ? `
-    <div class="action-bar"><button class="btn btn-primary" type="button" id="emp-pick" disabled>เลือก</button></div>
-    <div class="table-wrap"><table class="mo-data-table"><tbody>
-    ${data.employees.map((row) => `<tr data-pick="${esc(row.employee_id)}"><td>${esc(row.employee_id)}</td><td>${esc(row.name)}</td><td>${esc(row.department || '')}</td></tr>`).join('')}
+    <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th><th>ศูนย์ต้นทุน</th></tr></thead><tbody>
+    ${data.employees.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.employee_id)}</td><td>${esc(row.name)}</td><td>${esc(row.department || '')}</td><td>${esc(centerText(row))}</td></tr>`).join('')}
   </tbody></table></div>` : '<p class="empty">ไม่พบพนักงาน</p>';
   if (!data.employees.length) return;
-  bindRowSelect($('emp-results'), (id) => { picked = id; $('emp-pick').disabled = !id; });
-  $('emp-pick').onclick = () => {
-    if (!picked) return toast('เลือกแถวก่อน', 'error');
-    $('user-id').value = picked;
-  };
+  bindRowSelect($('emp-results'), (index) => {
+    picked = data.employees[Number(index)];
+    $('user-id').value = picked.employee_id;
+    $('user-centers').textContent = `${picked.department || '-'}: ${centerText(picked) || 'ไม่มีศูนย์ต้นทุน'}`;
+    $('user-save').textContent = 'เพิ่ม';
+    delete $('user-save').dataset.mode;
+  });
 }
 
 async function createUser() {
+  if (!$('user-id').value.trim()) return toast('เลือกพนักงานจากรายชื่อก่อน', 'error');
   try {
-    await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value } });
+    await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value } });
     toast('เพิ่มรายชื่อ Usage แล้ว');
     openView('setting');
   } catch (err) { toast(err.message, 'error'); }
 }
 
-async function editUser(employeeId, role, status) {
-  const nextRole = prompt('บทบาท viewer, user หรือ admin', role);
-  if (!nextRole) return;
-  const nextStatus = prompt('สถานะ Active หรือ Inactive', status);
-  if (!nextStatus) return;
-  const password = prompt('รหัสผ่านใหม่ เว้นว่างถ้าไม่เปลี่ยน', '') || '';
+async function editUser() {
+  const employeeId = $('user-id').value.trim();
   try {
-    await api(`/api/users/${encodeURIComponent(employeeId)}`, { method: 'PATCH', body: { role: nextRole, status: nextStatus, password } });
+    await api(`/api/users/${encodeURIComponent(employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value } });
+    toast('แก้ไขแล้ว');
     openView('setting');
   } catch (err) { toast(err.message, 'error'); }
 }
