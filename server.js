@@ -607,7 +607,11 @@ async function bootstrap() {
   else console.log('bootstrap user created');
 }
 
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`SMF listening on ${PORT}`);
-  await bootstrap();
+  try {
+    await bootstrap();
+  } catch {
+    console.error('bootstrap failed');
+  }
 });
