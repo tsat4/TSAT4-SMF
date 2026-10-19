@@ -61,6 +61,17 @@ async function api(path, options = {}) {
   return data;
 }
 
+function bindRowSelect(container, onSelect) {
+  const rows = [...container.querySelectorAll('tbody tr[data-pick]')];
+  rows.forEach((row) => {
+    row.classList.add('row-pick');
+    row.onclick = () => {
+      rows.forEach((item) => item.classList.toggle('is-selected', item === row));
+      onSelect(row.dataset.pick, row);
+    };
+  });
+}
+
 function badge(status) {
   const kind = status === 'ready' || status === 'received' ? 'badge-success' : status === 'cancelled' ? 'badge-danger' : status === 'cart' ? 'badge-warning' : 'badge-primary';
   return `<span class="badge ${kind}">${esc(STATUS[status] || status)}</span>`;
@@ -198,12 +209,17 @@ async function renderSystem(target) {
   let offset = 0;
   let editing = null;
   let rows = [];
+  let selected = null;
   target.innerHTML = `
     <div class="toolbar">
       <label class="field grow">ตาราง<select id="sys-table">${catalog.tables.map((table) => `<option value="${esc(table.name)}">${esc(table.name)}</option>`).join('')}</select></label>
       <label class="field grow">ค้นหา<input id="sys-q"></label>
       <button class="btn btn-secondary" type="button" id="sys-search">ค้นหา</button>
-      <button class="btn btn-primary" type="button" id="sys-add">เพิ่มแถว</button>
+      <div class="action-bar">
+        <button class="btn btn-primary" type="button" id="sys-add">เพิ่ม</button>
+        <button class="btn btn-secondary" type="button" id="sys-edit" disabled>แก้ไข</button>
+        <button class="btn btn-danger" type="button" id="sys-del" disabled>ลบ</button>
+      </div>
     </div>
     <div id="sys-form"></div>
     <div class="sum-meta" id="sys-count"></div>
@@ -223,7 +239,7 @@ async function renderSystem(target) {
       if (choices[column.type]) return `<label class="field">${column.name}<select id="sys-${column.name}">${choices[column.type].map((option) => `<option ${String(value) === option ? 'selected' : ''}>${esc(option)}</option>`).join('')}</select></label>`;
       const number = ['int', 'qty', 'money'].includes(column.type);
       return `<label class="field">${esc(column.name)}<input id="sys-${column.name}" ${number ? `type="number" step="${column.type === 'int' ? '1' : '0.001'}"` : ''} value="${esc(value ?? '')}" ${editing && column.pk ? 'disabled' : ''}></label>`;
-    }).join('')}</div><div class="actions"><button class="btn btn-primary" type="button" id="sys-save">บันทึก</button><button class="btn btn-secondary" type="button" id="sys-cancel">ยกเลิก</button></div></section>`;
+    }).join('')}</div><div class="form-actions"><button class="btn btn-primary" type="button" id="sys-save">บันทึก</button><button class="btn btn-secondary" type="button" id="sys-cancel">ยกเลิก</button></div></section>`;
     $('sys-cancel').onclick = () => { editing = null; delete box.dataset.open; drawForm(); };
     $('sys-save').onclick = saveRow;
   };
@@ -231,11 +247,17 @@ async function renderSystem(target) {
     const table = tableOf();
     const data = await api(`/api/system/tables/${encodeURIComponent(table.name)}?q=${encodeURIComponent($('sys-q').value.trim())}&offset=${offset}`);
     rows = data.rows;
+    selected = null;
+    $('sys-edit').disabled = true;
+    $('sys-del').disabled = true;
     $('sys-count').textContent = `แสดง ${rows.length} จาก ${data.total} แถว`;
     const visible = table.columns.filter((column) => column.type !== 'password');
-    $('sys-rows').innerHTML = rows.length ? `<table class="mo-data-table"><thead><tr>${visible.map((column) => `<th>${esc(column.name)}</th>`).join('')}<th></th></tr></thead><tbody>${rows.map((row, index) => `<tr>${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}<td class="actions"><button class="btn btn-secondary" data-sys-edit="${index}">แก้ไข</button><button class="btn btn-danger" data-sys-del="${index}">ลบ</button></td></tr>`).join('')}</tbody></table>` : '<p class="empty">ไม่มีแถว</p>';
-    $('sys-rows').querySelectorAll('[data-sys-edit]').forEach((node) => { node.onclick = () => { editing = rows[Number(node.dataset.sysEdit)]; $('sys-form').dataset.open = '1'; drawForm(); }; });
-    $('sys-rows').querySelectorAll('[data-sys-del]').forEach((node) => { node.onclick = () => removeRow(rows[Number(node.dataset.sysDel)]); });
+    $('sys-rows').innerHTML = rows.length ? `<table class="mo-data-table"><thead><tr>${visible.map((column) => `<th>${esc(column.name)}</th>`).join('')}</tr></thead><tbody>${rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p class="empty">ไม่มีแถว</p>';
+    bindRowSelect($('sys-rows'), (pick) => {
+      selected = rows[Number(pick)];
+      $('sys-edit').disabled = false;
+      $('sys-del').disabled = false;
+    });
   };
   const saveRow = async () => {
     const table = tableOf();
@@ -277,6 +299,16 @@ async function renderSystem(target) {
   $('sys-table').onchange = () => { offset = 0; editing = null; delete $('sys-form').dataset.open; drawForm(); loadRows().catch((err) => toast(err.message, 'error')); };
   $('sys-search').onclick = () => { offset = 0; loadRows().catch((err) => toast(err.message, 'error')); };
   $('sys-add').onclick = () => { editing = null; $('sys-form').dataset.open = '1'; drawForm(); };
+  $('sys-edit').onclick = () => {
+    if (!selected) return toast('เลือกแถวก่อน', 'error');
+    editing = selected;
+    $('sys-form').dataset.open = '1';
+    drawForm();
+  };
+  $('sys-del').onclick = () => {
+    if (!selected) return toast('เลือกแถวก่อน', 'error');
+    removeRow(selected);
+  };
   $('sys-prev').onclick = () => { offset = Math.max(0, offset - 50); loadRows().catch((err) => toast(err.message, 'error')); };
   $('sys-next').onclick = () => { offset += 50; loadRows().catch((err) => toast(err.message, 'error')); };
   await loadRows();
@@ -355,11 +387,11 @@ async function renderRequisition(target) {
           <button class="btn btn-primary" type="button" id="search-item">ค้นหา</button>
         </div>
         <div id="item-results"></div>
-        <div class="table-wrap" id="cart-lines"></div>
-        <div class="actions"><button class="btn btn-primary" type="button" id="submit-cart">ส่งออร์เดอร์</button></div>` : '<p class="empty">ยังไม่มีตะกร้า</p>'}
+        <div id="cart-lines"></div>` : '<p class="empty">ยังไม่มีตะกร้า</p>'}
     </section>
-    <section class="card"><div class="card-title">ใบเบิกของฉัน</div><div class="table-wrap">${orderTable(mine.requisitions.filter((row) => row.status !== 'cart'), true)}</div></section>
+    <section class="card"><div class="card-title-row"><div class="card-title">ใบเบิกของฉัน</div><div class="action-bar" id="mine-bar"></div></div><div class="table-wrap" id="mine-table">${orderTable(mine.requisitions.filter((row) => row.status !== 'cart'), true)}</div></section>
     </div>`;
+  mountOrderBar($('mine-table'), $('mine-bar'));
   if (!cart) {
     $('new-cart').onclick = async () => {
       try {
@@ -372,56 +404,71 @@ async function renderRequisition(target) {
   drawLines(cart);
   $('search-item').onclick = () => searchItems(cart.id);
   $('item-q').addEventListener('keydown', (event) => { if (event.key === 'Enter') searchItems(cart.id); });
-  $('submit-cart').onclick = () => changeStatus(cart.id, 'submitted');
-  bindOrderActions(target);
 }
 
 function drawLines(cart) {
   const box = $('cart-lines');
   if (!cart.lines?.length) {
-    box.innerHTML = '<p class="empty">ตะกร้าว่าง</p>';
+    box.innerHTML = '<div class="action-bar"><button class="btn btn-primary" type="button" id="submit-cart">ส่งออร์เดอร์</button></div><p class="empty">ตะกร้าว่าง</p>';
+    $('submit-cart').onclick = () => changeStatus(cart.id, 'submitted');
     return;
   }
-  box.innerHTML = `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>จำนวน</th><th></th></tr></thead><tbody>
-    ${cart.lines.map((line) => `<tr><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${Number(line.qty)} ${esc(line.bun)}</td><td class="actions"><button class="btn btn-danger" data-remove="${line.id}">เอาออก</button></td></tr>`).join('')}
-  </tbody></table>`;
-  box.querySelectorAll('[data-remove]').forEach((node) => {
-    node.onclick = async () => {
-      await api(`/api/requisitions/${cart.id}/lines/${node.dataset.remove}`, { method: 'DELETE' });
-      openView('requisition');
-    };
-  });
+  let picked = '';
+  box.innerHTML = `
+    <div class="action-bar"><button class="btn btn-danger" type="button" id="line-remove" disabled>เอาออก</button><button class="btn btn-primary" type="button" id="submit-cart">ส่งออร์เดอร์</button></div>
+    <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>จำนวน</th></tr></thead><tbody>
+    ${cart.lines.map((line) => `<tr data-pick="${esc(line.id)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${Number(line.qty)} ${esc(line.bun)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+  bindRowSelect(box, (id) => { picked = id; $('line-remove').disabled = !id; });
+  $('line-remove').onclick = async () => {
+    if (!picked) return toast('เลือกแถวก่อน', 'error');
+    await api(`/api/requisitions/${cart.id}/lines/${picked}`, { method: 'DELETE' });
+    openView('requisition');
+  };
+  $('submit-cart').onclick = () => changeStatus(cart.id, 'submitted');
 }
 
 async function searchItems(cartId) {
   const term = $('item-q').value.trim();
   const data = await api(`/api/materials?q=${encodeURIComponent(term)}`);
-  $('item-results').innerHTML = data.materials.length ? `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th><th></th></tr></thead><tbody>
-    ${data.materials.map((row) => `<tr><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td><td><button class="btn btn-secondary" data-add="${esc(row.material)}">ใส่ตะกร้า</button></td></tr>`).join('')}
+  let picked = '';
+  $('item-results').innerHTML = data.materials.length ? `
+    <div class="action-bar"><button class="btn btn-primary" type="button" id="item-add" disabled>ใส่ตะกร้า</button></div>
+    <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th></tr></thead><tbody>
+    ${data.materials.map((row) => `<tr data-pick="${esc(row.material)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join('')}
   </tbody></table></div>` : '<p class="empty">ไม่พบรายการ</p>';
-  $('item-results').querySelectorAll('[data-add]').forEach((node) => {
-    node.onclick = async () => {
-      try {
-        await api(`/api/requisitions/${cartId}/lines`, { method: 'POST', body: { material: node.dataset.add, qty: Number($('item-qty').value) } });
-        const detail = await api(`/api/requisitions/${cartId}`);
-        drawLines(detail.requisition);
-        toast('ใส่ตะกร้าแล้ว');
-      } catch (err) { toast(err.message, 'error'); }
-    };
-  });
+  if (!data.materials.length) return;
+  bindRowSelect($('item-results'), (id) => { picked = id; $('item-add').disabled = !id; });
+  $('item-add').onclick = async () => {
+    if (!picked) return toast('เลือกแถวก่อน', 'error');
+    try {
+      await api(`/api/requisitions/${cartId}/lines`, { method: 'POST', body: { material: picked, qty: Number($('item-qty').value) } });
+      const detail = await api(`/api/requisitions/${cartId}`);
+      drawLines(detail.requisition);
+      toast('ใส่ตะกร้าแล้ว');
+    } catch (err) { toast(err.message, 'error'); }
+  };
 }
 
 function orderTable(rows, mine) {
   if (!rows.length) return '<p class="empty">ไม่มีใบเบิก</p>';
-  return `<table class="mo-data-table"><thead><tr><th>เลขที่</th><th>ศูนย์ต้นทุน</th><th>สถานะ</th><th>ช่วงจัดเตรียม</th><th></th></tr></thead><tbody>
-    ${rows.map((row) => `<tr>
+  return `<table class="mo-data-table"><thead><tr><th>เลขที่</th><th>ศูนย์ต้นทุน</th><th>สถานะ</th><th>ช่วงจัดเตรียม</th></tr></thead><tbody>
+    ${rows.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-mine="${mine ? '1' : '0'}">
       <td>#${row.id}</td>
       <td>${esc(row.costcenter)} · ${esc(row.costcenterName)}</td>
       <td>${badge(row.status)}</td>
       <td>${esc(lead(row.prepare_lead))}</td>
-      <td class="actions">${actionsFor(row, mine)}</td>
     </tr>`).join('')}
   </tbody></table>`;
+}
+
+function mountOrderBar(tableHost, bar) {
+  if (!tableHost || !bar) return;
+  bar.innerHTML = '<button class="btn btn-secondary" type="button" disabled>ดูรายการ</button>';
+  bindRowSelect(tableHost, (_id, row) => {
+    bar.innerHTML = actionsFor({ id: row.dataset.pick, status: row.dataset.status }, row.dataset.mine === '1');
+    bindOrderActions(bar);
+  });
 }
 
 function lead(value) {
@@ -466,8 +513,8 @@ async function changeStatus(id, status) {
 
 async function renderQueue(target) {
   const data = await api('/api/requisitions?scope=queue');
-  target.innerHTML = `<div class="view-body"><section class="card fill-card"><div class="card-title">ออร์เดอร์ที่ต้องจัด</div><div class="table-wrap">${orderTable(data.requisitions, false)}</div></section></div>`;
-  bindOrderActions(target);
+  target.innerHTML = `<div class="view-body"><section class="card fill-card"><div class="card-title-row"><div class="card-title">ออร์เดอร์ที่ต้องจัด</div><div class="action-bar" id="queue-bar"></div></div><div class="table-wrap" id="queue-table">${orderTable(data.requisitions, false)}</div></section></div>`;
+  mountOrderBar($('queue-table'), $('queue-bar'));
 }
 
 async function renderStock(target) {
@@ -475,14 +522,14 @@ async function renderStock(target) {
   target.innerHTML = `
     <div class="view-body">
     <section class="card">
-      <div class="card-title">ศูนย์ต้นทุนที่สั่งซื้อ</div>
+      <div class="card-title-row"><div class="card-title">ศูนย์ต้นทุนที่สั่งซื้อ</div><div class="action-bar"><button class="btn btn-secondary" type="button" id="buyer-toggle" disabled>เปิด/ปิด</button></div></div>
       <div class="toolbar">
         <label class="field">ค้นศูนย์ต้นทุน<input id="cc-q" placeholder="รหัสหรือชื่อ"></label>
         <button class="btn btn-secondary" type="button" id="cc-search">ค้นหา</button>
       </div>
       <div id="cc-results"></div>
-      <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>สถานะ</th><th></th></tr></thead><tbody>
-        ${buyers.buyers.map((row) => `<tr><td>${esc(row.costcenter)}</td><td>${esc(row.objectName)}</td><td>${esc(row.status)}</td><td><button class="btn btn-secondary" data-buyer="${esc(row.costcenter)}" data-next="${row.status === 'Active' ? 'Inactive' : 'Active'}">${row.status === 'Active' ? 'ปิด' : 'เปิด'}</button></td></tr>`).join('') || '<tr><td colspan="4" class="empty">ยังไม่มีศูนย์ต้นทุนที่สั่งซื้อ</td></tr>'}
+      <div class="table-wrap" id="buyer-table"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>สถานะ</th></tr></thead><tbody>
+        ${buyers.buyers.map((row) => `<tr data-pick="${esc(row.costcenter)}" data-next="${row.status === 'Active' ? 'Inactive' : 'Active'}"><td>${esc(row.costcenter)}</td><td>${esc(row.objectName)}</td><td>${esc(row.status)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">ยังไม่มีศูนย์ต้นทุนที่สั่งซื้อ</td></tr>'}
       </tbody></table></div>
     </section>
     <section class="card">
@@ -497,7 +544,10 @@ async function renderStock(target) {
         <label class="field">Min<input id="stock-min" type="number" min="0" step="0.001" value="0"></label>
         <label class="field">Current<input id="stock-current" type="number" min="0" step="0.001" value="0"></label>
         <label class="field">Max<input id="stock-max" type="number" min="0" step="0.001" value="0"></label>
-        <button class="btn btn-primary" type="button" id="stock-save">บันทึกยอด</button>
+        <div class="action-bar">
+          <button class="btn btn-secondary" type="button" id="stock-edit" disabled>แก้ไข</button>
+          <button class="btn btn-primary" type="button" id="stock-save">บันทึกยอด</button>
+        </div>
       </div>
       <div class="table-wrap" id="stock-table"></div>
     </section>
@@ -505,45 +555,59 @@ async function renderStock(target) {
   $('cc-search').onclick = searchCenters;
   $('stock-load').onclick = loadStock;
   $('stock-save').onclick = saveStock;
-  target.querySelectorAll('[data-buyer]').forEach((node) => {
-    node.onclick = async () => {
-      await api(`/api/buyers/${encodeURIComponent(node.dataset.buyer)}`, { method: 'PATCH', body: { status: node.dataset.next } });
-      openView('stock');
-    };
+  let buyer = null;
+  bindRowSelect($('buyer-table'), (id, row) => {
+    buyer = { costcenter: id, next: row.dataset.next };
+    $('buyer-toggle').disabled = false;
+    $('buyer-toggle').textContent = row.dataset.next === 'Inactive' ? 'ปิด' : 'เปิด';
   });
+  $('buyer-toggle').onclick = async () => {
+    if (!buyer) return toast('เลือกแถวก่อน', 'error');
+    await api(`/api/buyers/${encodeURIComponent(buyer.costcenter)}`, { method: 'PATCH', body: { status: buyer.next } });
+    openView('stock');
+  };
   if ($('stock-cc').value) loadStock();
 }
 
 async function searchCenters() {
   const data = await api(`/api/costcenters?q=${encodeURIComponent($('cc-q').value.trim())}`);
-  $('cc-results').innerHTML = data.costcenters.length ? `<div class="table-wrap"><table class="mo-data-table"><tbody>
-    ${data.costcenters.map((row) => `<tr><td>${esc(row.costcenter)}</td><td>${esc(row.object_name)}</td><td><button class="btn btn-secondary" data-add-cc="${esc(row.costcenter)}">ตั้งเป็นผู้สั่งซื้อ</button></td></tr>`).join('')}
+  let picked = '';
+  $('cc-results').innerHTML = data.costcenters.length ? `
+    <div class="action-bar"><button class="btn btn-primary" type="button" id="cc-add" disabled>ตั้งเป็นผู้สั่งซื้อ</button></div>
+    <div class="table-wrap"><table class="mo-data-table"><tbody>
+    ${data.costcenters.map((row) => `<tr data-pick="${esc(row.costcenter)}"><td>${esc(row.costcenter)}</td><td>${esc(row.object_name)}</td></tr>`).join('')}
   </tbody></table></div>` : '<p class="empty">ไม่พบศูนย์ต้นทุน</p>';
-  $('cc-results').querySelectorAll('[data-add-cc]').forEach((node) => {
-    node.onclick = async () => {
-      try {
-        await api('/api/buyers', { method: 'POST', body: { costcenter: node.dataset.addCc } });
-        openView('stock');
-      } catch (err) { toast(err.message, 'error'); }
-    };
-  });
+  if (!data.costcenters.length) return;
+  bindRowSelect($('cc-results'), (id) => { picked = id; $('cc-add').disabled = !id; });
+  $('cc-add').onclick = async () => {
+    if (!picked) return toast('เลือกแถวก่อน', 'error');
+    try {
+      await api('/api/buyers', { method: 'POST', body: { costcenter: picked } });
+      openView('stock');
+    } catch (err) { toast(err.message, 'error'); }
+  };
 }
 
 async function loadStock() {
   const cc = $('stock-cc').value;
   if (!cc) return;
   const data = await api(`/api/stock?costcenter=${encodeURIComponent(cc)}&q=${encodeURIComponent($('stock-q').value.trim())}`);
-  $('stock-table').innerHTML = `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>Min</th><th>Current</th><th>Max</th><th></th></tr></thead><tbody>
-    ${data.stock.map((row) => `<tr><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${row.minQty}</td><td>${row.low ? `<span class="badge badge-warning">${row.currentQty}</span>` : row.currentQty}</td><td>${row.maxQty}</td><td><button class="btn btn-secondary" data-fill="${esc(row.material)}" data-min="${row.minQty}" data-current="${row.currentQty}" data-max="${row.maxQty}">แก้</button></td></tr>`).join('') || '<tr><td colspan="6" class="empty">ยังไม่มียอด</td></tr>'}
+  let picked = null;
+  $('stock-edit').disabled = true;
+  $('stock-table').innerHTML = `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>Min</th><th>Current</th><th>Max</th></tr></thead><tbody>
+    ${data.stock.map((row) => `<tr data-pick="${esc(row.material)}" data-min="${row.minQty}" data-current="${row.currentQty}" data-max="${row.maxQty}"><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${row.minQty}</td><td>${row.low ? `<span class="badge badge-warning">${row.currentQty}</span>` : row.currentQty}</td><td>${row.maxQty}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">ยังไม่มียอด</td></tr>'}
   </tbody></table>`;
-  $('stock-table').querySelectorAll('[data-fill]').forEach((node) => {
-    node.onclick = () => {
-      $('stock-material').value = node.dataset.fill;
-      $('stock-min').value = node.dataset.min;
-      $('stock-current').value = node.dataset.current;
-      $('stock-max').value = node.dataset.max;
-    };
+  bindRowSelect($('stock-table'), (_id, row) => {
+    picked = row;
+    $('stock-edit').disabled = false;
   });
+  $('stock-edit').onclick = () => {
+    if (!picked) return toast('เลือกแถวก่อน', 'error');
+    $('stock-material').value = picked.dataset.pick;
+    $('stock-min').value = picked.dataset.min;
+    $('stock-current').value = picked.dataset.current;
+    $('stock-max').value = picked.dataset.max;
+  };
 }
 
 async function saveStock() {
@@ -579,31 +643,48 @@ async function renderUsers(target) {
         <label class="field">รหัสพนักงาน<input id="user-id" required></label>
         <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8"></label>
         <label class="field">บทบาท<select id="user-role"><option value="viewer">Viewer</option><option value="user">User</option><option value="admin">Admin</option></select></label>
-        <button class="btn btn-primary" type="button" id="user-save">เพิ่ม</button>
       </div>
     </section>
-    <section class="card"><div class="card-title">บัญชีผู้ใช้</div><div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th><th>หมดอายุรหัส</th><th></th></tr></thead><tbody>
-      ${data.users.map((row) => `<tr>
+    <section class="card"><div class="card-title-row"><div class="card-title">บัญชีผู้ใช้</div><div class="action-bar"><button class="btn btn-primary" type="button" id="user-save">เพิ่ม</button><button class="btn btn-secondary" type="button" id="user-edit" disabled>แก้ไข</button><button class="btn btn-danger" type="button" id="user-del" disabled>นำออก</button></div></div><div class="table-wrap" id="user-table"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th><th>หมดอายุรหัส</th></tr></thead><tbody>
+      ${data.users.map((row) => `<tr data-pick="${esc(row.employeeId)}" data-creator="${row.creator ? '1' : '0'}">
         <td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td>
         <td>${row.passwordExpired ? '<span class="badge badge-danger">ครบ 90 วัน</span>' : esc(new Date(row.passwordExpiresAt).toLocaleDateString('th-TH'))}</td>
-        <td class="actions">
-          ${row.creator ? '' : `<button class="btn btn-secondary" data-edit="${esc(row.employeeId)}" data-role="${esc(row.role)}" data-user-status="${esc(row.status)}">แก้ไข</button>
-          <button class="btn btn-danger" data-delete="${esc(row.employeeId)}">นำออก</button>`}
-        </td></tr>`).join('')}
+        </tr>`).join('')}
     </tbody></table></div></section>
     </div>`;
   $('emp-search').onclick = searchEmployees;
   $('user-save').onclick = createUser;
-  target.querySelectorAll('[data-edit]').forEach((node) => { node.onclick = () => editUser(node.dataset.edit, node.dataset.role, node.dataset.userStatus); });
-  target.querySelectorAll('[data-delete]').forEach((node) => { node.onclick = () => deleteUser(node.dataset.delete); });
+  let picked = null;
+  bindRowSelect($('user-table'), (id, row) => {
+    picked = data.users.find((user) => user.employeeId === id) || null;
+    const locked = !picked || row.dataset.creator === '1';
+    $('user-edit').disabled = locked;
+    $('user-del').disabled = locked;
+  });
+  $('user-edit').onclick = () => {
+    if (!picked) return toast('เลือกแถวก่อน', 'error');
+    editUser(picked.employeeId, picked.role, picked.status);
+  };
+  $('user-del').onclick = () => {
+    if (!picked) return toast('เลือกแถวก่อน', 'error');
+    deleteUser(picked.employeeId);
+  };
 }
 
 async function searchEmployees() {
   const data = await api(`/api/employees?q=${encodeURIComponent($('emp-q').value.trim())}`);
-  $('emp-results').innerHTML = data.employees.length ? `<div class="table-wrap"><table class="mo-data-table"><tbody>
-    ${data.employees.map((row) => `<tr><td>${esc(row.employee_id)}</td><td>${esc(row.name)}</td><td>${esc(row.department || '')}</td><td><button class="btn btn-secondary" data-pick="${esc(row.employee_id)}">เลือก</button></td></tr>`).join('')}
+  let picked = '';
+  $('emp-results').innerHTML = data.employees.length ? `
+    <div class="action-bar"><button class="btn btn-primary" type="button" id="emp-pick" disabled>เลือก</button></div>
+    <div class="table-wrap"><table class="mo-data-table"><tbody>
+    ${data.employees.map((row) => `<tr data-pick="${esc(row.employee_id)}"><td>${esc(row.employee_id)}</td><td>${esc(row.name)}</td><td>${esc(row.department || '')}</td></tr>`).join('')}
   </tbody></table></div>` : '<p class="empty">ไม่พบพนักงาน</p>';
-  $('emp-results').querySelectorAll('[data-pick]').forEach((node) => { node.onclick = () => { $('user-id').value = node.dataset.pick; }; });
+  if (!data.employees.length) return;
+  bindRowSelect($('emp-results'), (id) => { picked = id; $('emp-pick').disabled = !id; });
+  $('emp-pick').onclick = () => {
+    if (!picked) return toast('เลือกแถวก่อน', 'error');
+    $('user-id').value = picked;
+  };
 }
 
 async function createUser() {
