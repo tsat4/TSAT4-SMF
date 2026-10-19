@@ -26,8 +26,7 @@ const TITLES = {
 
 let me = null;
 let view = 'main';
-let editStep = 'withdraw';
-let stockCc = '';
+let editMode = 'list';
 
 const $ = (id) => document.getElementById(id);
 
@@ -146,7 +145,7 @@ function showShell() {
 }
 
 function openView(name) {
-  const need = { home: 1, edit: 2, requisition: 2, queue: 2, stock: 2, setting: 3 }[name] || 0;
+  const need = { home: 1, edit: 1, setting: 3 }[name] || 0;
   if (need && rankOf() < need) name = 'locked';
   if (name === 'system' && !me.creator) name = 'main';
   view = name;
@@ -358,22 +357,47 @@ async function renderLocked(target) {
     </div>`;
 }
 
+function bindHold(button, onDone) {
+  const fill = button.querySelector('.hold-fill');
+  let active = false;
+  let finished = false;
+  let frame = 0;
+  const stop = (done) => {
+    if (finished) return;
+    active = false;
+    cancelAnimationFrame(frame);
+    if (!done) { fill.style.width = '0'; return; }
+    finished = true;
+    fill.style.width = '100%';
+    onDone();
+  };
+  const tick = (now) => {
+    if (!active) return;
+    const ratio = Math.min(1, (now - button.dataset.holdStart) / 2000);
+    fill.style.width = `${ratio * 100}%`;
+    if (ratio >= 1) { stop(true); return; }
+    frame = requestAnimationFrame(tick);
+  };
+  button.addEventListener('pointerdown', (event) => {
+    if (button.disabled || active || finished) return;
+    active = true;
+    button.dataset.holdStart = String(performance.now());
+    button.setPointerCapture?.(event.pointerId);
+    frame = requestAnimationFrame(tick);
+  });
+  button.addEventListener('pointerup', () => { if (active) stop(false); });
+  button.addEventListener('pointercancel', () => { if (active) stop(false); });
+  button.addEventListener('contextmenu', (event) => event.preventDefault());
+}
+
 async function renderEdit(target) {
   const pageSize = 50;
   let offset = 0;
-  let payCenters = null;
+  const admin = rankOf() >= 3;
   target.innerHTML = `
     <div class="toolbar">
-      <label class="field grow">ขั้นตอน<select id="edit-step">
-        <option value="withdraw">เบิก</option>
-        <option value="prepare">จัดเตรียม</option>
-        <option value="pay">จ่าย</option>
-        <option value="receive">รับ</option>
-        <option value="stock">ยอด</option>
-      </select></label>
-      <label class="field grow d-none" id="edit-cc-field">ศูนย์ต้นทุน<select id="edit-cc"></select></label>
       <div class="search-slot">
-        <label class="field grow">ค้นหา<input id="edit-q"></label>
+        <label class="field grow">ค้นหา<input id="edit-q" placeholder="เลขที่ ศูนย์ต้นทุน หรือสถานะ"></label>
         <button class="btn btn-secondary" type="button" id="edit-search">ค้นหา</button>
       </div>
       <div class="action-bar" id="edit-actions"></div>
@@ -386,157 +410,212 @@ async function renderEdit(target) {
         <button class="btn btn-secondary" type="button" id="edit-next">ถัดไป</button>
       </div>
     </div>`;
-  $('edit-step').value = editStep;
-  const step = () => $('edit-step').value;
   const setFoot = (shown, total) => {
     $('edit-count').textContent = `แสดง ${shown} จาก ${total} แถว`;
     $('edit-prev').disabled = offset <= 0;
     $('edit-next').disabled = offset + pageSize >= total;
   };
   const pageOf = (rows) => rows.slice(offset, offset + pageSize);
-  const goStep = (name) => { $('edit-step').value = name; offset = 0; $('edit-q').value = ''; load().catch((err) => toast(err.message, 'error')); };
   const load = async () => {
-    editStep = step();
-    const term = $('edit-q').value.trim();
-    $('edit-cc-field').classList.toggle('d-none', editStep !== 'stock');
-    $('edit-q').placeholder = editStep === 'withdraw' || editStep === 'stock' ? 'รหัสหรือชื่อรายการ' : 'เลขที่หรือศูนย์ต้นทุน';
-    if (editStep === 'withdraw') await loadWithdraw(term);
-    else if (editStep === 'prepare') await loadOrders(term, 'prepare');
-    else if (editStep === 'pay') await loadPay(term);
-    else if (editStep === 'receive') await loadOrders(term, 'receive');
-    else await loadStockTable(term);
+    if (editMode === 'summary') await loadSummary();
+    else await loadList();
   };
-  const loadWithdraw = async (term) => {
+  const loadList = async () => {
+    const term = $('edit-q').value.trim().toLowerCase();
     const mine = await api('/api/requisitions?scope=mine');
-    const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
-    const cart = cartHeader ? (await api(`/api/requisitions/${cartHeader.id}`)).requisition : null;
-    if (!cart) {
-      $('edit-actions').innerHTML = '<button class="btn btn-primary" type="button" id="edit-open">เปิดตะกร้า</button>';
-      $('edit-rows').innerHTML = '<p class="empty">ยังไม่มีตะกร้า</p>';
-      setFoot(0, 0);
-      $('edit-open').onclick = async () => {
-        try {
-          await api('/api/requisitions', { method: 'POST', body: {} });
-          openView('edit');
-        } catch (err) { toast(err.message, 'error'); }
-      };
-      return;
+    let rows = mine.requisitions;
+    if (admin) {
+      const queue = await api('/api/requisitions?scope=queue');
+      const seen = new Set(rows.map((row) => row.id));
+      rows = rows.concat(queue.requisitions.filter((row) => !seen.has(row.id)));
     }
-    if (term) {
-      const data = await api(`/api/materials?q=${encodeURIComponent(term)}`);
-      const materials = [...data.materials].sort((a, b) => String(a.material).localeCompare(String(b.material)));
-      const page = pageOf(materials);
-      let picked = '';
-      $('edit-actions').innerHTML = '<button class="btn btn-secondary" type="button" id="edit-back">ตะกร้า</button><button class="btn btn-primary" type="button" id="edit-add" disabled>ใส่ตะกร้า</button>';
-      $('edit-back').onclick = () => { $('edit-q').value = ''; offset = 0; load().catch((err) => toast(err.message, 'error')); };
-      $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th></tr></thead><tbody>
-        ${page.map((row) => `<tr data-pick="${esc(row.material)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join('')}
-      </tbody></table>` : '<p class="empty">ไม่พบรายการ</p>';
-      setFoot(page.length, materials.length);
-      bindRowSelect($('edit-rows'), (id) => { picked = id; $('edit-add').disabled = !id; });
-      $('edit-add').onclick = () => {
-        if (!picked) return toast('เลือกแถวก่อน', 'error');
-        const material = picked;
-        openPopup('ใส่ตะกร้า', `<label class="field">รหัส<input value="${esc(material)}" readonly></label><label class="field">จำนวน<input id="item-qty" type="number" min="0.001" step="0.001" value="1"></label>`, async () => {
-          await api(`/api/requisitions/${cart.id}/lines`, { method: 'POST', body: { material, qty: Number($('item-qty').value) } });
-          toast('ใส่ตะกร้าแล้ว');
-          closePopup();
-          $('edit-q').value = '';
-          offset = 0;
-          openView('edit');
-        });
-      };
-      return;
-    }
-    const lines = cart.lines || [];
-    const page = pageOf(lines);
-    let picked = '';
-    $('edit-actions').innerHTML = '<button class="btn btn-danger" type="button" id="edit-remove" disabled>เอาออก</button>';
-    $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>จำนวน</th></tr></thead><tbody>
-      ${page.map((line) => `<tr data-pick="${esc(line.id)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${Number(line.qty)} ${esc(line.bun)}</td></tr>`).join('')}
-    </tbody></table>` : '<p class="empty">ตะกร้าว่าง ค้นหารายการแล้วใส่ตะกร้า</p>';
-    setFoot(page.length, lines.length);
-    bindRowSelect($('edit-rows'), (id) => { picked = id; $('edit-remove').disabled = !id; });
-    $('edit-remove').onclick = () => {
-      if (!picked) return toast('เลือกแถวก่อน', 'error');
-      confirmPopup('เอาออกจากตะกร้า', 'ตรวจรายการที่เลือกอีกครั้งก่อนเอาออก', async () => {
-        await api(`/api/requisitions/${cart.id}/lines/${picked}`, { method: 'DELETE' });
+    rows.sort((a, b) => Number(b.id) - Number(a.id));
+    rows = rows.filter((row) => !term || `${row.id} ${row.requested_by} ${row.costcenter} ${row.costcenterName} ${STATUS[row.status] || ''}`.toLowerCase().includes(term));
+    const page = pageOf(rows);
+    $('edit-actions').innerHTML = `
+      <button class="btn btn-primary" type="button" id="edit-withdraw">เบิก</button>
+      <button class="btn btn-secondary" type="button" id="edit-fix" disabled>แก้ไข</button>
+      <button class="btn btn-danger" type="button" id="edit-del" disabled>ลบ</button>
+      ${admin ? '<button class="btn btn-secondary" type="button" id="edit-prepare" disabled>จัดเตรียม</button><button class="btn btn-secondary" type="button" id="edit-issue" disabled>จ่าย</button>' : ''}
+      <button class="btn btn-primary" type="button" id="edit-receive" disabled>รับ</button>`;
+    $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>เลขที่</th><th>ผู้เบิก</th><th>ศูนย์ต้นทุน</th><th>สถานะ</th></tr></thead><tbody>
+      ${page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}">
+        <td>#${row.id}</td><td>${esc(row.requested_by)}</td>
+        <td>${row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td>
+        <td>${badge(row.status)}</td></tr>`).join('')}
+    </tbody></table>` : '<p class="empty">ไม่มีใบเบิก</p>';
+    setFoot(page.length, rows.length);
+    const paint = (row) => {
+      const own = row?.dataset.own === '1';
+      const status = row?.dataset.status || '';
+      $('edit-fix').disabled = !(own && status === 'cart');
+      $('edit-del').disabled = !(own && ['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(status));
+      if ($('edit-prepare')) $('edit-prepare').disabled = !['submitted', 'accepted'].includes(status);
+      if ($('edit-issue')) $('edit-issue').disabled = status !== 'preparing';
+      $('edit-receive').disabled = !(own && status === 'ready');
+    };
+    bindRowSelect($('edit-rows'), (_id, row) => paint(row));
+    $('edit-withdraw').onclick = () => openAddPopup().catch((err) => toast(err.message, 'error'));
+    $('edit-fix').onclick = () => { editMode = 'summary'; openView('edit'); };
+    $('edit-del').onclick = () => {
+      const row = $('edit-rows').querySelector('tr.is-selected');
+      if (!row || row.dataset.own !== '1') return toast('ลบได้เฉพาะใบที่ตนเองสร้าง', 'error');
+      confirmPopup('ลบใบเบิก', `ตรวจใบเบิก #${row.dataset.pick} อีกครั้งก่อนลบ`, async () => {
+        await api(`/api/requisitions/${row.dataset.pick}/status`, { method: 'POST', body: { status: 'cancelled' } });
+        toast('ลบแล้ว');
         openView('edit');
       });
     };
-  };
-  const loadPay = async (term) => {
-    const mine = await api('/api/requisitions?scope=mine');
-    const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
-    const cart = cartHeader ? (await api(`/api/requisitions/${cartHeader.id}`)).requisition : null;
-    const lines = (cart?.lines || []).filter((line) => !term || `${line.material} ${line.materialDescription}`.toLowerCase().includes(term.toLowerCase()));
-    if (!cart || !(cart.lines || []).length) {
-      $('edit-actions').innerHTML = '<button class="btn btn-secondary" type="button" id="edit-goto">ไปที่เบิก</button>';
-      $('edit-rows').innerHTML = `<p class="empty">${cart ? 'ตะกร้าว่าง ใส่รายการที่เบิกก่อนจ่าย' : 'ยังไม่มีตะกร้า ไปที่เบิกก่อน'}</p>`;
-      setFoot(0, 0);
-      $('edit-goto').onclick = () => goStep('withdraw');
-      return;
-    }
-    const page = pageOf(lines);
-    $('edit-actions').innerHTML = '<button class="btn btn-primary" type="button" id="edit-pay">จ่าย</button>';
-    $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>จำนวน</th></tr></thead><tbody>
-      ${page.map((line) => `<tr data-pick="${esc(line.id)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${Number(line.qty)} ${esc(line.bun)}</td></tr>`).join('')}
-    </tbody></table>` : '<p class="empty">ไม่พบรายการในตะกร้า</p>';
-    setFoot(page.length, lines.length);
-    bindRowSelect($('edit-rows'), () => {});
-    $('edit-pay').onclick = () => payCart(cart.id);
-  };
-  const loadOrders = async (term, mode) => {
-    const data = mode === 'prepare'
-      ? await api('/api/requisitions?scope=queue')
-      : await api('/api/requisitions?scope=mine');
-    const wanted = mode === 'prepare' ? ['submitted', 'accepted', 'preparing'] : ['ready', 'received'];
-    const rows = data.requisitions.filter((row) => wanted.includes(row.status) && (!term || `${row.id} ${row.costcenter} ${row.costcenterName} ${STATUS[row.status] || ''}`.toLowerCase().includes(term.toLowerCase())));
-    const page = pageOf(rows);
-    $('edit-actions').innerHTML = '<button class="btn btn-secondary" type="button" disabled>ดูรายการ</button>';
-    $('edit-rows').innerHTML = page.length ? orderTable(page, mode === 'receive') : '<p class="empty">ไม่มีใบเบิก</p>';
-    setFoot(page.length, rows.length);
-    bindRowSelect($('edit-rows'), (_id, row) => {
-      $('edit-actions').innerHTML = actionsFor({ id: row.dataset.pick, status: row.dataset.status }, mode === 'receive');
-      bindOrderActions($('edit-actions'));
-    });
-  };
-  const loadStockTable = async (term) => {
-    if (!payCenters) payCenters = (await api('/api/pay-centers')).costcenters || [];
-    const select = $('edit-cc');
-    if (!select.options.length) {
-      select.innerHTML = payCenters.map((row) => `<option value="${esc(row.costcenter)}">${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('');
-      if (stockCc) select.value = stockCc;
-    }
-    stockCc = select.value;
-    $('edit-actions').innerHTML = '<button class="btn btn-primary" type="button" id="edit-stock-add">บันทึกยอด</button><button class="btn btn-secondary" type="button" id="edit-stock-edit" disabled>แก้ไข</button>';
-    $('edit-stock-add').onclick = () => openStockPopup();
-    if (!stockCc) {
-      $('edit-rows').innerHTML = '<p class="empty">ไม่มีศูนย์ต้นทุนในขอบเขตของคุณ</p>';
-      setFoot(0, 0);
-      $('edit-stock-edit').onclick = () => toast('เลือกแถวก่อน', 'error');
-      return;
-    }
-    const data = await api(`/api/stock?costcenter=${encodeURIComponent(stockCc)}&q=${encodeURIComponent(term)}`);
-    const page = pageOf(data.stock);
-    let picked = null;
-    $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>Min</th><th>Current</th><th>Max</th></tr></thead><tbody>
-      ${page.map((row) => `<tr data-pick="${esc(row.material)}" data-min="${row.minQty}" data-current="${row.currentQty}" data-max="${row.maxQty}"><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${row.minQty}</td><td>${row.low ? `<span class="badge badge-warning">${row.currentQty}</span>` : row.currentQty}</td><td>${row.maxQty}</td></tr>`).join('')}
-    </tbody></table>` : '<p class="empty">ยังไม่มียอด</p>';
-    setFoot(page.length, data.stock.length);
-    bindRowSelect($('edit-rows'), (_id, row) => { picked = row; $('edit-stock-edit').disabled = false; });
-    $('edit-stock-edit').onclick = () => {
-      if (!picked) return toast('เลือกแถวก่อน', 'error');
-      openStockPopup(picked);
+    const moveStatus = (buttonId, nextOf) => {
+      const button = $(buttonId);
+      if (!button) return;
+      button.onclick = async () => {
+        const row = $('edit-rows').querySelector('tr.is-selected');
+        const next = row ? nextOf(row.dataset.status) : '';
+        if (!next) return toast('เลือกใบที่ตรงขั้นตอนก่อน', 'error');
+        try {
+          await api(`/api/requisitions/${row.dataset.pick}/status`, { method: 'POST', body: { status: next } });
+          toast('อัปเดตสถานะแล้ว');
+          openView('edit');
+        } catch (err) { toast(err.message, 'error'); }
+      };
+    };
+    moveStatus('edit-prepare', (status) => ({ submitted: 'accepted', accepted: 'preparing' }[status]));
+    moveStatus('edit-issue', (status) => (status === 'preparing' ? 'ready' : ''));
+    $('edit-receive').onclick = async () => {
+      const row = $('edit-rows').querySelector('tr.is-selected');
+      if (!row || row.dataset.own !== '1' || row.dataset.status !== 'ready') return toast('รับได้เฉพาะใบที่ตนเองเบิกและพร้อมรับ', 'error');
+      try {
+        await api(`/api/requisitions/${row.dataset.pick}/status`, { method: 'POST', body: { status: 'received' } });
+        toast('ยืนยันแล้ว และตัดยอด Current');
+        openView('edit');
+      } catch (err) { toast(err.message, 'error'); }
     };
   };
-  $('edit-step').onchange = () => { offset = 0; $('edit-q').value = ''; closePopup(); load().catch((err) => toast(err.message, 'error')); };
+  const loadSummary = async () => {
+    const mine = await api('/api/requisitions?scope=mine');
+    const cartHeader = mine.requisitions.find((row) => row.status === 'cart' && row.requested_by === me.employeeId);
+    if (!cartHeader) { editMode = 'list'; await loadList(); return; }
+    const cart = (await api(`/api/requisitions/${cartHeader.id}`)).requisition;
+    const term = $('edit-q').value.trim().toLowerCase();
+    const allLines = cart.lines || [];
+    const lines = allLines.filter((line) => !term || `${line.material} ${line.materialDescription}`.toLowerCase().includes(term));
+    const page = pageOf(lines);
+    let picked = null;
+    $('edit-q').placeholder = 'รหัสหรือชื่อในสรุป';
+    $('edit-actions').innerHTML = `
+      <button class="btn btn-secondary" type="button" id="edit-back">รายการ</button>
+      <button class="btn btn-primary" type="button" id="edit-add">เพิ่ม</button>
+      <button class="btn btn-secondary" type="button" id="edit-line" disabled>แก้ไข</button>
+      <button class="btn btn-danger" type="button" id="edit-line-del" disabled>ลบ</button>
+      <button class="btn btn-primary hold-btn" type="button" id="edit-hold" ${allLines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">กดค้าง 2 วินาที</span></button>`;
+    $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th><th>จำนวน</th><th>ศูนย์ต้นทุน</th></tr></thead><tbody>
+      ${page.map((line) => `<tr data-pick="${esc(line.id)}" data-qty="${Number(line.qty)}" data-material="${esc(line.material)}" data-name="${esc(line.materialDescription)}" data-bun="${esc(line.bun)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${esc(line.bun)}</td><td>${Number(line.qty)}</td><td>${esc(line.costcenter === '-' ? cart.costcenter : line.costcenter)}</td></tr>`).join('')}
+    </tbody></table>` : '<p class="empty">ยังไม่มีรายการ กดเพิ่ม</p>';
+    setFoot(page.length, lines.length);
+    bindRowSelect($('edit-rows'), (_id, row) => { picked = row; $('edit-line').disabled = false; $('edit-line-del').disabled = false; });
+    $('edit-back').onclick = () => { editMode = 'list'; $('edit-q').value = ''; offset = 0; openView('edit'); };
+    $('edit-add').onclick = () => openAddPopup().catch((err) => toast(err.message, 'error'));
+    $('edit-line').onclick = () => {
+      if (!picked) return toast('เลือกแถวก่อน', 'error');
+      openPopup('แก้ไขจำนวน', `
+        <label class="field">รหัส<input value="${esc(picked.dataset.material)}" readonly></label>
+        <label class="field">รายการ<input value="${esc(picked.dataset.name)}" readonly></label>
+        <label class="field">หน่วย<input value="${esc(picked.dataset.bun)}" readonly></label>
+        <label class="field">จำนวน<input id="line-qty" type="number" min="0.001" step="0.001" value="${esc(picked.dataset.qty)}"></label>
+      `, async () => {
+        const qty = Number($('line-qty').value);
+        if (!(qty > 0)) throw new Error('ระบุจำนวน');
+        await api(`/api/requisitions/${cart.id}/lines/${picked.dataset.pick}`, { method: 'PATCH', body: { qty } });
+        toast('แก้ไขแล้ว');
+        closePopup();
+        editMode = 'summary';
+        openView('edit');
+      });
+    };
+    $('edit-line-del').onclick = () => {
+      if (!picked) return toast('เลือกแถวก่อน', 'error');
+      confirmPopup('ลบรายการ', `ตรวจ ${esc(picked.dataset.material)} อีกครั้งก่อนลบ`, async () => {
+        await api(`/api/requisitions/${cart.id}/lines/${picked.dataset.pick}`, { method: 'DELETE' });
+        editMode = 'summary';
+        openView('edit');
+      });
+    };
+    if (allLines.length) {
+      bindHold($('edit-hold'), async () => {
+        try {
+          await api(`/api/requisitions/${cart.id}/status`, { method: 'POST', body: { status: 'submitted', costcenter: cart.costcenter } });
+          toast('บันทึกการเบิกแล้ว');
+          editMode = 'list';
+          openView('edit');
+        } catch (err) {
+          toast(err.message, 'error');
+          editMode = 'summary';
+          openView('edit');
+        }
+      });
+    }
+  };
   $('edit-search').onclick = () => { offset = 0; load().catch((err) => toast(err.message, 'error')); };
   $('edit-q').addEventListener('keydown', (event) => { if (event.key === 'Enter') { offset = 0; load().catch((err) => toast(err.message, 'error')); } });
   $('edit-prev').onclick = () => { offset = Math.max(0, offset - pageSize); load().catch((err) => toast(err.message, 'error')); };
   $('edit-next').onclick = () => { offset += pageSize; load().catch((err) => toast(err.message, 'error')); };
-  $('edit-cc').onchange = () => { stockCc = $('edit-cc').value; offset = 0; load().catch((err) => toast(err.message, 'error')); };
   await load();
+}
+
+async function openAddPopup() {
+  const [pay, mine] = await Promise.all([
+    api('/api/pay-centers'),
+    api('/api/requisitions?scope=mine')
+  ]);
+  const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
+  if (!centers.length) return toast('ไม่มีศูนย์ต้นทุนในขอบเขตของคุณ', 'error');
+  const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
+  const chosen = cartHeader && cartHeader.costcenter !== '-' ? cartHeader.costcenter : centers[0].costcenter;
+  let picked = null;
+  openPopup('เบิก', `
+    <div class="search-block">
+      <div class="search-slot">
+        <label class="field">รายการ<input id="line-q" placeholder="รหัสหรือชื่อ"></label>
+        <button class="btn btn-secondary" type="button" id="line-search">ค้นหา</button>
+      </div>
+      <div class="search-list" id="line-results"></div>
+    </div>
+    <label class="field">รหัส<input id="line-code" readonly></label>
+    <label class="field">หน่วย<input id="line-bun" readonly></label>
+    <label class="field">จำนวน<input id="line-qty" type="number" min="0.001" step="0.001" value="1"></label>
+    <label class="field">ศูนย์ต้นทุน<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}" ${row.costcenter === chosen ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select></label>
+  `, async () => {
+    if (!picked) throw new Error('เลือกรายการ');
+    const qty = Number($('line-qty').value);
+    const costcenter = $('line-cc').value;
+    if (!(qty > 0)) throw new Error('ระบุจำนวน');
+    if (!costcenter) throw new Error('เลือกศูนย์ต้นทุน');
+    let id = cartHeader?.id;
+    if (!id) {
+      const created = await api('/api/requisitions', { method: 'POST', body: { costcenter } });
+      id = created.id;
+    }
+    await api(`/api/requisitions/${id}/lines`, { method: 'POST', body: { material: picked.material, qty, costcenter } });
+    toast('ใส่ตะกร้าแล้ว');
+    closePopup();
+    editMode = 'summary';
+    openView('edit');
+  }, 'ใส่ตะกร้า');
+  const searchLine = async () => {
+    const data = await api(`/api/materials?q=${encodeURIComponent($('line-q').value.trim())}`);
+    const materials = [...data.materials].sort((a, b) => String(a.material).localeCompare(String(b.material)));
+    $('line-results').innerHTML = materials.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th></tr></thead><tbody>
+      ${materials.map((row) => `<tr data-pick="${esc(row.material)}" data-bun="${esc(row.bun)}" data-name="${esc(row.material_description)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join('')}
+    </tbody></table>` : '<p class="empty">ไม่พบรายการ</p>';
+    bindRowSelect($('line-results'), (id, row) => {
+      picked = { material: id, bun: row.dataset.bun, name: row.dataset.name };
+      $('line-code').value = id;
+      $('line-bun').value = row.dataset.bun;
+    });
+  };
+  $('line-search').onclick = () => searchLine().catch((err) => toast(err.message, 'error'));
+  $('line-q').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); searchLine().catch((err) => toast(err.message, 'error')); } });
 }
 
 async function renderHome(target) {
@@ -550,119 +629,11 @@ async function renderHome(target) {
     <div class="view-body">
       <section class="card">
         <div class="card-title">เริ่มเบิก</div>
-        <p class="sum-meta">ใส่รายการลงตะกร้าก่อน ตอนส่งออร์เดอร์เลือกศูนย์ต้นทุนที่จะเบิกจ่าย ได้ทุกตัวในขอบเขตของคุณ เมื่อรับของและกดยืนยัน ระบบจะตัดยอด Current</p>
+        <p class="sum-meta">กดเบิก เลือกรายการ หน่วยขึ้นให้อัตโนมัติ ระบุจำนวนและศูนย์ต้นทุน แล้วตรวจสรุปก่อนกดค้างยืนยัน</p>
         <button class="btn btn-primary" type="button" data-go="edit">ไปที่ Edit Data</button>
       </section>
     </div>`;
   bindGo(target);
-}
-
-async function payCart(id) {
-  try {
-    const pay = await api('/api/pay-centers');
-    const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
-    if (!centers.length) return toast('ไม่มีศูนย์ต้นทุนในขอบเขตของคุณ', 'error');
-    let picked = centers.length === 1 ? centers[0].costcenter : '';
-    openPopup('จ่ายด้วยศูนย์ต้นทุน', `
-      <p class="sum-meta">เลือกศูนย์ต้นทุนที่จะเบิกจ่าย ได้ทุกตัวในขอบเขตของคุณ</p>
-      <div class="search-list" id="pay-list"><table class="mo-data-table"><thead><tr><th>ศูนย์ต้นทุน</th><th>ชื่อ</th></tr></thead><tbody>
-        ${centers.map((row) => `<tr class="row-pick${picked === row.costcenter ? ' is-selected' : ''}" data-pick="${esc(row.costcenter)}"><td>${esc(row.costcenter)}</td><td>${esc(row.objectName)}</td></tr>`).join('')}
-      </tbody></table></div>
-    `, async () => {
-      if (!picked) throw new Error('เลือกศูนย์ต้นทุน');
-      await api(`/api/requisitions/${id}/status`, { method: 'POST', body: { status: 'submitted', costcenter: picked } });
-      toast('ส่งออร์เดอร์แล้ว');
-      closePopup();
-      editStep = 'prepare';
-      openView('edit');
-    }, 'จ่าย');
-    bindRowSelect($('popup'), (value) => { picked = value; });
-  } catch (err) { toast(err.message, 'error'); }
-}
-
-function orderTable(rows, mine) {
-  if (!rows.length) return '<p class="empty">ไม่มีใบเบิก</p>';
-  return `<table class="mo-data-table"><thead><tr><th>เลขที่</th><th>ศูนย์ต้นทุน</th><th>สถานะ</th><th>ช่วงจัดเตรียม</th></tr></thead><tbody>
-    ${rows.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-mine="${mine ? '1' : '0'}">
-      <td>#${row.id}</td>
-      <td>${esc(row.costcenter)} · ${esc(row.costcenterName)}</td>
-      <td>${badge(row.status)}</td>
-      <td>${esc(lead(row.prepare_lead))}</td>
-    </tr>`).join('')}
-  </tbody></table>`;
-}
-
-function lead(value) {
-  if (!value) return '-';
-  return String(value).replace(/^(\d+):(\d+).*/, (_, h, m) => `${h} ชม. ${m} นาที`);
-}
-
-function actionsFor(row, mine) {
-  const buttons = [`<button class="btn btn-secondary" data-open="${row.id}">ดูรายการ</button>`];
-  if (mine && row.status === 'ready') buttons.push(`<button class="btn btn-primary" data-status="${row.id}" data-next="received">ยืนยันรับของ</button>`);
-  if (!mine && row.status === 'submitted') buttons.push(`<button class="btn btn-primary" data-status="${row.id}" data-next="accepted">รับออร์เดอร์</button>`);
-  if (!mine && row.status === 'accepted') buttons.push(`<button class="btn btn-primary" data-status="${row.id}" data-next="preparing">เริ่มจัด</button>`);
-  if (!mine && row.status === 'preparing') buttons.push(`<button class="btn btn-primary" data-status="${row.id}" data-next="ready">พร้อมรับ</button>`);
-  if (['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(row.status)) buttons.push(`<button class="btn btn-danger" data-status="${row.id}" data-next="cancelled">ยกเลิก</button>`);
-  return buttons.join('');
-}
-
-function bindOrderActions(target) {
-  target.querySelectorAll('[data-open]').forEach((node) => { node.onclick = () => showDetail(node.dataset.open); });
-  target.querySelectorAll('[data-status]').forEach((node) => { node.onclick = () => changeStatus(node.dataset.status, node.dataset.next); });
-}
-
-async function showDetail(id) {
-  const { requisition } = await api(`/api/requisitions/${id}`);
-  const lines = requisition.lines.map((line) => `<tr><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${Number(line.qty)} ${esc(line.bun)}</td></tr>`).join('');
-  const center = requisition.costcenter === '-' ? 'ยังไม่เลือกศูนย์ต้นทุน' : `${requisition.costcenter} · ${requisition.costcenterName}`;
-  openPopup(`ใบเบิก #${requisition.id}`, `
-    <p class="sum-meta">${badge(requisition.status)} ${esc(center)}</p>
-    <p class="sum-meta">จัดเตรียม ${esc(lead(requisition.prepare_lead))} · จนรับของ ${esc(lead(requisition.receive_lead))}</p>
-    <div class="search-list"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>จำนวน</th></tr></thead><tbody>${lines || '<tr><td colspan="3" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
-  `, () => closePopup(), 'ปิด');
-}
-
-async function changeStatus(id, status) {
-  const run = async () => {
-    await api(`/api/requisitions/${id}/status`, { method: 'POST', body: { status } });
-    toast(status === 'received' ? 'ยืนยันแล้ว และตัดยอด Current' : 'อัปเดตสถานะแล้ว');
-    closePopup();
-    openView(view);
-  };
-  if (status === 'cancelled') {
-    confirmPopup('ยกเลิกใบเบิก', `ตรวจใบเบิก #${id} อีกครั้งก่อนยกเลิก`, run, 'ยกเลิกใบเบิก');
-    return;
-  }
-  try { await run(); } catch (err) { toast(err.message, 'error'); }
-}
-
-function openStockPopup(row) {
-  openPopup(row ? 'แก้ไขยอด' : 'บันทึกยอด', `
-    <label class="field">รหัสวัสดุ<input id="stock-material" value="${esc(row?.dataset.pick || '')}" ${row ? 'readonly' : ''}></label>
-    <label class="field">Min<input id="stock-min" type="number" min="0" step="0.001" value="${row?.dataset.min ?? 0}"></label>
-    <label class="field">Current<input id="stock-current" type="number" min="0" step="0.001" value="${row?.dataset.current ?? 0}"></label>
-    <label class="field">Max<input id="stock-max" type="number" min="0" step="0.001" value="${row?.dataset.max ?? 0}"></label>
-  `, saveStock);
-}
-
-async function saveStock() {
-  try {
-    await api('/api/stock', {
-      method: 'PUT',
-      body: {
-        costcenter: $('edit-cc').value,
-        material: $('stock-material').value.trim(),
-        minQty: Number($('stock-min').value),
-        currentQty: Number($('stock-current').value),
-        maxQty: Number($('stock-max').value)
-      }
-    });
-    toast('บันทึกยอดแล้ว');
-    closePopup();
-    editStep = 'stock';
-    openView('edit');
-  } catch (err) { toast(err.message, 'error'); }
 }
 
 function centerText(row) {

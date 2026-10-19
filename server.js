@@ -273,7 +273,7 @@ app.get('/api/summary', wrap(requireUser), usageAtLeast(1), wrap(async (req, res
     .eq('requested_by', req.user.employeeId)
     .eq('status', 'ready');
   let queue = 0;
-  if (usageRank(req.user) >= 2) {
+  if (usageRank(req.user) >= 3) {
     const rows = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
       .in('status', ['submitted', 'accepted', 'preparing']);
     queue = rows.count || 0;
@@ -464,7 +464,7 @@ app.delete('/api/usage-materials/:material', wrap(requireUser), usageAtLeast(3),
   res.json({ ok: true });
 }));
 
-app.get('/api/pay-centers', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
+app.get('/api/pay-centers', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const department = req.user.department || '';
   const centers = await centersForDepartments([department]);
   res.json({ department, costcenters: centers.get(department) || [] });
@@ -515,7 +515,7 @@ app.patch('/api/buyers/:costcenter', wrap(requireUser), usageAtLeast(3), wrap(as
   res.json({ ok: true });
 }));
 
-app.get('/api/materials', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
+app.get('/api/materials', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const term = cleanTerm(req.query.q);
   let query = mx.from('mt_sto_usage')
     .select('material,material_description,bun,status')
@@ -586,7 +586,7 @@ app.put('/api/stock', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) 
 
 app.get('/api/requisitions', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const scope = req.query.scope === 'queue' ? 'queue' : 'mine';
-  if (scope === 'queue' && usageRank(req.user) < 2) return fail(res, 403, 'ไม่มีสิทธิ์ใน Edit Data');
+  if (scope === 'queue' && usageRank(req.user) < 3) return fail(res, 403, 'จัดเตรียมและจ่ายสำหรับ Admin');
   let query = tx.from('tx_sto_requisition').select('*').order('created_at', { ascending: false }).limit(50);
   if (scope === 'mine') query = query.eq('requested_by', req.user.employeeId);
   else query = query.in('status', ['submitted', 'accepted', 'preparing', 'ready']);
@@ -601,29 +601,40 @@ app.get('/api/requisitions/:id', wrap(requireUser), wrap(async (req, res) => {
   const id = Number(req.params.id);
   const { data: header, error } = await tx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
   if (error || !header) return fail(res, 404, 'ไม่พบใบเบิก');
-  if (header.requested_by !== req.user.employeeId && usageRank(req.user) < 2) return fail(res, 403, 'เปิดใบเบิกนี้ไม่ได้');
+  if (header.requested_by !== req.user.employeeId && usageRank(req.user) < 3) return fail(res, 403, 'เปิดใบเบิกนี้ไม่ได้');
   const { data: lines, error: lineError } = await tx.from('tx_sto_requisition_line').select('*').eq('requisition_id', id).order('id');
   if (lineError) return fail(res, 400, 'อ่านรายการไม่ได้');
   const [row] = await decorate([header], new Map([[id, lines || []]]));
   res.json({ requisition: row });
 }));
 
-app.post('/api/requisitions', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
+app.post('/api/requisitions', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
+  let costcenter = String(req.body.costcenter || '').trim();
+  if (costcenter) {
+    if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือกศูนย์ต้นทุนในขอบเขตของคุณ');
+  } else costcenter = DRAFT_COSTCENTER;
   const { data, error } = await tx.from('tx_sto_requisition')
-    .insert({ requested_by: req.user.employeeId, costcenter: DRAFT_COSTCENTER })
+    .insert({ requested_by: req.user.employeeId, costcenter })
     .select('id')
     .single();
   if (error) return fail(res, 400, 'เปิดตะกร้าไม่ได้');
   res.status(201).json({ id: data.id });
 }));
 
-app.post('/api/requisitions/:id/lines', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
+app.post('/api/requisitions/:id/lines', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const id = Number(req.params.id);
   const material = String(req.body.material || '').trim();
   const qty = qtyOf(req.body.qty);
   const header = await ownCart(req, id);
   if (!header) return fail(res, 400, 'แก้ได้เฉพาะตะกร้าของตนเอง');
   if (!material || !qty) return fail(res, 400, 'เลือกรายการและจำนวน');
+  const costcenter = String(req.body.costcenter || header.costcenter).trim();
+  if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือกศูนย์ต้นทุนในขอบเขตของคุณ');
+  if (costcenter !== header.costcenter) {
+    const applied = await tx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
+    if (applied.error) return fail(res, 400, 'บันทึกศูนย์ต้นทุนไม่ได้');
+    header.costcenter = costcenter;
+  }
   const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
   if (!item.data || item.data.status !== 'Active') return fail(res, 400, 'รายการนี้ใช้งานไม่ได้');
   const existing = await tx.from('tx_sto_requisition_line').select('id,qty').eq('requisition_id', id).eq('material', material).maybeSingle();
@@ -642,7 +653,7 @@ app.post('/api/requisitions/:id/lines', wrap(requireUser), usageAtLeast(2), wrap
   res.json({ ok: true });
 }));
 
-app.patch('/api/requisitions/:id/lines/:lineId', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
+app.patch('/api/requisitions/:id/lines/:lineId', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const qty = qtyOf(req.body.qty);
   const header = await ownCart(req, Number(req.params.id));
   if (!header || !qty) return fail(res, 400, 'แก้จำนวนในตะกร้าไม่ได้');
@@ -652,7 +663,7 @@ app.patch('/api/requisitions/:id/lines/:lineId', wrap(requireUser), usageAtLeast
   res.json({ ok: true });
 }));
 
-app.delete('/api/requisitions/:id/lines/:lineId', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
+app.delete('/api/requisitions/:id/lines/:lineId', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const header = await ownCart(req, Number(req.params.id));
   if (!header) return fail(res, 400, 'เอาออกจากตะกร้าไม่ได้');
   const { error } = await tx.from('tx_sto_requisition_line').delete()
@@ -667,29 +678,29 @@ app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res
   const { data: header, error } = await tx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
   if (error || !header) return fail(res, 404, 'ไม่พบใบเบิก');
   const mine = header.requested_by === req.user.employeeId;
-  const staff = usageRank(req.user) >= 2;
+  const admin = usageRank(req.user) >= 3;
   try {
     if (status === 'submitted' && mine && header.status === 'cart') {
-      const costcenter = String(req.body.costcenter || '').trim();
-      const center = await mx.from('mt_main_costcenter').select('department,status').eq('costcenter', costcenter).maybeSingle();
-      if (!center.data || center.data.status !== 'Active' || center.data.department !== req.user.department) return fail(res, 400, 'เลือกศูนย์ต้นทุนในขอบเขตของคุณ');
+      const costcenter = String(req.body.costcenter || header.costcenter || '').trim();
+      if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือกศูนย์ต้นทุนในขอบเขตของคุณ');
       const { data: lines, error: lineError } = await tx.from('tx_sto_requisition_line').select('material').eq('requisition_id', id);
       if (lineError || !lines?.length) return fail(res, 400, 'ตะกร้าว่าง');
       for (const line of lines) {
         const stock = await mx.from('mt_sto_stock').select('material').eq('costcenter', costcenter).eq('material', line.material).maybeSingle();
         if (!stock.data) return fail(res, 400, `ศูนย์ต้นทุนนี้ยังไม่มียอดของ ${line.material}`);
       }
-      const applied = await tx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
-      if (applied.error) return fail(res, 400, 'บันทึกศูนย์ต้นทุนไม่ได้');
+      if (costcenter !== header.costcenter) {
+        const applied = await tx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
+        if (applied.error) return fail(res, 400, 'บันทึกศูนย์ต้นทุนไม่ได้');
+      }
       await move(id, 'cart', { status: 'submitted' });
-    } else if (status === 'cancelled' && (mine || staff) && ['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(header.status)) {
-      if (header.status !== 'cart' && !staff && !mine) return fail(res, 403, 'ยกเลิกใบเบิกนี้ไม่ได้');
+    } else if (status === 'cancelled' && mine && ['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(header.status)) {
       await move(id, header.status, { status: 'cancelled' });
-    } else if (status === 'accepted' && staff && header.status === 'submitted') {
+    } else if (status === 'accepted' && admin && header.status === 'submitted') {
       await move(id, 'submitted', { status: 'accepted', accepted_by: req.user.employeeId });
-    } else if (status === 'preparing' && staff && header.status === 'accepted') {
+    } else if (status === 'preparing' && admin && header.status === 'accepted') {
       await move(id, 'accepted', { status: 'preparing' });
-    } else if (status === 'ready' && staff && header.status === 'preparing') {
+    } else if (status === 'ready' && admin && header.status === 'preparing') {
       await move(id, 'preparing', { status: 'ready' });
     } else if (status === 'received' && mine && header.status === 'ready') {
       await receive(header);
@@ -701,6 +712,12 @@ app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res
   }
   res.json({ ok: true });
 }));
+
+async function ownCenter(req, costcenter) {
+  const center = await mx.from('mt_main_costcenter').select('department,status').eq('costcenter', costcenter).maybeSingle();
+  if (!center.data || center.data.status !== 'Active' || center.data.department !== req.user.department) return null;
+  return center.data;
+}
 
 async function ownCart(req, id) {
   const { data } = await tx.from('tx_sto_requisition').select('id,requested_by,costcenter,status').eq('id', id).maybeSingle();

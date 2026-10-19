@@ -131,6 +131,10 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .toolbar .field.grow,.row .field.grow{flex:1 1 220px;min-width:180px;max-width:280px;width:auto}
 .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .action-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-left:auto;flex:0 0 auto}
+.hold-btn{position:relative;overflow:hidden;min-width:168px;touch-action:none;user-select:none}
+.hold-btn .hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.42);pointer-events:none}
+html[data-theme="dark"] .hold-btn .hold-fill{background:rgba(232,160,32,.4)}
+.hold-btn .hold-label{position:relative;z-index:1}
 .table-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto}
 .table-foot .sum-meta{margin:0}
 #sys-rows,#usage-rows,#edit-rows{flex:1}
