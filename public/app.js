@@ -7,18 +7,20 @@ const STATUS = {
   received: 'รับแล้ว',
   cancelled: 'ยกเลิก'
 };
-const ROLE = { employee: 'ผู้เบิก', supervisor: 'ผู้ดูแล', officer: 'เจ้าหน้าที่' };
+const USAGE_ROLE = { viewer: 'Viewer', user: 'User', admin: 'Admin' };
 const USAGE = 'ระบบงาน > Store > Usage';
 const TITLES = {
   main: ['TSAT4 SMF', 'หน้าหลัก'],
   work: ['ระบบงาน', 'Work System'],
   store: ['Store', 'ระบบงาน > Store'],
   activity: ['ระบบกิจกรรม', 'Activity'],
-  home: ['ภาพรวม', USAGE],
+  locked: ['Usage', USAGE],
+  home: ['Dashboard', USAGE],
+  edit: ['Edit Data', USAGE],
   requisition: ['เบิก', USAGE],
   queue: ['คิวจัดของ', USAGE],
   stock: ['Min / Current / Max', USAGE],
-  users: ['ผู้ใช้', USAGE]
+  setting: ['Setting', USAGE]
 };
 
 let me = null;
@@ -76,20 +78,26 @@ function showPassword() {
   $('shell').classList.add('d-none');
 }
 
+function rankOf(user = me) {
+  if (!user) return 0;
+  if (user.creator) return 3;
+  return { viewer: 1, user: 2, admin: 3 }[user.usageRole] || 0;
+}
+
 function showShell() {
   $('login').classList.add('d-none');
   $('password-gate').classList.add('d-none');
   $('shell').classList.remove('d-none');
   $('header-user').textContent = me.name || me.employeeId;
-  $('header-role').textContent = `${ROLE[me.role] || me.role} · ${me.employeeId}`;
-  document.querySelectorAll('[data-staff]').forEach((node) => node.classList.toggle('d-none', me.role === 'employee'));
-  document.querySelectorAll('[data-supervisor]').forEach((node) => node.classList.toggle('d-none', me.role !== 'supervisor'));
+  const access = me.creator ? 'ผู้สร้างระบบ' : (USAGE_ROLE[me.usageRole] || 'ยังไม่เข้า Usage');
+  $('header-role').textContent = `${access} · ${me.employeeId}`;
+  document.querySelectorAll('[data-usage]').forEach((node) => node.classList.toggle('d-none', Number(node.dataset.usage) > rankOf()));
   openView(view);
 }
 
 function openView(name) {
-  if (name === 'queue' && me.role === 'employee') name = 'home';
-  if ((name === 'stock' && me.role === 'employee') || (name === 'users' && me.role !== 'supervisor')) name = 'home';
+  const need = { home: 1, edit: 2, requisition: 2, queue: 2, stock: 2, setting: 3 }[name] || 0;
+  if (need && rankOf() < need) name = 'locked';
   view = name;
   const [title, subtitle] = TITLES[name];
   $('header-page-title').textContent = title;
@@ -108,11 +116,13 @@ function openView(name) {
     work: renderWork,
     store: renderStore,
     activity: renderActivity,
+    locked: renderLocked,
     home: renderHome,
+    edit: renderEdit,
     requisition: renderRequisition,
     queue: renderQueue,
     stock: renderStock,
-    users: renderUsers
+    setting: renderUsers
   }[name];
   render(target).catch((err) => { target.innerHTML = `<p class="form-error">${esc(err.message)}</p>`; });
 }
@@ -161,7 +171,7 @@ async function renderStore(target) {
         <div class="card-title">Store</div>
         <p class="sum-meta">ระบบงาน > Store</p>
         <div class="module-grid">
-          ${moduleCard('home', 'inventory_2', 'Usage', 'เบิกของ ยอด Min / Current / Max และผู้ใช้')}
+          ${moduleCard('home', 'inventory_2', 'Usage', 'Dashboard, Edit Data, Setting')}
         </div>
       </section>
     </div>`;
@@ -177,6 +187,37 @@ async function renderActivity(target) {
         <p class="empty">ยังไม่มีกิจกรรมในส่วนนี้</p>
       </section>
     </div>`;
+}
+
+async function renderLocked(target) {
+  target.innerHTML = `
+    <div class="view-body">
+      <section class="card">
+        <div class="card-title">Usage</div>
+        <p class="empty">ยังไม่มีชื่อในรายการ Usage จึงยังเข้าส่วนนี้ไม่ได้</p>
+      </section>
+    </div>`;
+}
+
+async function renderEdit(target) {
+  target.innerHTML = `
+    <div class="toolbar">
+      <button class="btn btn-secondary" type="button" data-panel="requisition">เบิก</button>
+      <button class="btn btn-secondary" type="button" data-panel="queue">คิวจัดของ</button>
+      <button class="btn btn-secondary" type="button" data-panel="stock">Min / Current / Max</button>
+    </div>
+    <div id="edit-panel"></div>`;
+  const openPanel = async (panel) => {
+    target.querySelectorAll('[data-panel]').forEach((node) => {
+      node.classList.toggle('btn-primary', node.dataset.panel === panel);
+      node.classList.toggle('btn-secondary', node.dataset.panel !== panel);
+    });
+    const box = $('edit-panel');
+    box.innerHTML = '<div class="empty">กำลังโหลด...</div>';
+    await { requisition: renderRequisition, queue: renderQueue, stock: renderStock }[panel](box);
+  };
+  target.querySelectorAll('[data-panel]').forEach((node) => { node.onclick = () => openPanel(node.dataset.panel); });
+  await openPanel('requisition');
 }
 
 async function renderHome(target) {
@@ -434,7 +475,8 @@ async function renderUsers(target) {
   target.innerHTML = `
     <div class="view-body">
     <section class="card">
-      <div class="card-title">เพิ่มผู้ใช้</div>
+      <div class="card-title">รายชื่อ Usage</div>
+      <p class="sum-meta">Viewer เห็น Dashboard · User เห็น Dashboard กับ Edit Data · Admin เห็นครบรวม Setting ถ้ายังไม่มีบัญชีเข้าสู่ระบบ ให้ตั้งรหัสผ่านอย่างน้อย 8 ตัว</p>
       <div class="toolbar">
         <label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อ"></label>
         <button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button>
@@ -443,17 +485,17 @@ async function renderUsers(target) {
       <div class="toolbar">
         <label class="field">รหัสพนักงาน<input id="user-id" required></label>
         <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8"></label>
-        <label class="field">บทบาท<select id="user-role"><option value="employee">ผู้เบิก</option><option value="officer">เจ้าหน้าที่</option><option value="supervisor">ผู้ดูแล</option></select></label>
+        <label class="field">บทบาท<select id="user-role"><option value="viewer">Viewer</option><option value="user">User</option><option value="admin">Admin</option></select></label>
         <button class="btn btn-primary" type="button" id="user-save">เพิ่ม</button>
       </div>
     </section>
     <section class="card"><div class="card-title">บัญชีผู้ใช้</div><div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>บทบาท</th><th>สถานะ</th><th>หมดอายุรหัส</th><th></th></tr></thead><tbody>
       ${data.users.map((row) => `<tr>
-        <td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(ROLE[row.role] || row.role)}</td><td>${esc(row.status)}</td>
+        <td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td>
         <td>${row.passwordExpired ? '<span class="badge badge-danger">ครบ 90 วัน</span>' : esc(new Date(row.passwordExpiresAt).toLocaleDateString('th-TH'))}</td>
         <td class="actions">
-          <button class="btn btn-secondary" data-edit="${esc(row.employeeId)}" data-role="${esc(row.role)}" data-user-status="${esc(row.status)}">แก้ไข</button>
-          <button class="btn btn-danger" data-delete="${esc(row.employeeId)}">ลบ</button>
+          ${row.creator ? '' : `<button class="btn btn-secondary" data-edit="${esc(row.employeeId)}" data-role="${esc(row.role)}" data-user-status="${esc(row.status)}">แก้ไข</button>
+          <button class="btn btn-danger" data-delete="${esc(row.employeeId)}">นำออก</button>`}
         </td></tr>`).join('')}
     </tbody></table></div></section>
     </div>`;
@@ -474,29 +516,29 @@ async function searchEmployees() {
 async function createUser() {
   try {
     await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value } });
-    toast('เพิ่มผู้ใช้แล้ว');
-    openView('users');
+    toast('เพิ่มรายชื่อ Usage แล้ว');
+    openView('setting');
   } catch (err) { toast(err.message, 'error'); }
 }
 
 async function editUser(employeeId, role, status) {
-  const nextRole = prompt('บทบาท employee, officer หรือ supervisor', role);
+  const nextRole = prompt('บทบาท viewer, user หรือ admin', role);
   if (!nextRole) return;
   const nextStatus = prompt('สถานะ Active หรือ Inactive', status);
   if (!nextStatus) return;
   const password = prompt('รหัสผ่านใหม่ เว้นว่างถ้าไม่เปลี่ยน', '') || '';
   try {
     await api(`/api/users/${encodeURIComponent(employeeId)}`, { method: 'PATCH', body: { role: nextRole, status: nextStatus, password } });
-    openView('users');
+    openView('setting');
   } catch (err) { toast(err.message, 'error'); }
 }
 
 async function deleteUser(employeeId) {
-  if (!confirm(`ลบหรือปิดบัญชี ${employeeId}?`)) return;
+  if (!confirm(`นำ ${employeeId} ออกจาก Usage?`)) return;
   try {
     const result = await api(`/api/users/${encodeURIComponent(employeeId)}`, { method: 'DELETE' });
-    toast(result.inactive ? 'มีประวัติแล้ว จึงปิดเป็น Inactive' : 'ลบผู้ใช้แล้ว');
-    openView('users');
+    toast(result.inactive ? 'มีประวัติแล้ว จึงปิดเป็น Inactive' : 'นำออกจาก Usage แล้ว');
+    openView('setting');
   } catch (err) { toast(err.message, 'error'); }
 }
 
