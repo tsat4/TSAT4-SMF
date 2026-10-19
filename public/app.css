@@ -117,6 +117,12 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .popup-fields .field{width:100%;max-width:none;flex:none}
 .popup-fields .btn{width:100%}
 .popup-fields .table-wrap{max-height:180px}
+.search-slot{display:flex;align-items:flex-end;gap:8px;min-width:0;width:100%}
+.toolbar .search-slot{flex:1 1 280px;width:auto}
+.search-slot .field,.toolbar .search-slot .field,.popup-fields .search-slot .field{flex:1 1 auto;width:auto;min-width:0;max-width:none}
+.search-slot > .btn,.popup-fields .search-slot > .btn{flex:0 0 auto;width:auto}
+.search-block{display:flex;flex-direction:column;gap:8px;width:100%;min-width:0}
+.search-list{max-height:168px;overflow:auto;border:1px solid var(--mo-line);border-radius:var(--mo-radius);background:var(--mo-surface)}
 .popup-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 .popup-actions .btn{width:auto}
 #login-form .btn-primary{width:100%}

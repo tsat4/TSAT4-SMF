@@ -248,8 +248,10 @@ async function renderSystem(target) {
   target.innerHTML = `
     <div class="toolbar">
       <label class="field grow">ตาราง<select id="sys-table">${catalog.tables.map((table) => `<option value="${esc(table.name)}">${esc(table.name)}</option>`).join('')}</select></label>
-      <label class="field grow">ค้นหา<input id="sys-q"></label>
-      <button class="btn btn-secondary" type="button" id="sys-search">ค้นหา</button>
+      <div class="search-slot">
+        <label class="field grow">ค้นหา<input id="sys-q"></label>
+        <button class="btn btn-secondary" type="button" id="sys-search">ค้นหา</button>
+      </div>
       <div class="action-bar">
         <button class="btn btn-primary" type="button" id="sys-add">เพิ่ม</button>
         <button class="btn btn-secondary" type="button" id="sys-edit" disabled>แก้ไข</button>
@@ -389,7 +391,7 @@ async function renderHome(target) {
     <div class="view-body">
       <section class="card">
         <div class="card-title">เริ่มเบิก</div>
-        <p class="sum-meta">เลือกศูนย์ต้นทุนที่จ่าย เลือกรายการ ระบุจำนวน แล้วใส่ตะกร้าได้หลายรายการ เมื่อรับของและกดยืนยัน ระบบจะตัดยอด Current</p>
+        <p class="sum-meta">ใส่รายการลงตะกร้าก่อน ตอนส่งออร์เดอร์เลือกศูนย์ต้นทุนที่จะเบิกจ่าย ได้ทุกตัวในขอบเขตของคุณ เมื่อรับของและกดยืนยัน ระบบจะตัดยอด Current</p>
         <button class="btn btn-primary" type="button" data-go="requisition">ไปที่ใบเบิก</button>
       </section>
     </div>`;
@@ -397,29 +399,23 @@ async function renderHome(target) {
 }
 
 async function renderRequisition(target) {
-  const [pay, mine] = await Promise.all([
-    api('/api/pay-centers'),
-    api('/api/requisitions?scope=mine')
-  ]);
+  const mine = await api('/api/requisitions?scope=mine');
   const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
   const cart = cartHeader ? (await api(`/api/requisitions/${cartHeader.id}`)).requisition : null;
   target.innerHTML = `
     <div class="view-body">
     <section class="card">
       <div class="card-title">${cart ? `ตะกร้า #${cart.id}` : 'เปิดตะกร้า'}</div>
-      <div class="toolbar">
-        <label class="field">ศูนย์ต้นทุนที่จ่าย
-          <select id="buyer">${pay.costcenters.map((row) => `<option value="${esc(row.costcenter)}" ${cart && cart.costcenter === row.costcenter ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>
-        </label>
-        ${cart || !pay.costcenters.length ? '' : '<button class="btn btn-primary" type="button" id="new-cart">เปิดตะกร้า</button>'}
-      </div>
+      <p class="sum-meta">ใส่รายการลงตะกร้าก่อน ตอนส่งออร์เดอร์เลือกศูนย์ต้นทุนที่จะเบิกจ่าย ได้ทุกตัวในขอบเขตของคุณ</p>
       ${cart ? `
-        <div class="toolbar">
-          <label class="field">ค้นหารายการ<input id="item-q" placeholder="รหัสหรือชื่อรายการ"></label>
-          <button class="btn btn-primary" type="button" id="search-item">ค้นหา</button>
+        <div class="search-block">
+          <div class="search-slot">
+            <label class="field">ค้นหารายการ<input id="item-q" placeholder="รหัสหรือชื่อรายการ"></label>
+            <button class="btn btn-primary" type="button" id="search-item">ค้นหา</button>
+          </div>
+          <div id="item-results"></div>
         </div>
-        <div id="item-results"></div>
-        <div id="cart-lines"></div>` : `<p class="empty">${pay.costcenters.length ? 'ยังไม่มีตะกร้า' : 'หน่วยงานนี้ยังไม่มีศูนย์ต้นทุนสำหรับเบิกจ่าย'}</p>`}
+        <div id="cart-lines"></div>` : '<button class="btn btn-primary" type="button" id="new-cart">เปิดตะกร้า</button>'}
     </section>
     <section class="card"><div class="card-title-row"><div class="card-title">ใบเบิกของฉัน</div><div class="action-bar" id="mine-bar"></div></div><div class="table-wrap" id="mine-table">${orderTable(mine.requisitions.filter((row) => row.status !== 'cart'), true)}</div></section>
     </div>`;
@@ -428,7 +424,7 @@ async function renderRequisition(target) {
     if (!$('new-cart')) return;
     $('new-cart').onclick = async () => {
       try {
-        await api('/api/requisitions', { method: 'POST', body: { costcenter: $('buyer').value } });
+        await api('/api/requisitions', { method: 'POST', body: {} });
         openView('requisition');
       } catch (err) { toast(err.message, 'error'); }
     };
@@ -443,7 +439,7 @@ function drawLines(cart) {
   const box = $('cart-lines');
   if (!cart.lines?.length) {
     box.innerHTML = '<div class="action-bar"><button class="btn btn-primary" type="button" id="submit-cart">ส่งออร์เดอร์</button></div><p class="empty">ตะกร้าว่าง</p>';
-    $('submit-cart').onclick = () => changeStatus(cart.id, 'submitted');
+    $('submit-cart').onclick = () => toast('ใส่รายการก่อนส่งออร์เดอร์', 'error');
     return;
   }
   let picked = '';
@@ -460,17 +456,40 @@ function drawLines(cart) {
       openView('requisition');
     });
   };
-  $('submit-cart').onclick = () => changeStatus(cart.id, 'submitted');
+  $('submit-cart').onclick = () => payCart(cart.id);
+}
+
+async function payCart(id) {
+  try {
+    const pay = await api('/api/pay-centers');
+    const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
+    if (!centers.length) return toast('ไม่มีศูนย์ต้นทุนในขอบเขตของคุณ', 'error');
+    let picked = centers.length === 1 ? centers[0].costcenter : '';
+    openPopup('จ่ายด้วยศูนย์ต้นทุน', `
+      <p class="sum-meta">เลือกศูนย์ต้นทุนที่จะเบิกจ่าย ได้ทุกตัวในขอบเขตของคุณ</p>
+      <div class="search-list" id="pay-list"><table class="mo-data-table"><thead><tr><th>ศูนย์ต้นทุน</th><th>ชื่อ</th></tr></thead><tbody>
+        ${centers.map((row) => `<tr class="row-pick${picked === row.costcenter ? ' is-selected' : ''}" data-pick="${esc(row.costcenter)}"><td>${esc(row.costcenter)}</td><td>${esc(row.objectName)}</td></tr>`).join('')}
+      </tbody></table></div>
+    `, async () => {
+      if (!picked) throw new Error('เลือกศูนย์ต้นทุน');
+      await api(`/api/requisitions/${id}/status`, { method: 'POST', body: { status: 'submitted', costcenter: picked } });
+      toast('ส่งออร์เดอร์แล้ว');
+      closePopup();
+      openView('requisition');
+    }, 'จ่าย');
+    bindRowSelect($('popup'), (value) => { picked = value; });
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 async function searchItems(cartId) {
   const term = $('item-q').value.trim();
   const data = await api(`/api/materials?q=${encodeURIComponent(term)}`);
   let picked = '';
-  $('item-results').innerHTML = data.materials.length ? `
+  const materials = [...data.materials].sort((a, b) => String(a.material).localeCompare(String(b.material)));
+  $('item-results').innerHTML = materials.length ? `
     <div class="action-bar"><button class="btn btn-primary" type="button" id="item-add" disabled>ใส่ตะกร้า</button></div>
-    <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th></tr></thead><tbody>
-    ${data.materials.map((row) => `<tr data-pick="${esc(row.material)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join('')}
+    <div class="search-list"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th></tr></thead><tbody>
+    ${materials.map((row) => `<tr data-pick="${esc(row.material)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join('')}
   </tbody></table></div>` : '<p class="empty">ไม่พบรายการ</p>';
   if (!data.materials.length) return;
   bindRowSelect($('item-results'), (id) => { picked = id; $('item-add').disabled = !id; });
@@ -566,11 +585,13 @@ async function renderStock(target) {
     <div class="view-body">
     <section class="card">
       <div class="card-title-row"><div class="card-title">ศูนย์ต้นทุนที่สั่งซื้อ</div><div class="action-bar"><button class="btn btn-secondary" type="button" id="buyer-toggle" disabled>เปิด/ปิด</button></div></div>
-      <div class="toolbar">
-        <label class="field">ค้นศูนย์ต้นทุน<input id="cc-q" placeholder="รหัสหรือชื่อ"></label>
-        <button class="btn btn-secondary" type="button" id="cc-search">ค้นหา</button>
+      <div class="search-block">
+        <div class="search-slot">
+          <label class="field">ค้นศูนย์ต้นทุน<input id="cc-q" placeholder="รหัสหรือชื่อ"></label>
+          <button class="btn btn-secondary" type="button" id="cc-search">ค้นหา</button>
+        </div>
+        <div id="cc-results"></div>
       </div>
-      <div id="cc-results"></div>
       <div class="table-wrap" id="buyer-table"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>สถานะ</th></tr></thead><tbody>
         ${buyers.buyers.map((row) => `<tr data-pick="${esc(row.costcenter)}" data-next="${row.status === 'Active' ? 'Inactive' : 'Active'}"><td>${esc(row.costcenter)}</td><td>${esc(row.objectName)}</td><td>${esc(row.status)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">ยังไม่มีศูนย์ต้นทุนที่สั่งซื้อ</td></tr>'}
       </tbody></table></div>
@@ -579,8 +600,10 @@ async function renderStock(target) {
       <div class="card-title">ยอดรายการ</div>
       <div class="toolbar">
         <label class="field">ศูนย์ต้นทุน<select id="stock-cc">${pay.costcenters.map((row) => `<option value="${esc(row.costcenter)}">${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select></label>
-        <label class="field">ค้นหารายการ<input id="stock-q"></label>
-        <button class="btn btn-secondary" type="button" id="stock-load">แสดง</button>
+        <div class="search-slot">
+          <label class="field">ค้นหารายการ<input id="stock-q"></label>
+          <button class="btn btn-secondary" type="button" id="stock-load">แสดง</button>
+        </div>
       </div>
       <div class="action-bar">
         <button class="btn btn-primary" type="button" id="stock-save">บันทึกยอด</button>
@@ -609,10 +632,11 @@ async function renderStock(target) {
 async function searchCenters() {
   const data = await api(`/api/costcenters?q=${encodeURIComponent($('cc-q').value.trim())}`);
   let picked = '';
-  $('cc-results').innerHTML = data.costcenters.length ? `
+  const centers = [...data.costcenters].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
+  $('cc-results').innerHTML = centers.length ? `
     <div class="action-bar"><button class="btn btn-primary" type="button" id="cc-add" disabled>ตั้งเป็นผู้สั่งซื้อ</button></div>
-    <div class="table-wrap"><table class="mo-data-table"><tbody>
-    ${data.costcenters.map((row) => `<tr data-pick="${esc(row.costcenter)}"><td>${esc(row.costcenter)}</td><td>${esc(row.object_name)}</td></tr>`).join('')}
+    <div class="search-list"><table class="mo-data-table"><tbody>
+    ${centers.map((row) => `<tr data-pick="${esc(row.costcenter)}"><td>${esc(row.costcenter)}</td><td>${esc(row.object_name)}</td></tr>`).join('')}
   </tbody></table></div>` : '<p class="empty">ไม่พบศูนย์ต้นทุน</p>';
   if (!data.costcenters.length) return;
   bindRowSelect($('cc-results'), (id) => { picked = id; $('cc-add').disabled = !id; });
@@ -682,8 +706,10 @@ async function renderUsers(target) {
   target.innerHTML = `
     <div class="toolbar">
       <label class="field grow">ตาราง<select id="usage-table"><option value="members">mt_sto_user</option><option value="materials">mt_sto_usage</option></select></label>
-      <label class="field grow">ค้นหา<input id="usage-q"></label>
-      <button class="btn btn-secondary" type="button" id="usage-search">ค้นหา</button>
+      <div class="search-slot">
+        <label class="field grow">ค้นหา<input id="usage-q"></label>
+        <button class="btn btn-secondary" type="button" id="usage-search">ค้นหา</button>
+      </div>
       <div class="action-bar">
         <button class="btn btn-primary" type="button" id="usage-add">เพิ่ม</button>
         <button class="btn btn-secondary" type="button" id="usage-edit" disabled>แก้ไข</button>
@@ -715,25 +741,24 @@ async function renderUsers(target) {
     }
     const row = formMode === 'edit' && selected ? selected : null;
     openPopup(`${row ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_user`, `
-      ${row ? '' : `<label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อจาก mt_main_employee"></label><button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button><div id="emp-results"></div>`}
+      ${row ? '' : `<div class="search-block"><div class="search-slot"><label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อจาก mt_main_employee"></label><button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button></div><div class="search-list" id="emp-results"></div></div>`}
       <label class="field">รหัสพนักงาน<input id="user-id" readonly value="${esc(row?.employeeId || '')}" placeholder="เลือกจากรายชื่อพนักงาน"></label>
       <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8" autocomplete="new-password"></label>
       <label class="field">บทบาท<select id="user-role"><option value="viewer" ${row?.role === 'viewer' ? 'selected' : ''}>Viewer</option><option value="user" ${row?.role === 'user' ? 'selected' : ''}>User</option><option value="admin" ${row?.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>
       <label class="field">สถานะ<select id="user-status"><option ${row?.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row?.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
-      <p class="sum-meta" id="user-centers">${row ? esc(`${row.department || '-'}: ${centerText(row) || 'ไม่มีศูนย์ต้นทุน'}`) : ''}</p>
     `, saveRow);
-    if ($('emp-search')) $('emp-search').onclick = searchEmployees;
+    if ($('emp-search')) {
+      $('emp-search').onclick = searchEmployees;
+      $('emp-q').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); searchEmployees(); } });
+    }
   };
   const searchEmployees = async () => {
     const data = await api(`/api/employees?q=${encodeURIComponent($('emp-q').value.trim())}`);
-    $('emp-results').innerHTML = data.employees.length ? `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th><th>ศูนย์ต้นทุน</th></tr></thead><tbody>
-      ${data.employees.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.employee_id)}</td><td>${esc(row.name)}</td><td>${esc(row.department || '')}</td><td>${esc(centerText(row))}</td></tr>`).join('')}
-    </tbody></table></div>` : '<p class="empty">ไม่พบพนักงาน</p>';
-    bindRowSelect($('emp-results'), (index) => {
-      const person = data.employees[Number(index)];
-      $('user-id').value = person.employee_id;
-      $('user-centers').textContent = `${person.department || '-'}: ${centerText(person) || 'ไม่มีศูนย์ต้นทุน'}`;
-    });
+    const people = [...data.employees].sort((a, b) => String(a.employee_id).localeCompare(String(b.employee_id)));
+    $('emp-results').innerHTML = people.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th></tr></thead><tbody>
+      ${people.map((person) => `<tr data-pick="${esc(person.employee_id)}"><td>${esc(person.employee_id)}</td><td>${esc(person.name)}</td><td>${esc(person.department || '')}</td></tr>`).join('')}
+    </tbody></table>` : '<p class="empty">ไม่พบพนักงาน</p>';
+    bindRowSelect($('emp-results'), (id) => { $('user-id').value = id; });
   };
   const loadRows = async () => {
     selected = null;
