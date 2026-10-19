@@ -222,9 +222,14 @@ async function renderSystem(target) {
       </div>
     </div>
     <div id="sys-form"></div>
-    <div class="sum-meta" id="sys-count"></div>
     <div class="table-wrap" id="sys-rows"></div>
-    <div class="actions"><button class="btn btn-secondary" type="button" id="sys-prev">ก่อนหน้า</button><button class="btn btn-secondary" type="button" id="sys-next">ถัดไป</button></div>`;
+    <div class="table-foot">
+      <div class="sum-meta" id="sys-count"></div>
+      <div class="action-bar">
+        <button class="btn btn-secondary" type="button" id="sys-prev">ก่อนหน้า</button>
+        <button class="btn btn-secondary" type="button" id="sys-next">ถัดไป</button>
+      </div>
+    </div>`;
   const tableOf = () => catalog.tables.find((table) => table.name === $('sys-table').value);
   const choices = { status: ['Active', 'Inactive'], group: ['Factory', 'Non', 'Center'], usage: ['viewer', 'user', 'admin'], req: ['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'] };
   const drawForm = () => {
