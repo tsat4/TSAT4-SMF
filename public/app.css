@@ -133,7 +133,7 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .action-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-left:auto;flex:0 0 auto}
 .table-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto}
 .table-foot .sum-meta{margin:0}
-#sys-rows,#usage-rows{flex:1}
+#sys-rows,#usage-rows,#edit-rows{flex:1}
 .table-wrap{overflow:auto;max-width:100%;width:100%;min-width:0;border:1px solid var(--mo-line);border-radius:var(--mo-radius);background:var(--mo-surface);min-height:0;-webkit-overflow-scrolling:touch}
 table{border-collapse:separate;border-spacing:0;width:100%;min-width:0}
 table.mo-data-table{width:max-content;min-width:100%}
