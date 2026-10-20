@@ -451,7 +451,7 @@ app.post('/api/usage-materials', wrap(requireUser), usageAtLeast(3), wrap(async 
     usage_group: usageGroup || null,
     img: img || null
   });
-  if (error) return fail(res, 400, 'เพิ่มรายการไม่ได้');
+  if (error) return fail(res, 400, adminWriteError(error, 'เพิ่มรายการไม่ได้'));
   res.status(201).json({ ok: true });
 }));
 
@@ -462,6 +462,7 @@ app.patch('/api/usage-materials/:material', wrap(requireUser), usageAtLeast(3), 
   const price = amountOf(req.body.price);
   const status = ['Active', 'Inactive'].includes(req.body.status) ? req.body.status : '';
   const usageGroup = usageGroupOf(req.body.usageGroup);
+  const nextMaterial = String(req.body.material || '').trim();
   if (!materialDescription || !bun || !crcy || price == null || !status) return fail(res, 400, 'ระบุรายการให้ครบ');
   const patch = {
     material_description: materialDescription,
@@ -471,13 +472,15 @@ app.patch('/api/usage-materials/:material', wrap(requireUser), usageAtLeast(3), 
     status,
     usage_group: usageGroup || null
   };
+  if (nextMaterial && nextMaterial !== req.params.material) patch.material = nextMaterial;
   if (req.body.img) {
     const img = await saveUsageImage(req.params.material, req.body.img);
     if (!img) return fail(res, 400, 'รูปต้องเป็นสี่เหลี่ยมจัตุรัส');
     patch.img = img;
   }
   const { data, error } = await mx.from('mt_sto_usage').update(patch).eq('material', req.params.material).select('material');
-  if (error || !data?.length) return fail(res, 400, 'แก้ไขรายการไม่ได้');
+  if (error) return fail(res, 400, adminWriteError(error, 'แก้ไขรายการไม่ได้'));
+  if (!data?.length) return fail(res, 400, 'แก้ไขรายการไม่ได้');
   res.json({ ok: true });
 }));
 
@@ -485,7 +488,7 @@ app.delete('/api/usage-materials/:material', wrap(requireUser), usageAtLeast(3),
   const used = await mx.from('mt_sto_stock').select('material', { count: 'exact', head: true }).eq('material', req.params.material);
   if (used.count) return fail(res, 400, 'รายการนี้มียอดคงเหลือ ลบไม่ได้');
   const { error } = await mx.from('mt_sto_usage').delete().eq('material', req.params.material);
-  if (error) return fail(res, 400, 'ลบรายการไม่ได้');
+  if (error) return fail(res, 400, adminWriteError(error, 'ลบรายการไม่ได้'));
   res.json({ ok: true });
 }));
 
@@ -768,6 +771,16 @@ function hasKey(spec, key) {
   return spec.pk.every((column) => key?.[column] != null && String(key[column]) !== '');
 }
 
+function adminWriteError(error, fallback) {
+  const code = error?.code;
+  const message = String(error?.message || '');
+  if (code === '23505') return 'ข้อมูลนี้มีอยู่แล้ว';
+  if (code === '23503') return fallback.includes('ลบ') ? 'แถวนี้ถูกใช้อยู่ ลบไม่ได้' : 'ค่านี้ขัดกับตารางที่เชื่อมอยู่';
+  if (message.includes('cannot change employee')) return 'เปลี่ยนรหัสพนักงานไม่ได้';
+  if (message.includes('must be Active')) return 'สถานะที่เชื่อมอยู่ต้องเป็น Active';
+  return fallback;
+}
+
 function creatorOnly(req, res, next) {
   if (!req.user?.creator) return fail(res, 403, 'เฉพาะผู้ดูแลระบบ');
   next();
@@ -856,7 +869,7 @@ app.post('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async 
   if (req.params.name === 'mt_main_user' && !out.password_hash) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
   if (req.params.name === 'mt_main_user') out.role = 'employee';
   const { error } = await client.from(req.params.name).insert(out);
-  if (error) return fail(res, 400, 'เพิ่มแถวไม่ได้');
+  if (error) return fail(res, 400, adminWriteError(error, 'เพิ่มแถวไม่ได้'));
   res.status(201).json({ ok: true });
 }));
 
@@ -868,14 +881,20 @@ app.patch('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async
   if (!hasKey(spec, key)) return fail(res, 400, 'ไม่พบแถวที่แก้');
   const { out, error: invalid } = await adminPayload(spec, req.body?.values || {}, { insert: false });
   if (invalid) return fail(res, 400, invalid);
-  for (const column of spec.pk) delete out[column];
   if (req.params.name === 'mt_main_user' && String(key.employee_id) === CREATOR_ID && out.creator === false) return fail(res, 400, 'ปิดผู้สร้างระบบไม่ได้');
   if (req.params.name === 'mt_sto_user' && String(key.employee_id) === CREATOR_ID && (out.role && out.role !== 'admin' || out.status === 'Inactive')) return fail(res, 400, 'ผู้สร้างระบบเป็น Admin เสมอ');
-  if (!Object.keys(out).length) return fail(res, 400, 'ไม่มีข้อมูลให้แก้ไข');
-  let query = client.from(req.params.name).update(out);
+  const changed = {};
+  for (const [column, value] of Object.entries(out)) {
+    if (spec.pk.includes(column) && String(value) === String(key[column] ?? '')) continue;
+    changed[column] = value;
+  }
+  if ((req.params.name === 'mt_main_user' || req.params.name === 'mt_sto_user') && changed.employee_id) return fail(res, 400, 'เปลี่ยนรหัสพนักงานไม่ได้');
+  if (!Object.keys(changed).length) return fail(res, 400, 'ไม่มีข้อมูลให้แก้ไข');
+  let query = client.from(req.params.name).update(changed);
   for (const column of spec.pk) query = query.eq(column, key[column]);
   const { data, error } = await query.select(spec.pk.join(','));
-  if (error || !data?.length) return fail(res, 400, 'แก้ไขแถวไม่ได้');
+  if (error) return fail(res, 400, adminWriteError(error, 'แก้ไขแถวไม่ได้'));
+  if (!data?.length) return fail(res, 400, 'แก้ไขแถวไม่ได้');
   res.json({ ok: true });
 }));
 
@@ -889,7 +908,7 @@ app.delete('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(asyn
   let query = client.from(req.params.name).delete();
   for (const column of spec.pk) query = query.eq(column, key[column]);
   const { error } = await query;
-  if (error) return fail(res, 400, 'ลบแถวไม่ได้');
+  if (error) return fail(res, 400, adminWriteError(error, 'ลบแถวไม่ได้'));
   res.json({ ok: true });
 }));
 

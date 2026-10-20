@@ -290,14 +290,14 @@ async function renderLocked(target) {
   target.innerHTML = cardView('Usage', '', '<p class="empty">ยังไม่มีชื่อในรายการ Usage จึงยังเข้าส่วนนี้ไม่ได้</p>');
 }
 
-function columnControl(column, value, editing) {
+function columnControl(column, value) {
   const id = `sys-${column.name}`;
   if (column.type === 'password') return field(column.name, `<input id="${id}" type="password" autocomplete="new-password">`);
   if (column.type === 'bool') return field(column.name, `<select id="${id}"><option value="false">false</option><option value="true"${value ? ' selected' : ''}>true</option></select>`);
   if (CHOICES[column.type]) return field(column.name, `<select id="${id}">${options(CHOICES[column.type], value)}</select>`);
   const number = ['int', 'qty', 'money'].includes(column.type);
   const step = column.type === 'int' ? '1' : '0.001';
-  return field(column.name, `<input id="${id}" ${number ? `type="number" step="${step}"` : ''} value="${esc(value ?? '')}" ${editing && column.pk ? 'readonly' : ''}>`);
+  return field(column.name, `<input id="${id}" ${number ? `type="number" step="${step}"` : ''} value="${esc(value ?? '')}">`);
 }
 
 async function renderSystem(target) {
@@ -348,7 +348,7 @@ async function renderSystem(target) {
   };
   const drawForm = () => {
     const table = tableOf();
-    const fields = table.columns.map((column) => (column.type === 'read' ? '' : columnControl(column, state.editing ? state.editing[column.name] : '', state.editing))).join('');
+    const fields = table.columns.map((column) => (column.type === 'read' ? '' : columnControl(column, state.editing ? state.editing[column.name] : ''))).join('');
     openPopup(`${state.editing ? 'แก้ไขแถว' : 'เพิ่มแถว'} ${esc(table.name)}`, fields, saveRow);
   };
   $('sys-table').onchange = () => { state.offset = 0; state.editing = null; closePopup(); loadRows().catch(onErr); };
@@ -667,7 +667,7 @@ async function renderUsers(target) {
       const row = state.formMode === 'edit' && state.selected ? state.selected : {};
       state.imgData = '';
       openPopup(`${row.material ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_usage`, [
-        field('รหัส', `<input id="mat-code" value="${esc(row.material || '')}" ${row.material ? 'readonly' : ''}>`),
+        field('รหัส', `<input id="mat-code" value="${esc(row.material || '')}">`),
         field('ชื่อรายการ', `<input id="mat-name" value="${esc(row.material_description || '')}">`),
         field('group', `<input id="mat-group" value="${esc(row.usage_group || '')}" maxlength="40">`),
         field('หน่วย', `<input id="mat-bun" value="${esc(row.bun || '')}">`),
