@@ -91,7 +91,7 @@ function nameOf(employee) {
 async function loadUser(employeeId) {
   const { data, error } = await mx
     .from('mt_main_user')
-    .select('employee_id,creator,status,password_expires_at,password_hash,department,mt_main_employee(prefix,first_name,last_name,department,position,status)')
+    .select('employee_id,creator,status,password_expires_at,password_hash,department,mt_main_employee!mt_main_user_employee_id_fkey(prefix,first_name,last_name,department,position,status)')
     .eq('employee_id', employeeId)
     .maybeSingle();
   if (error) throw error;
@@ -296,7 +296,7 @@ app.get('/api/employees', wrap(requireUser), usageAtLeast(3), wrap(async (req, r
 
 app.get('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
   const { data, error } = await mx.from('mt_sto_user')
-    .select('employee_id,role,status,department,mt_main_user(creator,mt_main_employee(prefix,first_name,last_name,department,position))')
+    .select('employee_id,role,status,department,mt_main_user!mt_sto_user_employee_id_fkey(creator,mt_main_employee!mt_main_user_employee_id_fkey(prefix,first_name,last_name,department,position))')
     .order('employee_id');
   if (error) return fail(res, 400, 'อ่านผู้ใช้ไม่ได้');
   const users = (data || []).map((row) => {
