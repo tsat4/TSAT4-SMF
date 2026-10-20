@@ -291,19 +291,12 @@ app.get('/api/employees', wrap(requireUser), usageAtLeast(3), wrap(async (req, r
   if (term) query = query.or(`employee_id.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%`);
   const { data, error } = await query;
   if (error) return fail(res, 400, 'ค้นหาพนักงานไม่ได้');
-  const centers = await centersForDepartments((data || []).map((row) => row.department));
-  res.json({
-    employees: (data || []).map((row) => ({
-      ...row,
-      name: nameOf(row),
-      costcenters: centers.get(row.department) || []
-    }))
-  });
+  res.json({ employees: (data || []).map((row) => ({ ...row, name: nameOf(row) })) });
 }));
 
 app.get('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
   const { data, error } = await mx.from('mt_sto_user')
-    .select('employee_id,role,status,department,mt_main_user(creator,password_expires_at,mt_main_employee(prefix,first_name,last_name,department,position))')
+    .select('employee_id,role,status,department,mt_main_user(creator,mt_main_employee(prefix,first_name,last_name,department,position))')
     .order('employee_id');
   if (error) return fail(res, 400, 'อ่านผู้ใช้ไม่ได้');
   const users = (data || []).map((row) => {
@@ -315,9 +308,7 @@ app.get('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) 
       department: row.department || '',
       role: row.role,
       status: row.status,
-      creator: Boolean(account.creator) || row.employee_id === CREATOR_ID,
-      passwordExpiresAt: account.password_expires_at,
-      passwordExpired: account.password_expires_at ? new Date(account.password_expires_at).getTime() <= Date.now() : false
+      creator: Boolean(account.creator) || row.employee_id === CREATOR_ID
     };
   });
   const centers = await centersForDepartments(users.map((row) => row.department));
@@ -485,49 +476,37 @@ app.get('/api/pay-centers', wrap(requireUser), usageAtLeast(1), wrap(async (req,
   res.json({ department, costcenters: centers.get(department) || [] });
 }));
 
-app.get('/api/costcenters', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
+app.get('/api/stock', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
+  const grouped = await centersForDepartments([req.user.department || '']);
+  const codes = (grouped.get(req.user.department) || []).map((row) => row.costcenter);
+  if (!codes.length) return res.json({ stock: [], total: 0 });
   const term = cleanTerm(req.query.q);
-  let query = mx.from('mt_main_costcenter')
-    .select('costcenter,object_name,department,status')
-    .eq('status', 'Active')
-    .order('costcenter')
-    .limit(30);
-  if (term) query = query.or(`costcenter.ilike.%${term}%,object_name.ilike.%${term}%,department.ilike.%${term}%`);
-  const { data, error } = await query;
-  if (error) return fail(res, 400, 'อ่านศูนย์ต้นทุนไม่ได้');
-  res.json({ costcenters: data || [] });
-}));
-
-app.get('/api/buyers', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
-  const { data, error } = await mx.from('mt_sto_buyer')
-    .select('costcenter,status,mt_main_costcenter(object_name,department)')
-    .order('costcenter');
-  if (error) return fail(res, 400, 'อ่านศูนย์ต้นทุนที่สั่งซื้อไม่ได้');
-  const rows = (usageRank(req.user) < 3 ? (data || []).filter((row) => row.status === 'Active') : data || [])
-    .map((row) => ({
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  let query = mx.from('mt_sto_stock')
+    .select('costcenter,material,min_qty,current_qty,max_qty,mt_sto_usage(material_description,bun)', { count: 'exact' })
+    .in('costcenter', codes)
+    .order('material')
+    .range(offset, offset + 49);
+  if (term) {
+    const found = await mx.from('mt_sto_usage').select('material').or(`material.ilike.%${term}%,material_description.ilike.%${term}%`).limit(200);
+    const materials = (found.data || []).map((row) => row.material);
+    if (!materials.length) return res.json({ stock: [], total: 0 });
+    query = query.in('material', materials);
+  }
+  const { data, error, count } = await query;
+  if (error) return fail(res, 400, 'อ่านยอดคงเหลือไม่ได้');
+  res.json({
+    stock: (data || []).map((row) => ({
       costcenter: row.costcenter,
-      status: row.status,
-      objectName: row.mt_main_costcenter?.object_name || '',
-      department: row.mt_main_costcenter?.department || ''
-    }));
-  res.json({ buyers: rows });
-}));
-
-app.post('/api/buyers', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
-  const costcenter = String(req.body.costcenter || '').trim();
-  const { data: center } = await mx.from('mt_main_costcenter').select('costcenter,status').eq('costcenter', costcenter).maybeSingle();
-  if (!center || center.status !== 'Active') return fail(res, 400, 'ศูนย์ต้นทุนนี้ใช้งานไม่ได้');
-  const { error } = await mx.from('mt_sto_buyer').insert({ costcenter });
-  if (error) return fail(res, 400, 'เพิ่มศูนย์ต้นทุนที่สั่งซื้อไม่ได้');
-  res.status(201).json({ ok: true });
-}));
-
-app.patch('/api/buyers/:costcenter', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
-  if (!['Active', 'Inactive'].includes(req.body.status)) return fail(res, 400, 'สถานะไม่ถูกต้อง');
-  const { data, error } = await mx.from('mt_sto_buyer').update({ status: req.body.status })
-    .eq('costcenter', req.params.costcenter).select('costcenter');
-  if (error || !data?.length) return fail(res, 400, 'แก้ไขศูนย์ต้นทุนไม่ได้');
-  res.json({ ok: true });
+      material: row.material,
+      minQty: Number(row.min_qty),
+      currentQty: Number(row.current_qty),
+      maxQty: Number(row.max_qty),
+      materialDescription: row.mt_sto_usage?.material_description || '',
+      bun: row.mt_sto_usage?.bun || ''
+    })),
+    total: count || 0
+  });
 }));
 
 app.get('/api/materials', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
@@ -543,69 +522,12 @@ app.get('/api/materials', wrap(requireUser), usageAtLeast(1), wrap(async (req, r
   res.json({ materials: data || [] });
 }));
 
-app.get('/api/stock', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
-  const costcenter = String(req.query.costcenter || '').trim();
-  if (!costcenter) return fail(res, 400, 'เลือกศูนย์ต้นทุน');
-  const term = cleanTerm(req.query.q);
-  let query = mx.from('mt_sto_stock')
-    .select('costcenter,material,min_qty,current_qty,max_qty,mt_sto_usage(material_description,bun,status)')
-    .eq('costcenter', costcenter)
-    .order('material')
-    .limit(100);
-  if (term) {
-    const found = await mx.from('mt_sto_usage').select('material').or(`material.ilike.%${term}%,material_description.ilike.%${term}%`).limit(100);
-    const codes = (found.data || []).map((row) => row.material);
-    if (!codes.length) return res.json({ stock: [] });
-    query = query.in('material', codes);
-  }
-  const { data, error } = await query;
-  if (error) return fail(res, 400, 'อ่านยอดคงเหลือไม่ได้');
-  res.json({
-    stock: (data || []).map((row) => ({
-      costcenter: row.costcenter,
-      material: row.material,
-      minQty: Number(row.min_qty),
-      currentQty: Number(row.current_qty),
-      maxQty: Number(row.max_qty),
-      materialDescription: row.mt_sto_usage?.material_description || '',
-      bun: row.mt_sto_usage?.bun || '',
-      low: Number(row.current_qty) <= Number(row.min_qty)
-    }))
-  });
-}));
-
-app.put('/api/stock', wrap(requireUser), usageAtLeast(2), wrap(async (req, res) => {
-  const costcenter = String(req.body.costcenter || '').trim();
-  const material = String(req.body.material || '').trim();
-  const minQty = amountOf(req.body.minQty);
-  const currentQty = amountOf(req.body.currentQty);
-  const maxQty = amountOf(req.body.maxQty);
-  if (!costcenter || !material || minQty == null || currentQty == null || maxQty == null) return fail(res, 400, 'ระบุยอดให้ครบ');
-  if (maxQty < minQty) return fail(res, 400, 'Max ต้องไม่ต่ำกว่า Min');
-  const center = await mx.from('mt_main_costcenter').select('department,status').eq('costcenter', costcenter).maybeSingle();
-  if (!center.data || center.data.status !== 'Active' || center.data.department !== req.user.department) return fail(res, 400, 'ศูนย์ต้นทุนนี้ไม่ใช่ของหน่วยงานคุณ');
-  const buyer = await mx.from('mt_sto_buyer').upsert({ costcenter, status: 'Active' }, { onConflict: 'costcenter' });
-  if (buyer.error) return fail(res, 400, 'เปิดศูนย์ต้นทุนนี้ให้เบิกจ่ายไม่ได้');
-  const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
-  if (!item.data || item.data.status !== 'Active') return fail(res, 400, 'รายการนี้ใช้งานไม่ได้');
-  const { error } = await mx.from('mt_sto_stock').upsert({
-    costcenter,
-    material,
-    min_qty: minQty,
-    current_qty: currentQty,
-    max_qty: maxQty
-  }, { onConflict: 'costcenter,material' });
-  if (error) return fail(res, 400, 'บันทึกยอดไม่ได้');
-  res.json({ ok: true });
-}));
-
 app.get('/api/requisitions', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const scope = req.query.scope === 'queue' ? 'queue' : 'mine';
   if (scope === 'queue' && usageRank(req.user) < 3) return fail(res, 403, 'จัดเตรียมและจ่ายสำหรับ Admin');
   let query = tx.from('tx_sto_requisition').select('*').order('created_at', { ascending: false }).limit(50);
   if (scope === 'mine') query = query.eq('requested_by', req.user.employeeId);
   else query = query.in('status', ['submitted', 'accepted', 'preparing', 'ready']);
-  if (req.query.status) query = query.eq('status', String(req.query.status));
   const { data, error } = await query;
   if (error) return fail(res, 400, 'อ่านใบเบิกไม่ได้');
   const rows = await decorate(data || []);
@@ -818,8 +740,18 @@ function adminSpec(name) {
   if (!spec) return null;
   return {
     ...spec,
-    columns: spec.columns.map(([name, type, required]) => ({ name, type, required: Boolean(required), pk: spec.pk.includes(name) }))
+    columns: spec.columns.map(([column, type, required]) => ({ name: column, type, required: Boolean(required), pk: spec.pk.includes(column) }))
   };
+}
+
+function adminClient(name) {
+  const spec = adminSpec(name);
+  const client = spec ? (spec.db === 'tx' ? tx : mx) : null;
+  return spec && client ? { spec, client } : null;
+}
+
+function hasKey(spec, key) {
+  return spec.pk.every((column) => key?.[column] != null && String(key[column]) !== '');
 }
 
 function creatorOnly(req, res, next) {
@@ -873,18 +805,17 @@ async function adminPayload(spec, body, { insert }) {
 
 app.get('/api/system/tables', wrap(requireUser), creatorOnly, (_req, res) => {
   res.json({
-    tables: Object.entries(ADMIN_TABLES).map(([name, spec]) => ({
-      name,
-      pk: spec.pk,
-      columns: spec.columns.map(([column, type, required]) => ({ name: column, type, required: Boolean(required), pk: spec.pk.includes(column) }))
-    }))
+    tables: Object.keys(ADMIN_TABLES).map((name) => {
+      const spec = adminSpec(name);
+      return { name, pk: spec.pk, columns: spec.columns };
+    })
   });
 });
 
 app.get('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
-  const spec = adminSpec(req.params.name);
-  const client = spec && (spec.db === 'tx' ? tx : mx);
-  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const opened = adminClient(req.params.name);
+  if (!opened) return fail(res, 404, 'ไม่พบตาราง');
+  const { spec, client } = opened;
   const term = cleanTerm(req.query.q);
   const offset = Math.max(0, Number(req.query.offset) || 0);
   const readable = spec.columns.filter((column) => column.type !== 'password').map((column) => column.name);
@@ -901,9 +832,9 @@ app.get('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (
 }));
 
 app.post('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
-  const spec = adminSpec(req.params.name);
-  const client = spec && (spec.db === 'tx' ? tx : mx);
-  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const opened = adminClient(req.params.name);
+  if (!opened) return fail(res, 404, 'ไม่พบตาราง');
+  const { spec, client } = opened;
   const { out, error: invalid } = await adminPayload(spec, req.body || {}, { insert: true });
   if (invalid) return fail(res, 400, invalid);
   if (req.params.name === 'mt_main_user' && out.creator && out.employee_id !== CREATOR_ID) return fail(res, 400, 'กำหนดผู้สร้างระบบเพิ่มไม่ได้');
@@ -916,11 +847,11 @@ app.post('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async 
 }));
 
 app.patch('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
-  const spec = adminSpec(req.params.name);
-  const client = spec && (spec.db === 'tx' ? tx : mx);
-  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const opened = adminClient(req.params.name);
+  if (!opened) return fail(res, 404, 'ไม่พบตาราง');
+  const { spec, client } = opened;
   const key = req.body?.key || {};
-  if (!spec.pk.every((column) => key[column] != null && String(key[column]) !== '')) return fail(res, 400, 'ไม่พบแถวที่แก้');
+  if (!hasKey(spec, key)) return fail(res, 400, 'ไม่พบแถวที่แก้');
   const { out, error: invalid } = await adminPayload(spec, req.body?.values || {}, { insert: false });
   if (invalid) return fail(res, 400, invalid);
   for (const column of spec.pk) delete out[column];
@@ -935,11 +866,11 @@ app.patch('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async
 }));
 
 app.delete('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
-  const spec = adminSpec(req.params.name);
-  const client = spec && (spec.db === 'tx' ? tx : mx);
-  if (!spec || !client) return fail(res, 404, 'ไม่พบตาราง');
+  const opened = adminClient(req.params.name);
+  if (!opened) return fail(res, 404, 'ไม่พบตาราง');
+  const { spec, client } = opened;
   const key = req.body?.key || {};
-  if (!spec.pk.every((column) => key[column] != null && String(key[column]) !== '')) return fail(res, 400, 'ไม่พบแถวที่ลบ');
+  if (!hasKey(spec, key)) return fail(res, 400, 'ไม่พบแถวที่ลบ');
   if ((req.params.name === 'mt_main_user' || req.params.name === 'mt_sto_user') && String(key.employee_id) === CREATOR_ID) return fail(res, 400, 'ลบผู้สร้างระบบไม่ได้');
   let query = client.from(req.params.name).delete();
   for (const column of spec.pk) query = query.eq(column, key[column]);
