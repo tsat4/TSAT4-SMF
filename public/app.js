@@ -509,7 +509,7 @@ async function renderEdit(target) {
       <button class="btn btn-secondary" type="button" id="edit-line" disabled>แก้ไข</button>
       <button class="btn btn-danger" type="button" id="edit-line-del" disabled>ลบ</button>
       <button class="btn btn-primary hold-btn" type="button" id="edit-hold" ${allLines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">กดค้าง 2 วินาที</span></button>`;
-    $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th><th>จำนวน</th><th>ศูนย์ต้นทุน</th></tr></thead><tbody>
+    $('edit-rows').innerHTML = page.length ? `<table class="mo-data-table"><thead><tr><th>หมายเลขเลขรายการ</th><th>ชื่อรายการ</th><th>หน่วย</th><th>จำนวน</th><th>costcenter</th></tr></thead><tbody>
       ${page.map((line) => `<tr data-pick="${esc(line.id)}" data-qty="${Number(line.qty)}" data-material="${esc(line.material)}" data-name="${esc(line.materialDescription)}" data-bun="${esc(line.bun)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${esc(line.bun)}</td><td>${Number(line.qty)}</td><td>${esc(line.costcenter === '-' ? cart.costcenter : line.costcenter)}</td></tr>`).join('')}
     </tbody></table>` : '<p class="empty">ยังไม่มีรายการ กดเพิ่ม</p>';
     setFoot(page.length, lines.length);
@@ -519,8 +519,8 @@ async function renderEdit(target) {
     $('edit-line').onclick = () => {
       if (!picked) return toast('เลือกแถวก่อน', 'error');
       openPopup('แก้ไขจำนวน', `
-        <label class="field">รหัส<input value="${esc(picked.dataset.material)}" readonly></label>
-        <label class="field">รายการ<input value="${esc(picked.dataset.name)}" readonly></label>
+        <label class="field">หมายเลขเลขรายการ<input value="${esc(picked.dataset.material)}" readonly></label>
+        <label class="field">ชื่อรายการ<input value="${esc(picked.dataset.name)}" readonly></label>
         <label class="field">หน่วย<input value="${esc(picked.dataset.bun)}" readonly></label>
         <label class="field">จำนวน<input id="line-qty" type="number" min="0.001" step="0.001" value="${esc(picked.dataset.qty)}"></label>
       `, async () => {
@@ -575,15 +575,16 @@ async function openAddPopup() {
   openPopup('เบิก', `
     <div class="search-block">
       <div class="search-slot">
-        <label class="field">รายการ<input id="line-q" placeholder="รหัสหรือชื่อ"></label>
+        <label class="field">รายการ<input id="line-q" placeholder="หมายเลขหรือชื่อ"></label>
         <button class="btn btn-secondary" type="button" id="line-search">ค้นหา</button>
       </div>
       <div class="search-list" id="line-results"></div>
     </div>
-    <label class="field">รหัส<input id="line-code" readonly></label>
+    <label class="field">หมายเลขเลขรายการ<input id="line-code" readonly></label>
+    <label class="field">ชื่อรายการ<input id="line-name" readonly></label>
     <label class="field">หน่วย<input id="line-bun" readonly></label>
     <label class="field">จำนวน<input id="line-qty" type="number" min="0.001" step="0.001" value="1"></label>
-    <label class="field d-none" id="line-cc-field">ศูนย์ต้นทุน${centers.length ? `<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}" ${row.costcenter === chosen ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>` : '<input readonly value="ตั้ง department ใน mt_sto_user ก่อน">'}</label>
+    <label class="field d-none" id="line-cc-field">costcenter${centers.length ? `<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}" ${row.costcenter === chosen ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>` : '<input readonly value="ตั้ง department ใน mt_sto_user ก่อน">'}</label>
   `, async () => {
     if (!picked) throw new Error('เลือกรายการ');
     const qty = Number($('line-qty').value);
@@ -604,12 +605,13 @@ async function openAddPopup() {
   const searchLine = async () => {
     const data = await api(`/api/materials?q=${encodeURIComponent($('line-q').value.trim())}`);
     const materials = [...data.materials].sort((a, b) => String(a.material).localeCompare(String(b.material)));
-    $('line-results').innerHTML = materials.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>รายการ</th><th>หน่วย</th></tr></thead><tbody>
+    $('line-results').innerHTML = materials.length ? `<table class="mo-data-table"><thead><tr><th>หมายเลขเลขรายการ</th><th>ชื่อรายการ</th><th>หน่วย</th></tr></thead><tbody>
       ${materials.map((row) => `<tr data-pick="${esc(row.material)}" data-bun="${esc(row.bun)}" data-name="${esc(row.material_description)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join('')}
     </tbody></table>` : '<p class="empty">ไม่พบรายการ</p>';
     bindRowSelect($('line-results'), (id, row) => {
       picked = { material: id, bun: row.dataset.bun, name: row.dataset.name };
       $('line-code').value = id;
+      $('line-name').value = row.dataset.name || '';
       $('line-bun').value = row.dataset.bun;
       revealCenter();
     });
@@ -633,7 +635,7 @@ async function renderHome(target) {
     <div class="view-body">
       <section class="card">
         <div class="card-title">เริ่มเบิก</div>
-        <p class="sum-meta">กดเบิก เลือกรายการ หน่วยขึ้นให้อัตโนมัติ ระบุจำนวน แล้วเลือกศูนย์ต้นทุน จากนั้นตรวจสรุปก่อนกดค้างยืนยัน</p>
+        <p class="sum-meta">กดเบิก เลือกรายการ ชื่อและหน่วยขึ้นให้อัตโนมัติ ระบุจำนวน แล้วเลือก costcenter จากนั้นตรวจสรุปก่อนกดค้างยืนยัน</p>
         <button class="btn btn-primary" type="button" data-go="edit">ไปที่ Edit Data</button>
       </section>
     </div>`;
