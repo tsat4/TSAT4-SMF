@@ -96,7 +96,7 @@ async function loadUser(employeeId) {
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  const member = await mx.from('mt_sto_user').select('role,status').eq('employee_id', employeeId).maybeSingle();
+  const member = await mx.from('mt_sto_user').select('role,status,department').eq('employee_id', employeeId).maybeSingle();
   if (member.error) throw member.error;
   data.usage = member.data || null;
   return data;
@@ -118,7 +118,7 @@ function publicUser(row) {
     usageRole: usageRoleOf(row),
     status: row.status,
     name: nameOf(employee),
-    department: employee.department || '',
+    department: row.usage?.department || '',
     position: employee.position || '',
     passwordExpiresAt: row.password_expires_at,
     passwordExpired: new Date(row.password_expires_at).getTime() <= Date.now()
@@ -303,7 +303,7 @@ app.get('/api/employees', wrap(requireUser), usageAtLeast(3), wrap(async (req, r
 
 app.get('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
   const { data, error } = await mx.from('mt_sto_user')
-    .select('employee_id,role,status,mt_main_user(creator,password_expires_at,mt_main_employee(prefix,first_name,last_name,department,position))')
+    .select('employee_id,role,status,department,mt_main_user(creator,password_expires_at,mt_main_employee(prefix,first_name,last_name,department,position))')
     .order('employee_id');
   if (error) return fail(res, 400, 'อ่านผู้ใช้ไม่ได้');
   const users = (data || []).map((row) => {
@@ -312,7 +312,7 @@ app.get('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) 
     return {
       employeeId: row.employee_id,
       name: nameOf(employee),
-      department: employee.department || '',
+      department: row.department || '',
       role: row.role,
       status: row.status,
       creator: Boolean(account.creator) || row.employee_id === CREATOR_ID,
@@ -347,10 +347,13 @@ app.post('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res)
     if (created.error) return fail(res, 400, 'เพิ่มบัญชีเข้าสู่ระบบไม่ได้');
   }
   const status = ['Active', 'Inactive'].includes(req.body.status) ? req.body.status : 'Active';
+  const department = await usageDepartment(req.body.department);
+  if (!department) return fail(res, 400, 'เลือกหน่วยงานที่มีศูนย์ต้นทุน');
   const { error } = await mx.from('mt_sto_user').upsert({
     employee_id: employeeId,
     role: employeeId === CREATOR_ID ? 'admin' : role,
-    status: employeeId === CREATOR_ID ? 'Active' : status
+    status: employeeId === CREATOR_ID ? 'Active' : status,
+    department
   }, { onConflict: 'employee_id' });
   if (error) return fail(res, 400, 'เพิ่มรายชื่อ Usage ไม่ได้');
   res.status(201).json({ ok: true });
@@ -368,6 +371,11 @@ app.patch('/api/users/:employeeId', wrap(requireUser), usageAtLeast(3), wrap(asy
     if (!['Active', 'Inactive'].includes(req.body.status)) return fail(res, 400, 'สถานะไม่ถูกต้อง');
     if (employeeId === CREATOR_ID && req.body.status !== 'Active') return fail(res, 400, 'ปิดสิทธิ์ผู้สร้างระบบไม่ได้');
     patch.status = req.body.status;
+  }
+  if (req.body.department != null) {
+    const department = await usageDepartment(req.body.department);
+    if (!department) return fail(res, 400, 'เลือกหน่วยงานที่มีศูนย์ต้นทุน');
+    patch.department = department;
   }
   if (req.body.password) {
     if (String(req.body.password).length < 8) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
@@ -462,6 +470,13 @@ app.delete('/api/usage-materials/:material', wrap(requireUser), usageAtLeast(3),
   const { error } = await mx.from('mt_sto_usage').delete().eq('material', req.params.material);
   if (error) return fail(res, 400, 'ลบรายการไม่ได้');
   res.json({ ok: true });
+}));
+
+app.get('/api/departments', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
+  const { data, error } = await mx.from('mt_main_costcenter').select('department').eq('status', 'Active');
+  if (error) return fail(res, 400, 'อ่านหน่วยงานไม่ได้');
+  const departments = [...new Set((data || []).map((row) => row.department).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  res.json({ departments });
 }));
 
 app.get('/api/pay-centers', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
@@ -713,6 +728,14 @@ app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res
   res.json({ ok: true });
 }));
 
+async function usageDepartment(name) {
+  const department = String(name || '').trim();
+  if (!department) return '';
+  const found = await mx.from('mt_main_costcenter').select('department').eq('department', department).eq('status', 'Active').limit(1);
+  if (found.error || !found.data?.length) return '';
+  return department;
+}
+
 async function ownCenter(req, costcenter) {
   const center = await mx.from('mt_main_costcenter').select('department,status').eq('costcenter', costcenter).maybeSingle();
   if (!center.data || center.data.status !== 'Active' || center.data.department !== req.user.department) return null;
@@ -769,7 +792,7 @@ const ADMIN_TABLES = {
     ['employee_id', 'text', true], ['password', 'password'], ['creator', 'bool'], ['status', 'status', true], ['password_expires_at', 'read']
   ] },
   mt_sto_user: { db: 'mx', pk: ['employee_id'], columns: [
-    ['employee_id', 'text', true], ['role', 'usage', true], ['status', 'status', true]
+    ['employee_id', 'text', true], ['department', 'text', true], ['role', 'usage', true], ['status', 'status', true]
   ] },
   mt_sto_buyer: { db: 'mx', pk: ['costcenter'], columns: [
     ['costcenter', 'text', true], ['status', 'status', true]

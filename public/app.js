@@ -569,9 +569,8 @@ async function openAddPopup() {
     api('/api/requisitions?scope=mine')
   ]);
   const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
-  if (!centers.length) return toast('ไม่มีศูนย์ต้นทุนในขอบเขตของคุณ', 'error');
   const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
-  const chosen = cartHeader && cartHeader.costcenter !== '-' ? cartHeader.costcenter : centers[0].costcenter;
+  const chosen = cartHeader && cartHeader.costcenter !== '-' ? cartHeader.costcenter : (centers[0]?.costcenter || '');
   let picked = null;
   openPopup('เบิก', `
     <div class="search-block">
@@ -584,11 +583,11 @@ async function openAddPopup() {
     <label class="field">รหัส<input id="line-code" readonly></label>
     <label class="field">หน่วย<input id="line-bun" readonly></label>
     <label class="field">จำนวน<input id="line-qty" type="number" min="0.001" step="0.001" value="1"></label>
-    <label class="field">ศูนย์ต้นทุน<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}" ${row.costcenter === chosen ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select></label>
+    <label class="field d-none" id="line-cc-field">ศูนย์ต้นทุน${centers.length ? `<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}" ${row.costcenter === chosen ? 'selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>` : '<input readonly value="ตั้ง department ใน mt_sto_user ก่อน">'}</label>
   `, async () => {
     if (!picked) throw new Error('เลือกรายการ');
     const qty = Number($('line-qty').value);
-    const costcenter = $('line-cc').value;
+    const costcenter = $('line-cc')?.value || '';
     if (!(qty > 0)) throw new Error('ระบุจำนวน');
     if (!costcenter) throw new Error('เลือกศูนย์ต้นทุน');
     let id = cartHeader?.id;
@@ -612,8 +611,13 @@ async function openAddPopup() {
       picked = { material: id, bun: row.dataset.bun, name: row.dataset.name };
       $('line-code').value = id;
       $('line-bun').value = row.dataset.bun;
+      revealCenter();
     });
   };
+  const revealCenter = () => {
+    $('line-cc-field')?.classList.toggle('d-none', !(picked && Number($('line-qty').value) > 0));
+  };
+  $('line-qty').addEventListener('input', revealCenter);
   $('line-search').onclick = () => searchLine().catch((err) => toast(err.message, 'error'));
   $('line-q').addEventListener('keydown', (event) => { if (event.key === 'Enter') { event.preventDefault(); searchLine().catch((err) => toast(err.message, 'error')); } });
 }
@@ -629,7 +633,7 @@ async function renderHome(target) {
     <div class="view-body">
       <section class="card">
         <div class="card-title">เริ่มเบิก</div>
-        <p class="sum-meta">กดเบิก เลือกรายการ หน่วยขึ้นให้อัตโนมัติ ระบุจำนวนและศูนย์ต้นทุน แล้วตรวจสรุปก่อนกดค้างยืนยัน</p>
+        <p class="sum-meta">กดเบิก เลือกรายการ หน่วยขึ้นให้อัตโนมัติ ระบุจำนวน แล้วเลือกศูนย์ต้นทุน จากนั้นตรวจสรุปก่อนกดค้างยืนยัน</p>
         <button class="btn btn-primary" type="button" data-go="edit">ไปที่ Edit Data</button>
       </section>
     </div>`;
@@ -644,6 +648,7 @@ async function renderUsers(target) {
   let offset = 0;
   let selected = null;
   let rows = [];
+  const departments = (await api('/api/departments')).departments || [];
   target.innerHTML = `
     <div class="toolbar">
       <label class="field grow">ตาราง<select id="usage-table"><option value="members">mt_sto_user</option><option value="materials">mt_sto_usage</option></select></label>
@@ -684,6 +689,7 @@ async function renderUsers(target) {
     openPopup(`${row ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_user`, `
       ${row ? '' : `<div class="search-block"><div class="search-slot"><label class="field">ค้นพนักงาน<input id="emp-q" placeholder="รหัสหรือชื่อจาก mt_main_employee"></label><button class="btn btn-secondary" type="button" id="emp-search">ค้นหา</button></div><div class="search-list" id="emp-results"></div></div>`}
       <label class="field">รหัสพนักงาน<input id="user-id" readonly value="${esc(row?.employeeId || '')}" placeholder="เลือกจากรายชื่อพนักงาน"></label>
+      <label class="field">หน่วยงาน<select id="user-dept"><option value="">เลือกหน่วยงาน</option>${departments.map((name) => `<option value="${esc(name)}" ${row?.department === name ? 'selected' : ''}>${esc(name)}</option>`).join('')}</select></label>
       <label class="field">รหัสผ่าน<input id="user-password" type="password" minlength="8" autocomplete="new-password"></label>
       <label class="field">บทบาท<select id="user-role"><option value="viewer" ${row?.role === 'viewer' ? 'selected' : ''}>Viewer</option><option value="user" ${row?.role === 'user' ? 'selected' : ''}>User</option><option value="admin" ${row?.role === 'admin' ? 'selected' : ''}>Admin</option></select></label>
       <label class="field">สถานะ<select id="user-status"><option ${row?.status === 'Inactive' ? '' : 'selected'}>Active</option><option ${row?.status === 'Inactive' ? 'selected' : ''}>Inactive</option></select></label>
@@ -697,9 +703,12 @@ async function renderUsers(target) {
     const data = await api(`/api/employees?q=${encodeURIComponent($('emp-q').value.trim())}`);
     const people = [...data.employees].sort((a, b) => String(a.employee_id).localeCompare(String(b.employee_id)));
     $('emp-results').innerHTML = people.length ? `<table class="mo-data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วยงาน</th></tr></thead><tbody>
-      ${people.map((person) => `<tr data-pick="${esc(person.employee_id)}"><td>${esc(person.employee_id)}</td><td>${esc(person.name)}</td><td>${esc(person.department || '')}</td></tr>`).join('')}
+      ${people.map((person) => `<tr data-pick="${esc(person.employee_id)}" data-dept="${esc(person.department || '')}"><td>${esc(person.employee_id)}</td><td>${esc(person.name)}</td><td>${esc(person.department || '')}</td></tr>`).join('')}
     </tbody></table>` : '<p class="empty">ไม่พบพนักงาน</p>';
-    bindRowSelect($('emp-results'), (id) => { $('user-id').value = id; });
+    bindRowSelect($('emp-results'), (id, row) => {
+      $('user-id').value = id;
+      if ([...$('user-dept').options].some((option) => option.value === row.dataset.dept)) $('user-dept').value = row.dataset.dept;
+    });
   };
   const loadRows = async () => {
     selected = null;
@@ -726,7 +735,7 @@ async function renderUsers(target) {
     bindRowSelect($('usage-rows'), (pick, row) => {
       selected = rows[Number(pick)];
       const locked = kind() === 'members' && row.dataset.creator === '1';
-      $('usage-edit').disabled = locked;
+      $('usage-edit').disabled = false;
       $('usage-del').disabled = locked;
     });
   };
@@ -737,10 +746,10 @@ async function renderUsers(target) {
         if (formMode === 'edit' && selected) await api(`/api/usage-materials/${encodeURIComponent(selected.material)}`, { method: 'PATCH', body });
         else await api('/api/usage-materials', { method: 'POST', body });
       } else if (formMode === 'edit' && selected) {
-        await api(`/api/users/${encodeURIComponent(selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value } });
+        await api(`/api/users/${encodeURIComponent(selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value, department: $('user-dept').value } });
       } else {
         if (!$('user-id').value.trim()) return toast('เลือกพนักงานจากรายชื่อก่อน', 'error');
-        await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value } });
+        await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value, department: $('user-dept').value } });
       }
       toast('บันทึกแล้ว');
       closePopup();
