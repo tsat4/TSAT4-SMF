@@ -570,7 +570,7 @@ async function openAddPopup() {
   let picked = null;
   const centerField = centers.length
     ? `<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}"${row.costcenter === chosen ? ' selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>`
-    : '<input readonly value="ตั้ง department ใน mt_sto_user ก่อน">';
+    : `<input readonly value="${pay.department ? 'หน่วยงานนี้ยังไม่มี costcenter' : 'พนักงานนี้ยังไม่มีหน่วยงาน'}">`;
   openPopup('เบิก', [
     searchBlock(searchSlot('รายการ', 'line-q', 'line-search', { placeholder: 'หมายเลขหรือชื่อ' }), 'line-results'),
     field('หมายเลขเลขรายการ', '<input id="line-code" readonly>'),
@@ -627,7 +627,6 @@ function centerText(row) {
 
 async function renderUsers(target) {
   const state = { offset: 0, selected: null, rows: [], formMode: 'add' };
-  const departments = (await api('/api/departments')).departments || [];
   target.innerHTML = tablePage('usage', `
     ${field('ตาราง', '<select id="usage-table"><option value="members">mt_sto_user</option><option value="materials">mt_sto_usage</option></select>', 'grow')}
     ${searchSlot('ค้นหา', 'usage-q', 'usage-search', { grow: true })}
@@ -651,7 +650,7 @@ async function renderUsers(target) {
     openPopup(`${row ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_user`, [
       row ? '' : searchBlock(searchSlot('ค้นพนักงาน', 'emp-q', 'emp-search', { placeholder: 'รหัสหรือชื่อจาก mt_main_employee' }), 'emp-results'),
       field('รหัสพนักงาน', `<input id="user-id" readonly value="${esc(row?.employeeId || '')}" placeholder="เลือกจากรายชื่อพนักงาน">`),
-      field('หน่วยงาน', `<select id="user-dept"><option value="">เลือกหน่วยงาน</option>${options(departments, row?.department)}</select>`),
+      field('หน่วยงาน', `<input id="user-dept" readonly value="${esc(row?.department || '')}">`),
       field('รหัสผ่าน', '<input id="user-password" type="password" minlength="8" autocomplete="new-password">'),
       field('บทบาท', `<select id="user-role">${options(['viewer', 'user', 'admin'], row?.role || 'viewer', (value) => USAGE_ROLE[value])}</select>`),
       statusField('user-status', row?.status)
@@ -667,7 +666,7 @@ async function renderUsers(target) {
     fillTable('emp-results', ['รหัส', 'ชื่อ', 'หน่วยงาน'], people.map((person) => `<tr data-pick="${esc(person.employee_id)}" data-dept="${esc(person.department || '')}"><td>${esc(person.employee_id)}</td><td>${esc(person.name)}</td><td>${esc(person.department || '')}</td></tr>`).join(''), 'ไม่พบพนักงาน');
     bindRowSelect($('emp-results'), (id, row) => {
       $('user-id').value = id;
-      if ([...$('user-dept').options].some((option) => option.value === row.dataset.dept)) $('user-dept').value = row.dataset.dept;
+      $('user-dept').value = row.dataset.dept || '';
     });
   };
   const loadRows = async () => {
@@ -699,10 +698,10 @@ async function renderUsers(target) {
       if (state.formMode === 'edit' && state.selected) await api(`/api/usage-materials/${encodeURIComponent(state.selected.material)}`, { method: 'PATCH', body });
       else await api('/api/usage-materials', { method: 'POST', body });
     } else if (state.formMode === 'edit' && state.selected) {
-      await api(`/api/users/${encodeURIComponent(state.selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value, department: $('user-dept').value } });
+      await api(`/api/users/${encodeURIComponent(state.selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value } });
     } else {
       if (!$('user-id').value.trim()) throw new Error('เลือกพนักงานจากรายชื่อก่อน');
-      await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value, department: $('user-dept').value } });
+      await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value } });
     }
     toast('บันทึกแล้ว');
     closePopup();

@@ -91,7 +91,7 @@ function nameOf(employee) {
 async function loadUser(employeeId) {
   const { data, error } = await mx
     .from('mt_main_user')
-    .select('employee_id,creator,status,password_expires_at,password_hash,mt_main_employee(prefix,first_name,last_name,department,position,status)')
+    .select('employee_id,creator,status,password_expires_at,password_hash,department,mt_main_employee(prefix,first_name,last_name,department,position,status)')
     .eq('employee_id', employeeId)
     .maybeSingle();
   if (error) throw error;
@@ -118,7 +118,7 @@ function publicUser(row) {
     usageRole: usageRoleOf(row),
     status: row.status,
     name: nameOf(employee),
-    department: row.usage?.department || '',
+    department: row.department || employee.department || '',
     position: employee.position || '',
     passwordExpiresAt: row.password_expires_at,
     passwordExpired: new Date(row.password_expires_at).getTime() <= Date.now()
@@ -305,7 +305,7 @@ app.get('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) 
     return {
       employeeId: row.employee_id,
       name: nameOf(employee),
-      department: row.department || '',
+      department: employee.department || row.department || '',
       role: row.role,
       status: row.status,
       creator: Boolean(account.creator) || row.employee_id === CREATOR_ID
@@ -322,8 +322,10 @@ app.post('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res)
   if (!employeeId || !role) return fail(res, 400, 'ระบุพนักงานและบทบาท');
   if (employeeId === CREATOR_ID && role !== 'admin') return fail(res, 400, 'ผู้สร้างระบบเป็น Admin เสมอ');
   const { data: employee, error: employeeError } = await mx.from('mt_main_employee')
-    .select('employee_id,status').eq('employee_id', employeeId).maybeSingle();
+    .select('employee_id,status,department').eq('employee_id', employeeId).maybeSingle();
   if (employeeError || !employee || employee.status !== 'Active') return fail(res, 400, 'พนักงานนี้ใช้งานไม่ได้');
+  const department = String(employee.department || '').trim();
+  if (!department) return fail(res, 400, 'พนักงานนี้ยังไม่มีหน่วยงาน');
   const existing = await mx.from('mt_main_user').select('employee_id').eq('employee_id', employeeId).maybeSingle();
   if (existing.error) return fail(res, 400, 'ตรวจบัญชีไม่ได้');
   if (!existing.data) {
@@ -338,8 +340,6 @@ app.post('/api/users', wrap(requireUser), usageAtLeast(3), wrap(async (req, res)
     if (created.error) return fail(res, 400, 'เพิ่มบัญชีเข้าสู่ระบบไม่ได้');
   }
   const status = ['Active', 'Inactive'].includes(req.body.status) ? req.body.status : 'Active';
-  const department = await usageDepartment(req.body.department);
-  if (!department) return fail(res, 400, 'เลือกหน่วยงานที่มีศูนย์ต้นทุน');
   const { error } = await mx.from('mt_sto_user').upsert({
     employee_id: employeeId,
     role: employeeId === CREATOR_ID ? 'admin' : role,
@@ -362,11 +362,6 @@ app.patch('/api/users/:employeeId', wrap(requireUser), usageAtLeast(3), wrap(asy
     if (!['Active', 'Inactive'].includes(req.body.status)) return fail(res, 400, 'สถานะไม่ถูกต้อง');
     if (employeeId === CREATOR_ID && req.body.status !== 'Active') return fail(res, 400, 'ปิดสิทธิ์ผู้สร้างระบบไม่ได้');
     patch.status = req.body.status;
-  }
-  if (req.body.department != null) {
-    const department = await usageDepartment(req.body.department);
-    if (!department) return fail(res, 400, 'เลือกหน่วยงานที่มีศูนย์ต้นทุน');
-    patch.department = department;
   }
   if (req.body.password) {
     if (String(req.body.password).length < 8) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
@@ -461,13 +456,6 @@ app.delete('/api/usage-materials/:material', wrap(requireUser), usageAtLeast(3),
   const { error } = await mx.from('mt_sto_usage').delete().eq('material', req.params.material);
   if (error) return fail(res, 400, 'ลบรายการไม่ได้');
   res.json({ ok: true });
-}));
-
-app.get('/api/departments', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
-  const { data, error } = await mx.from('mt_main_costcenter').select('department').eq('status', 'Active');
-  if (error) return fail(res, 400, 'อ่านหน่วยงานไม่ได้');
-  const departments = [...new Set((data || []).map((row) => row.department).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  res.json({ departments });
 }));
 
 app.get('/api/pay-centers', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
@@ -650,14 +638,6 @@ app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res
   res.json({ ok: true });
 }));
 
-async function usageDepartment(name) {
-  const department = String(name || '').trim();
-  if (!department) return '';
-  const found = await mx.from('mt_main_costcenter').select('department').eq('department', department).eq('status', 'Active').limit(1);
-  if (found.error || !found.data?.length) return '';
-  return department;
-}
-
 async function ownCenter(req, costcenter) {
   const center = await mx.from('mt_main_costcenter').select('department,status').eq('costcenter', costcenter).maybeSingle();
   if (!center.data || center.data.status !== 'Active' || center.data.department !== req.user.department) return null;
@@ -699,6 +679,9 @@ async function receive(header) {
 }
 
 const ADMIN_TABLES = {
+  mt_main_department: { db: 'mx', pk: ['department'], columns: [
+    ['department', 'text', true]
+  ] },
   mt_main_employee: { db: 'mx', pk: ['employee_id'], columns: [
     ['employee_id', 'text', true], ['prefix', 'text'], ['first_name', 'text', true], ['last_name', 'text', true],
     ['position', 'text'], ['level', 'text'], ['department', 'text'], ['status', 'status', true]
@@ -711,7 +694,7 @@ const ADMIN_TABLES = {
     ['price', 'money', true], ['crcy', 'text', true], ['status', 'status', true]
   ] },
   mt_main_user: { db: 'mx', pk: ['employee_id'], columns: [
-    ['employee_id', 'text', true], ['password', 'password'], ['creator', 'bool'], ['status', 'status', true], ['password_expires_at', 'read']
+    ['employee_id', 'text', true], ['department', 'read'], ['password', 'password'], ['creator', 'bool'], ['status', 'status', true], ['password_expires_at', 'read']
   ] },
   mt_sto_user: { db: 'mx', pk: ['employee_id'], columns: [
     ['employee_id', 'text', true], ['department', 'text', true], ['role', 'usage', true], ['status', 'status', true]
