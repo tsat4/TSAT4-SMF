@@ -46,6 +46,35 @@ function field(label, control, extra = '') {
   return `<label class="field${extra ? ` ${extra}` : ''}">${label}${control}</label>`;
 }
 
+function usageThumb(src) {
+  return src ? `<img class="usage-thumb" src="${esc(src)}" alt="">` : '';
+}
+
+function squareJpeg(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const side = Math.min(image.width, image.height);
+      canvas.getContext('2d').drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('จัดรูปไม่ได้'));
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('อ่านรูปไม่ได้'));
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', 0.75);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('เปิดรูปไม่ได้')); };
+    image.src = url;
+  });
+}
+
 function options(values, current, labelOf = (value) => value) {
   return values.map((value) => `<option value="${esc(value)}"${String(current) === String(value) ? ' selected' : ''}>${esc(labelOf(value))}</option>`).join('');
 }
@@ -397,7 +426,7 @@ async function renderEdit(target) {
   const admin = rankOf() >= 3;
   target.innerHTML = tablePage('edit', `
     ${field('เลือกหน้าย่อย', `<select id="edit-page">${options(Object.keys(TX_PAGE), txPage, (value) => TX_PAGE[value])}</select>`, 'grow')}
-    ${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'เลขที่ ศูนย์ต้นทุน หรือสถานะ', grow: true })}
+    ${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'เลขที่ costcenter หรือสถานะ', grow: true })}
     <div class="action-bar" id="edit-actions"></div>`);
   const setFoot = (shown, total) => {
     countText('edit-count', shown, total);
@@ -444,7 +473,7 @@ async function renderEdit(target) {
       admin ? button('edit-prepare', 'จัดเตรียม', 'secondary', 'disabled') + button('edit-issue', 'จ่าย', 'secondary', 'disabled') : '',
       button('edit-receive', 'รับ', 'primary', 'disabled')
     ].join('');
-    fillTable('edit-rows', ['เลขที่', 'ผู้เบิก', 'ศูนย์ต้นทุน', 'สถานะ'], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก');
+    fillTable('edit-rows', ['เลขที่', 'ผู้เบิก', 'costcenter', 'สถานะ'], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก');
     setFoot(page.length, rows.length);
     bindRowSelect($('edit-rows'), (_id, row) => {
       const own = row.dataset.own === '1';
@@ -572,7 +601,7 @@ async function openAddPopup() {
     ? `<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}"${row.costcenter === chosen ? ' selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>`
     : `<input readonly value="${pay.department ? 'หน่วยงานนี้ยังไม่มี costcenter' : 'พนักงานนี้ยังไม่มีหน่วยงาน'}">`;
   openPopup('เบิก', [
-    searchBlock(searchSlot('รายการ', 'line-q', 'line-search', { placeholder: 'หมายเลขหรือชื่อ' }), 'line-results'),
+    searchBlock(searchSlot('รายการ', 'line-q', 'line-search', { placeholder: 'หมายเลข ชื่อ หรือ group' }), 'line-results'),
     field('หมายเลขเลขรายการ', '<input id="line-code" readonly>'),
     field('ชื่อรายการ', '<input id="line-name" readonly>'),
     field('หน่วย', '<input id="line-bun" readonly>'),
@@ -583,7 +612,7 @@ async function openAddPopup() {
     const qty = Number($('line-qty').value);
     const costcenter = $('line-cc')?.value || '';
     if (!(qty > 0)) throw new Error('ระบุจำนวน');
-    if (!costcenter) throw new Error('เลือกศูนย์ต้นทุน');
+    if (!costcenter) throw new Error('เลือก costcenter');
     let id = cartHeader?.id;
     if (!id) id = (await api('/api/requisitions', { method: 'POST', body: { costcenter } })).id;
     await api(`/api/requisitions/${id}/lines`, { method: 'POST', body: { material: picked.material, qty, costcenter } });
@@ -595,7 +624,7 @@ async function openAddPopup() {
   const searchLine = async () => {
     const materials = [...(await api(`/api/materials?q=${encodeURIComponent($('line-q').value.trim())}`)).materials]
       .sort((a, b) => String(a.material).localeCompare(String(b.material)));
-    fillTable('line-results', LINE_HEAD, materials.map((row) => `<tr data-pick="${esc(row.material)}" data-bun="${esc(row.bun)}" data-name="${esc(row.material_description)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join(''), 'ไม่พบรายการ');
+    fillTable('line-results', ['รูป', ...LINE_HEAD.slice(0, 2), 'group', 'หน่วย'], materials.map((row) => `<tr data-pick="${esc(row.material)}" data-bun="${esc(row.bun)}" data-name="${esc(row.material_description)}"><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.usage_group || '')}</td><td>${esc(row.bun)}</td></tr>`).join(''), 'ไม่พบรายการ');
     bindRowSelect($('line-results'), (id, row) => {
       picked = { material: id, bun: row.dataset.bun, name: row.dataset.name };
       $('line-code').value = id;
@@ -636,14 +665,28 @@ async function renderUsers(target) {
   const drawForm = () => {
     if (kind() === 'materials') {
       const row = state.formMode === 'edit' && state.selected ? state.selected : {};
+      state.imgData = '';
       openPopup(`${row.material ? 'แก้ไขแถว' : 'เพิ่มแถว'} mt_sto_usage`, [
         field('รหัส', `<input id="mat-code" value="${esc(row.material || '')}" ${row.material ? 'readonly' : ''}>`),
         field('ชื่อรายการ', `<input id="mat-name" value="${esc(row.material_description || '')}">`),
+        field('group', `<input id="mat-group" value="${esc(row.usage_group || '')}" maxlength="40">`),
         field('หน่วย', `<input id="mat-bun" value="${esc(row.bun || '')}">`),
         field('ราคา', `<input id="mat-price" type="number" min="0" step="0.01" value="${row.price ?? ''}">`),
         field('สกุลเงิน', `<input id="mat-crcy" value="${esc(row.crcy || 'THB')}">`),
-        statusField('mat-status', row.status)
+        statusField('mat-status', row.status),
+        field('รูป', `<input id="mat-img" type="file" accept="image/*">${usageThumb(row.img).replace('usage-thumb', 'usage-preview') || '<img id="mat-preview" class="usage-preview d-none" alt="">'}`)
       ].join(''), saveRow);
+      const preview = document.querySelector('.usage-preview');
+      if (preview) preview.id = 'mat-preview';
+      $('mat-img').onchange = async () => {
+        const file = $('mat-img').files?.[0];
+        if (!file) return;
+        try {
+          state.imgData = await squareJpeg(file);
+          $('mat-preview').src = state.imgData;
+          $('mat-preview').classList.remove('d-none');
+        } catch (err) { onErr(err); }
+      };
       return;
     }
     const row = state.formMode === 'edit' && state.selected ? state.selected : null;
@@ -677,14 +720,14 @@ async function renderUsers(target) {
       const data = await api(`/api/usage-materials?q=${encodeURIComponent($('usage-q').value.trim())}&offset=${state.offset}`);
       state.rows = data.materials;
       countText('usage-count', state.rows.length, data.total);
-      fillTable('usage-rows', ['รหัส', 'ชื่อรายการ', 'หน่วย', 'ราคา', 'สกุลเงิน', 'สถานะ'], state.rows.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td><td>${Number(row.price)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีรายการ');
+      fillTable('usage-rows', ['รูป', 'รหัส', 'ชื่อรายการ', 'group', 'หน่วย', 'ราคา', 'สกุลเงิน', 'สถานะ'], state.rows.map((row, index) => `<tr data-pick="${index}"><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.usage_group || '')}</td><td>${esc(row.bun)}</td><td>${Number(row.price)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีรายการ');
     } else {
       const term = $('usage-q').value.trim().toLowerCase();
       const filtered = (await api('/api/users')).users.filter((row) => !term || [row.employeeId, row.name, row.department, centerText(row), row.role].join(' ').toLowerCase().includes(term));
       const page = filtered.slice(state.offset, state.offset + PAGE);
       state.rows = page;
       countText('usage-count', page.length, filtered.length);
-      fillTable('usage-rows', ['รหัส', 'ชื่อ', 'หน่วยงาน', 'ศูนย์ต้นทุน', 'บทบาท', 'สถานะ'], page.map((row, index) => `<tr data-pick="${index}" data-creator="${row.creator ? '1' : '0'}"><td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีแถว');
+      fillTable('usage-rows', ['รหัส', 'ชื่อ', 'หน่วยงาน', 'costcenter', 'บทบาท', 'สถานะ'], page.map((row, index) => `<tr data-pick="${index}" data-creator="${row.creator ? '1' : '0'}"><td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีแถว');
     }
     bindRowSelect($('usage-rows'), (pick, row) => {
       state.selected = state.rows[Number(pick)];
@@ -694,7 +737,8 @@ async function renderUsers(target) {
   };
   const saveRow = async () => {
     if (kind() === 'materials') {
-      const body = { material: $('mat-code').value.trim(), materialDescription: $('mat-name').value.trim(), bun: $('mat-bun').value.trim(), price: Number($('mat-price').value), crcy: $('mat-crcy').value.trim(), status: $('mat-status').value };
+      const body = { material: $('mat-code').value.trim(), materialDescription: $('mat-name').value.trim(), bun: $('mat-bun').value.trim(), price: Number($('mat-price').value), crcy: $('mat-crcy').value.trim(), status: $('mat-status').value, usageGroup: $('mat-group').value.trim() };
+      if (state.imgData) body.img = state.imgData;
       if (state.formMode === 'edit' && state.selected) await api(`/api/usage-materials/${encodeURIComponent(state.selected.material)}`, { method: 'PATCH', body });
       else await api('/api/usage-materials', { method: 'POST', body });
     } else if (state.formMode === 'edit' && state.selected) {

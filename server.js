@@ -223,7 +223,7 @@ async function decorate(headers, linesById = new Map()) {
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, database: Boolean(mx && tx && process.env.SESSION_SECRET) });
@@ -396,14 +396,32 @@ app.delete('/api/users/:employeeId', wrap(requireUser), usageAtLeast(3), wrap(as
   res.json({ ok: true });
 }));
 
+function usageGroupOf(value) {
+  return String(value || '').trim().slice(0, 40);
+}
+
+async function saveUsageImage(material, dataUrl) {
+  const text = String(dataUrl || '');
+  if (!text) return '';
+  const match = text.match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+  const bytes = Buffer.from(match[1], 'base64');
+  if (bytes.length < 32 || bytes.length > 400000 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  const path = `${String(material).replace(/[^A-Za-z0-9._-]/g, '_')}.jpg`;
+  const uploaded = await mx.storage.from('usage-img').upload(path, new Uint8Array(bytes), { contentType: 'image/jpeg', upsert: true });
+  if (uploaded.error) return null;
+  const { data } = mx.storage.from('usage-img').getPublicUrl(path);
+  return `${data.publicUrl}?v=${Date.now()}`;
+}
+
 app.get('/api/usage-materials', wrap(requireUser), usageAtLeast(3), wrap(async (req, res) => {
   const term = cleanTerm(req.query.q);
   const offset = Math.max(0, Number(req.query.offset) || 0);
   let query = mx.from('mt_sto_usage')
-    .select('no,material,material_description,bun,price,crcy,status', { count: 'exact' })
+    .select('no,material,material_description,bun,price,crcy,status,usage_group,img', { count: 'exact' })
     .order('material')
     .range(offset, offset + 49);
-  if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%`);
+  if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`);
   const { data, error, count } = await query;
   if (error) return fail(res, 400, 'อ่านรายการไม่ได้');
   res.json({ materials: data || [], total: count || 0 });
@@ -416,7 +434,10 @@ app.post('/api/usage-materials', wrap(requireUser), usageAtLeast(3), wrap(async 
   const crcy = String(req.body.crcy || 'THB').trim();
   const price = amountOf(req.body.price);
   const status = ['Active', 'Inactive'].includes(req.body.status) ? req.body.status : '';
+  const usageGroup = usageGroupOf(req.body.usageGroup);
   if (!material || !materialDescription || !bun || !crcy || price == null || !status) return fail(res, 400, 'ระบุรายการให้ครบ');
+  const img = req.body.img ? await saveUsageImage(material, req.body.img) : '';
+  if (req.body.img && !img) return fail(res, 400, 'รูปต้องเป็นสี่เหลี่ยมจัตุรัส');
   const last = await mx.from('mt_sto_usage').select('no').order('no', { ascending: false }).limit(1).maybeSingle();
   if (last.error) return fail(res, 400, 'เพิ่มรายการไม่ได้');
   const { error } = await mx.from('mt_sto_usage').insert({
@@ -426,7 +447,9 @@ app.post('/api/usage-materials', wrap(requireUser), usageAtLeast(3), wrap(async 
     bun,
     price,
     crcy,
-    status
+    status,
+    usage_group: usageGroup || null,
+    img: img || null
   });
   if (error) return fail(res, 400, 'เพิ่มรายการไม่ได้');
   res.status(201).json({ ok: true });
@@ -438,14 +461,22 @@ app.patch('/api/usage-materials/:material', wrap(requireUser), usageAtLeast(3), 
   const crcy = String(req.body.crcy || '').trim();
   const price = amountOf(req.body.price);
   const status = ['Active', 'Inactive'].includes(req.body.status) ? req.body.status : '';
+  const usageGroup = usageGroupOf(req.body.usageGroup);
   if (!materialDescription || !bun || !crcy || price == null || !status) return fail(res, 400, 'ระบุรายการให้ครบ');
-  const { data, error } = await mx.from('mt_sto_usage').update({
+  const patch = {
     material_description: materialDescription,
     bun,
     price,
     crcy,
-    status
-  }).eq('material', req.params.material).select('material');
+    status,
+    usage_group: usageGroup || null
+  };
+  if (req.body.img) {
+    const img = await saveUsageImage(req.params.material, req.body.img);
+    if (!img) return fail(res, 400, 'รูปต้องเป็นสี่เหลี่ยมจัตุรัส');
+    patch.img = img;
+  }
+  const { data, error } = await mx.from('mt_sto_usage').update(patch).eq('material', req.params.material).select('material');
   if (error || !data?.length) return fail(res, 400, 'แก้ไขรายการไม่ได้');
   res.json({ ok: true });
 }));
@@ -476,7 +507,7 @@ app.get('/api/stock', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) 
     .order('material')
     .range(offset, offset + 49);
   if (term) {
-    const found = await mx.from('mt_sto_usage').select('material').or(`material.ilike.%${term}%,material_description.ilike.%${term}%`).limit(200);
+    const found = await mx.from('mt_sto_usage').select('material').or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`).limit(200);
     const materials = (found.data || []).map((row) => row.material);
     if (!materials.length) return res.json({ stock: [], total: 0 });
     query = query.in('material', materials);
@@ -500,11 +531,11 @@ app.get('/api/stock', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) 
 app.get('/api/materials', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   const term = cleanTerm(req.query.q);
   let query = mx.from('mt_sto_usage')
-    .select('material,material_description,bun,status')
+    .select('material,material_description,bun,status,usage_group,img')
     .eq('status', 'Active')
     .order('material')
     .limit(20);
-  if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%`);
+  if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`);
   const { data, error } = await query;
   if (error) return fail(res, 400, 'ค้นหารายการไม่ได้');
   res.json({ materials: data || [] });
@@ -536,7 +567,7 @@ app.get('/api/requisitions/:id', wrap(requireUser), wrap(async (req, res) => {
 app.post('/api/requisitions', wrap(requireUser), usageAtLeast(1), wrap(async (req, res) => {
   let costcenter = String(req.body.costcenter || '').trim();
   if (costcenter) {
-    if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือกศูนย์ต้นทุนในขอบเขตของคุณ');
+    if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
   } else costcenter = DRAFT_COSTCENTER;
   const { data, error } = await tx.from('tx_sto_requisition')
     .insert({ requested_by: req.user.employeeId, costcenter })
@@ -554,10 +585,10 @@ app.post('/api/requisitions/:id/lines', wrap(requireUser), usageAtLeast(1), wrap
   if (!header) return fail(res, 400, 'แก้ได้เฉพาะตะกร้าของตนเอง');
   if (!material || !qty) return fail(res, 400, 'เลือกรายการและจำนวน');
   const costcenter = String(req.body.costcenter || header.costcenter).trim();
-  if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือกศูนย์ต้นทุนในขอบเขตของคุณ');
+  if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
   if (costcenter !== header.costcenter) {
     const applied = await tx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
-    if (applied.error) return fail(res, 400, 'บันทึกศูนย์ต้นทุนไม่ได้');
+    if (applied.error) return fail(res, 400, 'บันทึก costcenter ไม่ได้');
     header.costcenter = costcenter;
   }
   const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
@@ -607,16 +638,16 @@ app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res
   try {
     if (status === 'submitted' && mine && header.status === 'cart') {
       const costcenter = String(req.body.costcenter || header.costcenter || '').trim();
-      if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือกศูนย์ต้นทุนในขอบเขตของคุณ');
+      if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
       const { data: lines, error: lineError } = await tx.from('tx_sto_requisition_line').select('material').eq('requisition_id', id);
       if (lineError || !lines?.length) return fail(res, 400, 'ตะกร้าว่าง');
       for (const line of lines) {
         const stock = await mx.from('mt_sto_stock').select('material').eq('costcenter', costcenter).eq('material', line.material).maybeSingle();
-        if (!stock.data) return fail(res, 400, `ศูนย์ต้นทุนนี้ยังไม่มียอดของ ${line.material}`);
+        if (!stock.data) return fail(res, 400, `costcenter นี้ยังไม่มียอดของ ${line.material}`);
       }
       if (costcenter !== header.costcenter) {
         const applied = await tx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
-        if (applied.error) return fail(res, 400, 'บันทึกศูนย์ต้นทุนไม่ได้');
+        if (applied.error) return fail(res, 400, 'บันทึก costcenter ไม่ได้');
       }
       await move(id, 'cart', { status: 'submitted' });
     } else if (status === 'cancelled' && mine && ['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(header.status)) {
@@ -691,7 +722,7 @@ const ADMIN_TABLES = {
   ] },
   mt_sto_usage: { db: 'mx', pk: ['material'], columns: [
     ['no', 'int'], ['material', 'text', true], ['material_description', 'text', true], ['bun', 'text', true],
-    ['price', 'money', true], ['crcy', 'text', true], ['status', 'status', true]
+    ['price', 'money', true], ['crcy', 'text', true], ['usage_group', 'text'], ['img', 'text'], ['status', 'status', true]
   ] },
   mt_main_user: { db: 'mx', pk: ['employee_id'], columns: [
     ['employee_id', 'text', true], ['department', 'read'], ['password', 'password'], ['creator', 'bool'], ['status', 'status', true], ['password_expires_at', 'read']

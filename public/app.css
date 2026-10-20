@@ -143,6 +143,8 @@ table.mo-data-table tbody tr.row-pick{cursor:pointer}
 table.mo-data-table tbody tr.row-pick.is-selected,
 table.mo-data-table tbody tr.row-pick.is-selected td{background:var(--mo-row)}
 table.mo-data-table tbody tr.row-pick.is-selected td:first-child{box-shadow:inset 3px 0 0 var(--mo-primary)}
+.usage-thumb{width:24px;height:24px;object-fit:cover;border-radius:4px;display:block;background:var(--mo-surface-2)}
+.usage-preview{width:160px;height:160px;object-fit:cover;border-radius:var(--mo-radius);border:1px solid var(--mo-line);background:var(--mo-surface-2)}
 .badge{display:inline-flex;align-items:center;min-height:21px;padding:2px 8px;border-radius:var(--mo-radius);font-size:10.5px;font-weight:500;background:var(--mo-surface-2);color:var(--mo-text-muted)}
 .badge-success{background:var(--mo-success-soft);color:var(--mo-success)}
 .badge-warning{background:var(--mo-warning-soft);color:#8a5a00}
