@@ -718,7 +718,7 @@ const ADMIN_TABLES = {
   ] },
   mt_main_employee: { db: 'mx', pk: ['employee_id'], columns: [
     ['employee_id', 'text', true], ['prefix', 'text'], ['first_name', 'text', true], ['last_name', 'text', true],
-    ['position', 'text'], ['level', 'text'], ['department', 'text'], ['status', 'status', true]
+    ['position', 'text'], ['level', 'level', true], ['department', 'text'], ['status', 'status', true]
   ] },
   mt_main_costcenter: { db: 'mx', pk: ['costcenter'], columns: [
     ['costcenter', 'text', true], ['object_name', 'text', true], ['group_name', 'group', true], ['department', 'text', true], ['status', 'status', true]
@@ -806,6 +806,7 @@ function adminValue(column, raw, { insert }) {
     return Math.round(n * 1000) / 1000;
   }
   if (column.type === 'status' && !['Active', 'Inactive'].includes(raw)) return null;
+  if (column.type === 'level' && !['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8'].includes(raw)) return null;
   if (column.type === 'group' && !['Factory', 'Non', 'Center'].includes(raw)) return null;
   if (column.type === 'usage' && !['viewer', 'user', 'admin'].includes(raw)) return null;
   if (column.type === 'req' && !['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'].includes(raw)) return null;
@@ -850,7 +851,7 @@ app.get('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (
   const order = spec.pk[0];
   query = query.order(order, { ascending: true });
   if (term) {
-    const filters = spec.columns.filter((column) => ['text', 'status', 'group', 'usage', 'req'].includes(column.type)).map((column) => `${column.name}.ilike.%${term}%`);
+    const filters = spec.columns.filter((column) => ['text', 'status', 'group', 'usage', 'level', 'req'].includes(column.type)).map((column) => `${column.name}.ilike.%${term}%`);
     if (filters.length) query = query.or(filters.join(','));
   }
   const { data, error, count } = await query;
