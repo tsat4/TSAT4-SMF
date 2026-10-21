@@ -25,6 +25,23 @@ const TITLES = {
 };
 const LINE_HEAD = ['หมายเลขเลขรายการ', 'ชื่อรายการ', 'หน่วย'];
 const TX_PAGE = { issue: 'เบิกจ่าย', receive: 'รับเข้า', stock: 'Stock' };
+const PLANTS = [
+  ['pd1', 'PD1', 'factory'],
+  ['pd2', 'PD2', 'factory'],
+  ['pd3', 'PD3', 'factory'],
+  ['pd4', 'PD4', 'factory'],
+  ['mtn', 'MTN', 'build']
+];
+const PLANT_PAGES = [
+  ['home', 'monitoring', 'Dashboard', 'ภาพรวม'],
+  ['edit', 'edit_note', 'transaction', 'รายการ'],
+  ['setting', 'settings', 'Setting', 'ข้อมูลตั้งต้น']
+];
+for (const [id, label] of PLANTS) {
+  const path = `ระบบงาน > ${label}`;
+  TITLES[id] = [label, path];
+  for (const [page, , title] of PLANT_PAGES) TITLES[`${id}-${page}`] = [title, path];
+}
 
 let me = null;
 let view = 'main';
@@ -249,8 +266,19 @@ function openView(name) {
   document.body.classList.remove('sidebar-open');
   const target = $('app-view');
   target.innerHTML = '<div class="empty">กำลังโหลด...</div>';
-  const render = { main: renderMain, work: renderWork, store: renderStore, activity: renderActivity, locked: renderLocked, home: renderHome, edit: renderEdit, setting: renderUsers, system: renderSystem }[name];
+  const render = { main: renderMain, work: renderWork, store: renderStore, activity: renderActivity, locked: renderLocked, home: renderHome, edit: renderEdit, setting: renderUsers, system: renderSystem }[name] || plantRender(name);
   render(target).catch((err) => { target.innerHTML = `<p class="form-error">${esc(err.message)}</p>`; });
+}
+
+function plantOf(name) {
+  return PLANTS.find(([id]) => name === id || name.startsWith(`${id}-`));
+}
+
+function plantRender(name) {
+  const plant = plantOf(name);
+  if (!plant) return async (target) => { target.innerHTML = cardView('ไม่พบหน้า', '', '<p class="empty">ไม่มีหน้านี้</p>'); };
+  const page = name === plant[0] ? '' : name.slice(plant[0].length + 1);
+  return async (target) => (page ? renderPlantPage(target, plant[0], page) : renderPlant(target, plant[0]));
 }
 
 function moduleCard(viewName, icon, title, text) {
@@ -275,7 +303,23 @@ async function renderMain(target) {
 }
 
 async function renderWork(target) {
-  modulePage(target, 'ระบบงาน', 'Work System', [['store', 'warehouse', 'Store', 'คลังและรายการใช้งาน']]);
+  modulePage(target, 'ระบบงาน', 'Work System', [
+    ['store', 'warehouse', 'Store', 'คลังและรายการใช้งาน'],
+    ...PLANTS.map(([id, label, icon]) => [id, icon, label, 'Dashboard, transaction, Setting'])
+  ]);
+}
+
+function renderPlant(target, id) {
+  const label = PLANTS.find((row) => row[0] === id)[1];
+  modulePage(target, label, `ระบบงาน > ${label}`, PLANT_PAGES.map(([page, icon, title, text]) => [`${id}-${page}`, icon, title, text]));
+}
+
+function renderPlantPage(target, id, page) {
+  const label = PLANTS.find((row) => row[0] === id)[1];
+  const found = PLANT_PAGES.find((row) => row[0] === page);
+  const title = found ? found[2] : page;
+  const text = page === 'edit' ? 'ยังไม่มีรายการในส่วนนี้' : page === 'setting' ? 'ยังไม่มีการตั้งค่าในส่วนนี้' : 'ยังไม่มีข้อมูลในส่วนนี้';
+  target.innerHTML = cardView(title, `ระบบงาน > ${label}`, `<p class="empty">${text}</p>`);
 }
 
 async function renderStore(target) {
@@ -799,6 +843,13 @@ function logout() {
 }
 $('logout').onclick = logout;
 $('password-logout').onclick = logout;
+document.querySelector('[data-nav-panel="work"]').insertAdjacentHTML('beforeend', PLANTS.map(([id, label, icon]) => `<div class="nav-acc is-collapsed" data-nav-acc="${id}">
+  <div class="nav-split">
+    <button class="nav-btn nav-parent" type="button" data-view="${id}" title="${label}"><span class="material-symbols-rounded">${icon}</span><span>${label}</span></button>
+    <button class="nav-caret-btn" type="button" data-nav-toggle="${id}" aria-expanded="false" aria-label="ย่อ ${label}" title="ย่อ/ขยาย"><span class="material-symbols-rounded nav-caret">expand_more</span></button>
+  </div>
+  <div class="nav-sub" data-nav-panel="${id}">${PLANT_PAGES.map(([page, itemIcon, title]) => `<button class="nav-btn" data-view="${id}-${page}" title="${title}"><span class="material-symbols-rounded">${itemIcon}</span><span>${title}</span></button>`).join('')}</div>
+</div>`).join(''));
 document.querySelectorAll('.nav-btn[data-view]').forEach((node) => { node.onclick = () => openView(node.dataset.view); });
 document.querySelectorAll('[data-nav-toggle]').forEach((node) => {
   node.onclick = () => {
@@ -811,9 +862,13 @@ document.querySelectorAll('[data-nav-toggle]').forEach((node) => {
 });
 document.querySelectorAll('[data-nav-acc]').forEach((acc) => {
   const name = acc.dataset.navAcc;
-  if (localStorage.getItem(`smf-nav-${name}`) === 'collapsed') {
+  const saved = localStorage.getItem(`smf-nav-${name}`);
+  if (saved === 'collapsed') {
     acc.classList.add('is-collapsed');
     acc.querySelector('[data-nav-toggle]')?.setAttribute('aria-expanded', 'false');
+  } else if (saved === 'open') {
+    acc.classList.remove('is-collapsed');
+    acc.querySelector('[data-nav-toggle]')?.setAttribute('aria-expanded', 'true');
   }
 });
 function updateSidebarIcon() {
