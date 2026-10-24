@@ -8,11 +8,15 @@
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/check.js",
-    "migrate:tx": "node --env-file=.env scripts/migrate-tx-to-mx.js"
+    "migrate:tx": "node --env-file=.env scripts/migrate-tx-to-mx.js",
+    "test:db": "node scripts/test-db.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
     "bcryptjs": "^2.4.3",
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.15"
   }
 }

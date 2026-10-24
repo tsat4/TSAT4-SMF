@@ -10,7 +10,8 @@ begin
   for col in
     select c.table_name, c.column_name
     from information_schema.columns c
-    where c.table_schema = 'public' and c.table_name like 'tx\_%' and c.is_identity = 'YES'
+    where c.table_schema = 'public' and c.table_name like 'tx\_%'
+      and pg_get_serial_sequence('public.' || quote_ident(c.table_name), c.column_name) is not null
   loop
     execute format(
       'select setval(pg_get_serial_sequence(%L, %L), coalesce((select max(%I) from public.%I), 0) + 1, false)',

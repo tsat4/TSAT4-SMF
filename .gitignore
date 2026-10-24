@@ -2,3 +2,4 @@ node_modules/
 .env
 inbox/
 *.xlsx
+db/backup_*.sql
