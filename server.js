@@ -713,9 +713,6 @@ async function receive(header) {
 }
 
 const ADMIN_TABLES = {
-  mt_main_department: { db: 'mx', pk: ['department'], columns: [
-    ['department', 'text', true]
-  ] },
   mt_main_employee: { db: 'mx', pk: ['employee_id'], columns: [
     ['employee_id', 'text', true], ['prefix', 'text'], ['first_name', 'text', true], ['last_name', 'text', true],
     ['position', 'text'], ['level', 'level', true], ['department', 'text'], ['status', 'status', true]
