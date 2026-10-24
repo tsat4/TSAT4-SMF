@@ -56,8 +56,22 @@ async function move(id, from, patch) {
   if (error || !data?.length) throw new Error('เปลี่ยนสถานะไม่ได้');
 }
 
-// Not atomic: stock is cut line by line and given back if a later line fails.
+// Once tx lives in the same database as mx, tx_sto_receive (db/03_receive_rpc.sql) cuts all stock
+// and marks the requisition received in one transaction. Until it exists, fall back to the old way.
 async function receive(header) {
+  const { error } = await tx.rpc('tx_sto_receive', { p_id: header.id, p_employee: header.requested_by });
+  if (!error) return;
+  if (error.code !== 'PGRST202') {
+    const text = error.message || '';
+    if (text.includes('not enough')) throw new Error('ยอดคงเหลือไม่พอ');
+    if (text.includes('no lines')) throw new Error('ใบเบิกไม่มีรายการ');
+    throw new Error('เปลี่ยนสถานะไม่ได้');
+  }
+  await receiveLineByLine(header);
+}
+
+// Not atomic: stock is cut line by line and given back if a later line fails.
+async function receiveLineByLine(header) {
   const { data: lines, error } = await tx.from('tx_sto_requisition_line')
     .select('costcenter,material,qty').eq('requisition_id', header.id);
   if (error || !lines?.length) throw new Error('ใบเบิกไม่มีรายการ');

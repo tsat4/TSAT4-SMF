@@ -33,7 +33,9 @@ public/
   js/units.js                รายชื่อหน่วยงาน PLANTS / ACTIVITIES และหน้าชั่วคราว
   js/system.js               หน้าแก้ตารางของ creator
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)
+db/                          SQL ที่ผู้ใช้รันเองใน Supabase + คู่มือ (README.md)
 scripts/
+  migrate-tx-to-mx.js        npm run migrate:tx (คัดลอก tx_* จาก TX ไป MX)
   check.js                   npm run check (ดู AGENTS.md)
   routes.snapshot.txt        รายการ route + สิทธิ์ที่ถูกต้อง
 ```
@@ -96,7 +98,6 @@ RPC: `mt_sto_stock_adjust(p_costcenter, p_material, p_delta)` (mx), `tx_sto_appl
 
 ## หนี้ทางเทคนิคที่รู้แล้ว (ยังไม่แก้)
 
-- การตัดสต็อกตอน `received` วนตัดทีละรายการแล้วคืนค่าเองถ้าพลาด ยังไม่ใช่ transaction ควรย้ายไปทำใน RPC เดียว (ต้องแก้ DB)
-- mx กับ tx อยู่คนละโปรเจกต์ Supabase จึง join หรือใช้ FK ข้ามกันไม่ได้
+- mx กับ tx อยู่คนละโปรเจกต์ Supabase จึง join หรือใช้ FK ข้ามกันไม่ได้ และการตัดสต็อกตอน `received` ยังไม่ใช่ transaction เดียว กำลังแก้อยู่โดยรวมฐาน (ดู `db/README.md`) เมื่อมี RPC `tx_sto_receive` แล้ว server จะใช้เอง
 - ทุก request อ่านตารางสมาชิกของทุกโมดูล ถ้ามีเกิน 8–10 โมดูล ควรรวมเป็นตารางเดียว `mt_main_user_role(employee_id, module_id, role, status)`
 - ยังไม่มีเทสต์ที่ต่อฐานข้อมูลจริง `npm run check` ตรวจได้แค่โครงสร้าง, route, สิทธิ์ และการ boot
