@@ -31,7 +31,8 @@ const PLANTS = [
   ['pd2', 'PD2', 'factory'],
   ['pd3', 'PD3', 'factory'],
   ['pd4', 'PD4', 'factory'],
-  ['mtn', 'MTN', 'build']
+  ['jig-mtn', 'JIG MTN', 'build'],
+  ['die-mtn', 'DIE MTN', 'build']
 ];
 const PLANT_PAGES = [
   ['home', 'monitoring', 'Dashboard', 'ภาพรวม'],
