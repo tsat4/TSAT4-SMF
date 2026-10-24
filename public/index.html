@@ -151,6 +151,11 @@
     </main>
   </div>
   <div class="toast-stack" id="toasts"></div>
-  <script src="/app.js"></script>
+  <!-- Load order matters: core first, boot last. All scripts share one global scope. -->
+  <script src="/js/core.js"></script>
+  <script src="/js/sto.js"></script>
+  <script src="/js/units.js"></script>
+  <script src="/js/system.js"></script>
+  <script src="/js/boot.js"></script>
 </body>
 </html>

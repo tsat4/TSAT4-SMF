@@ -1,0 +1,13 @@
+---
+description: SMF project rules shared with Claude Code. Read before any change.
+alwaysApply: true
+---
+
+กฎของโปรเจกต์นี้อยู่ใน @AGENTS.md และสถานะงานล่าสุดอยู่ใน @docs/HANDOFF.md อ่านทั้งสองไฟล์ก่อนแก้โค้ดทุกครั้ง
+
+สรุปข้อที่ห้ามพลาด:
+1. เริ่มงาน: `git status` ถ้ามีงานค้างที่ไม่ใช่ของคุณ ห้าม reset, checkout หรือ stash ให้ทำต่อตาม HANDOFF ถ้าไม่มีงานค้าง ให้รัน `git pull --rebase`
+2. ก่อนงานใหญ่ ให้เขียนแผนลงหัวข้อ "กำลังทำอยู่" ใน docs/HANDOFF.md
+3. หน่วยงานใหม่ = โมดูลใหม่ (`server/modules/<id>/` + `public/js/<id>.js`) ตามที่ docs/ARCHITECTURE.md กำหนด
+4. ก่อน commit: `npm run check` ต้องผ่าน และต้องอัปเดตบันทึกใน docs/HANDOFF.md
+5. push ไปที่ main = deploy ขึ้น Render ทันที ห้าม push ถ้า check ไม่ผ่าน

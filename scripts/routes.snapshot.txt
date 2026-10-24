@@ -1,0 +1,30 @@
+DELETE /api/requisitions/:id/lines/:lineId auth sto:1
+DELETE /api/system/tables/:name auth creator
+DELETE /api/usage-materials/:material auth sto:3
+DELETE /api/users/:employeeId auth sto:3
+GET /api/employees auth sto:3
+GET /api/health
+GET /api/materials auth sto:1
+GET /api/me auth
+GET /api/pay-centers auth sto:1
+GET /api/requisitions auth sto:1
+GET /api/requisitions/:id auth
+GET /api/stock auth sto:1
+GET /api/summary auth sto:1
+GET /api/system/tables auth creator
+GET /api/system/tables/:name auth creator
+GET /api/usage-materials auth sto:3
+GET /api/users auth sto:3
+PATCH /api/requisitions/:id/lines/:lineId auth sto:1
+PATCH /api/system/tables/:name auth creator
+PATCH /api/usage-materials/:material auth sto:3
+PATCH /api/users/:employeeId auth sto:3
+POST /api/login
+POST /api/logout
+POST /api/password auth
+POST /api/requisitions auth sto:1
+POST /api/requisitions/:id/lines auth sto:1
+POST /api/requisitions/:id/status auth
+POST /api/system/tables/:name auth creator
+POST /api/usage-materials auth sto:3
+POST /api/users auth sto:3

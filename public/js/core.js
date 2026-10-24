@@ -1,0 +1,285 @@
+// Shared shell: helpers, popup, api(), session screens, and the view router.
+// Modules register into VIEWS / TITLES / ACCESS. Scripts share one global scope: never reuse a top-level name.
+const RANK = { viewer: 1, user: 2, admin: 3 };
+const PAGE = 50;
+const TITLES = {
+  main: ['TSAT4 SMF', 'หน้าหลัก']
+};
+// view name -> render(target)
+const VIEWS = {};
+// view name -> [moduleId, minimum rank]; below it the view opens as 'locked'
+const ACCESS = {};
+// render for view names not in VIEWS (set by units.js)
+let viewFallback = null;
+
+let me = null;
+let view = 'main';
+
+const $ = (id) => document.getElementById(id);
+const onErr = (err) => toast(err.message, 'error');
+
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function button(id, label, kind = 'secondary', extra = '') {
+  return `<button class="btn btn-${kind}" type="button"${id ? ` id="${id}"` : ''} ${extra}>${label}</button>`;
+}
+
+function field(label, control, extra = '') {
+  return `<label class="field${extra ? ` ${extra}` : ''}">${label}${control}</label>`;
+}
+
+function squareJpeg(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const side = Math.min(image.width, image.height);
+      canvas.getContext('2d').drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, size, size);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) return reject(new Error('จัดรูปไม่ได้'));
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('อ่านรูปไม่ได้'));
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', 0.75);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('เปิดรูปไม่ได้')); };
+    image.src = url;
+  });
+}
+
+function options(values, current, labelOf = (value) => value) {
+  return values.map((value) => `<option value="${esc(value)}"${String(current) === String(value) ? ' selected' : ''}>${esc(labelOf(value))}</option>`).join('');
+}
+
+function searchSlot(label, inputId, buttonId, { placeholder = '', grow = false } = {}) {
+  const hint = placeholder ? ` placeholder="${esc(placeholder)}"` : '';
+  return `<div class="search-slot">${field(label, `<input id="${inputId}"${hint}>`, grow ? 'grow' : '')}${button(buttonId, 'ค้นหา')}</div>`;
+}
+
+function searchBlock(slot, listId) {
+  return `<div class="search-block">${slot}<div class="search-list" id="${listId}"></div></div>`;
+}
+
+function crudBar(prefix) {
+  return `<div class="action-bar">${button(`${prefix}-add`, 'เพิ่ม', 'primary')}${button(`${prefix}-edit`, 'แก้ไข', 'secondary', 'disabled')}${button(`${prefix}-del`, 'ลบ', 'danger', 'disabled')}</div>`;
+}
+
+function tablePage(prefix, toolbar) {
+  return `<div class="toolbar">${toolbar}</div>
+    <div class="table-wrap sheet" id="${prefix}-rows"></div>
+    <div class="table-foot">
+      <div class="sum-meta" id="${prefix}-count"></div>
+      <div class="action-bar">${button(`${prefix}-prev`, 'ก่อนหน้า')}${button(`${prefix}-next`, 'ถัดไป')}</div>
+    </div>`;
+}
+
+function fillTable(id, headers, rows, emptyText) {
+  $(id).innerHTML = rows
+    ? `<table class="mo-data-table"><thead><tr>${headers.map((name) => `<th>${esc(name)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`
+    : `<p class="empty">${emptyText}</p>`;
+}
+
+function countText(id, shown, total) {
+  $(id).textContent = `แสดง ${shown} จาก ${total} แถว`;
+}
+
+function bindPager(prefix, state, load) {
+  $(`${prefix}-search`).onclick = () => { state.offset = 0; load().catch(onErr); };
+  $(`${prefix}-prev`).onclick = () => { state.offset = Math.max(0, state.offset - PAGE); load().catch(onErr); };
+  $(`${prefix}-next`).onclick = () => { state.offset += PAGE; load().catch(onErr); };
+}
+
+function onEnter(id, run) {
+  $(id)?.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    run();
+  });
+}
+
+function cardView(title, meta, body = '') {
+  return `<div class="view-body"><section class="card"><div class="card-title">${title}</div>${meta ? `<p class="sum-meta">${meta}</p>` : ''}${body}</section></div>`;
+}
+
+function closePopup() {
+  document.removeEventListener('keydown', popupKey);
+  $('popup')?.remove();
+}
+
+function popupKey(event) {
+  if (event.key === 'Escape') closePopup();
+}
+
+function openPopup(title, body, onSave, saveLabel = 'บันทึก') {
+  closePopup();
+  const node = document.createElement('div');
+  node.className = 'popup-back';
+  node.id = 'popup';
+  node.innerHTML = `<section class="popup" role="dialog" aria-modal="true">
+    <div class="popup-title">${title}</div>
+    <div class="popup-fields">${body}</div>
+    <div class="popup-actions">
+      ${button('popup-cancel', 'ยกเลิก')}
+      ${button('popup-save', saveLabel, saveLabel === 'ลบ' ? 'danger' : 'primary')}
+    </div>
+  </section>`;
+  document.body.appendChild(node);
+  document.addEventListener('keydown', popupKey);
+  $('popup-cancel').onclick = closePopup;
+  node.addEventListener('click', (event) => { if (event.target === node) closePopup(); });
+  $('popup-save').onclick = () => Promise.resolve(onSave()).catch(onErr);
+  node.querySelector('input:not([readonly]):not([disabled]),select,textarea')?.focus();
+}
+
+function confirmPopup(title, text, onYes, saveLabel = 'ลบ') {
+  openPopup(title, `<p class="sum-meta">${text}</p>`, async () => { await onYes(); closePopup(); }, saveLabel);
+}
+
+function toast(message, kind = 'success') {
+  const node = document.createElement('div');
+  node.className = `toast ${kind}`;
+  node.textContent = message;
+  $('toasts').appendChild(node);
+  setTimeout(() => node.remove(), 3200);
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    credentials: 'same-origin',
+    headers: { 'content-type': 'application/json' },
+    ...options,
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { showLogin(); throw new Error(data.error || 'กรุณาเข้าสู่ระบบ'); }
+  if (res.status === 403 && String(data.error || '').includes('90')) { showPassword(); throw new Error(data.error); }
+  if (!res.ok) throw new Error(data.error || 'ไม่สำเร็จ');
+  return data;
+}
+
+function bindRowSelect(container, onSelect) {
+  const rows = [...container.querySelectorAll('tbody tr[data-pick]')];
+  rows.forEach((row) => {
+    row.classList.add('row-pick');
+    row.onclick = () => {
+      rows.forEach((item) => item.classList.toggle('is-selected', item === row));
+      onSelect(row.dataset.pick, row);
+    };
+  });
+}
+
+function rankOf(moduleId = 'sto', user = me) {
+  if (!user) return 0;
+  if (user.creator) return RANK.admin;
+  return RANK[user.roles?.[moduleId] ?? (moduleId === 'sto' ? user.usageRole : null)] || 0;
+}
+
+function showLogin() {
+  me = null;
+  $('login').classList.remove('d-none');
+  $('password-gate').classList.add('d-none');
+  $('shell').classList.add('d-none');
+}
+
+function showPassword() {
+  $('login').classList.add('d-none');
+  $('password-gate').classList.remove('d-none');
+  $('shell').classList.add('d-none');
+}
+
+function showShell() {
+  $('login').classList.add('d-none');
+  $('password-gate').classList.add('d-none');
+  $('shell').classList.remove('d-none');
+  $('header-user').textContent = me.name || me.employeeId;
+  const access = me.creator ? 'ผู้สร้างระบบ' : (USAGE_ROLE[me.usageRole] || 'ยังไม่เข้า Usage');
+  $('header-role').textContent = `${access} · ${me.employeeId}`;
+  document.querySelectorAll('[data-usage]').forEach((node) => node.classList.toggle('d-none', Number(node.dataset.usage) > rankOf('sto')));
+  document.querySelectorAll('[data-system]').forEach((node) => node.classList.toggle('d-none', !me.creator));
+  openView(view);
+}
+
+function openView(name) {
+  const rule = ACCESS[name];
+  if (rule && rankOf(rule[0]) < rule[1]) name = 'locked';
+  if (name === 'system' && !me.creator) name = 'main';
+  view = name;
+  const [title, subtitle] = TITLES[name];
+  $('header-page-title').textContent = title;
+  $('header-page-subtitle').textContent = subtitle;
+  document.querySelectorAll('.nav-btn').forEach((node) => node.classList.toggle('active', node.dataset.view === name && !node.classList.contains('nav-parent')));
+  document.querySelectorAll('.nav-acc').forEach((acc) => {
+    if (!acc.querySelector(`.nav-btn[data-view="${name}"]`)) return;
+    acc.classList.remove('is-collapsed');
+    acc.querySelector('[data-nav-toggle]')?.setAttribute('aria-expanded', 'true');
+  });
+  document.body.classList.remove('sidebar-open');
+  const target = $('app-view');
+  target.innerHTML = '<div class="empty">กำลังโหลด...</div>';
+  const render = VIEWS[name] || viewFallback(name);
+  render(target).catch((err) => { target.innerHTML = `<p class="form-error">${esc(err.message)}</p>`; });
+}
+
+function moduleCard(viewName, icon, title, text) {
+  return `<button class="card module-card" type="button" data-go="${viewName}"><span class="material-symbols-rounded">${icon}</span><div class="card-title">${title}</div><div class="sum-meta">${text}</div></button>`;
+}
+
+function bindGo(target) {
+  target.querySelectorAll('[data-go]').forEach((node) => { node.onclick = () => openView(node.dataset.go); });
+}
+
+function modulePage(target, title, meta, cards) {
+  const grid = `<div class="module-grid">${cards.map((card) => moduleCard(...card)).join('')}</div>`;
+  target.innerHTML = cardView(title, meta, grid);
+  bindGo(target);
+}
+
+async function renderMain(target) {
+  modulePage(target, 'TSAT4 SMF', 'เลือกส่วนที่ต้องการเข้า ตอนนี้มี 2 ส่วน และเพิ่มส่วนใหม่ได้ภายหลัง', [
+    ['work', 'work', 'ระบบงาน', 'Work System'],
+    ['activity', 'event', 'ระบบกิจกรรม', 'Activity']
+  ]);
+}
+
+function bindHold(button, onDone) {
+  const fill = button.querySelector('.hold-fill');
+  let active = false;
+  let finished = false;
+  let frame = 0;
+  const stop = (done) => {
+    if (finished) return;
+    active = false;
+    cancelAnimationFrame(frame);
+    if (!done) { fill.style.width = '0'; return; }
+    finished = true;
+    fill.style.width = '100%';
+    onDone();
+  };
+  const tick = (now) => {
+    if (!active) return;
+    const ratio = Math.min(1, (now - button.dataset.holdStart) / 2000);
+    fill.style.width = `${ratio * 100}%`;
+    if (ratio >= 1) { stop(true); return; }
+    frame = requestAnimationFrame(tick);
+  };
+  button.addEventListener('pointerdown', (event) => {
+    if (button.disabled || active || finished) return;
+    active = true;
+    button.dataset.holdStart = String(performance.now());
+    button.setPointerCapture?.(event.pointerId);
+    frame = requestAnimationFrame(tick);
+  });
+  button.addEventListener('pointerup', () => { if (active) stop(false); });
+  button.addEventListener('pointercancel', () => { if (active) stop(false); });
+  button.addEventListener('contextmenu', (event) => event.preventDefault());
+}
+
+VIEWS.main = renderMain;

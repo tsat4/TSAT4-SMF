@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node scripts/check.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
