@@ -34,6 +34,7 @@ server/
     act/index.js             ระบบกิจกรรม: แผน Gantt /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (db/04_act_plan.sql)
     act/common.js            tablesOf(กิจกรรม) ชื่อตาราง, accessOf (สิทธิ์รายปีจาก mt_<act>_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
     act/transaction.js       ระบบตรวจ checklist: บันทึกผลตรวจ Self/Committee + Issue (รูปใน Storage bucket img_<กิจกรรม> ของ Tx Data เช่น img_5s) กติกาเป็นฟังก์ชันแยก ทดสอบใน test:act
+    act/planner.js           Project Planner (100P) /api/act/:activity/tasks ข้อหลัก/ข้อรอง ลากได้ (mt_<act>_task) spec docs/specs/act-planner.md
     act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/act/<กิจกรรม>.sql) summarize()/rank() ทดสอบด้วย npm run test:act
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
 public/
@@ -46,6 +47,7 @@ public/
   js/act-gantt.js            แผนประจำปีแบบ Gantt (สัปดาห์ / เดือน / ปี) เปิดใช้ตาม ACT_GANTT_ON
   js/act-5s.js               <กิจกรรม> > Dashboard (Summary/Ranking/Schedule/Team) + Setting (แผนงาน/พื้นที่/ทีม/หัวข้อ/แผนตรวจ) เปิดใช้ตาม A5_ON
   js/act-tx.js               <กิจกรรม> > transaction: รายการใบตรวจ + ฟอร์มตรวจ + Issue (ใช้ helper ของ act-5s.js)
+  js/act-planner.js          <กิจกรรม> > Setting: Project Planner รายปี (W1–W4) / รายเดือน (วัน) ลากแท่งได้ เปิดใช้ตาม APL_ON
   js/system.js               หน้าแก้ตารางของ creator
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)
 db/                          SQL ที่ผู้ใช้รันเองใน Supabase + คู่มือ (README.md)
@@ -107,6 +109,7 @@ scripts/
 | tx_sto_requisition / _line | tx | ใบเบิกและรายการในใบเบิก |
 | tx_sto_issue | tx | ประวัติการจ่าย |
 | mt_5s_team / _area / _checklist / _audit_plan / _setting / _plan | **tx** | กิจกรรม 5S: ทีมรายปี (รวมเจ้าของพื้นที่ role owner + area_id), พื้นที่, หัวข้อตรวจรายปี, แผนตรวจ, ค่าตั้งต้น, แผน Gantt |
+| mt_100p_team / _setting / _plan / _task | **tx** | กิจกรรม 100P: ทีมรายปี (admin แก้แผน), Project Planner ข้อหลัก/ข้อรอง (db/act/100p.sql) |
 | tx_5s_audit (+ auditors, receivers) / _audit_score / _issue (+ photo_before, photo_after), v_5s_audit_group | **tx** | ผลตรวจ คะแนนรายข้อ Issue และ % ราย ส (9 ตาราง ตั้งแต่ v2 2026-10-25) |
 
 ## Schedule Plan (ระบบกิจกรรม)

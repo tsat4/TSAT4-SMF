@@ -5,6 +5,7 @@ import { requireUser } from '../../core/users.js';
 import { ACTIVITIES, accessOf, activityOf, dateOf, missingTables, namesOf, tablesOf } from './common.js';
 import { mountAudit } from './audit.js';
 import { mountTransaction } from './transaction.js';
+import { PLANNER_ON, mountPlanner, plannerEvents } from './planner.js';
 
 // ระบบกิจกรรม (Tx Data): Gantt plan + calendar here, checklist audit Dashboard/Setting in audit.js, audits and Issues in transaction.js.
 // Each activity has its own tables (db/act/<activity>.sql). Rights come from mt_<act>_team per year (common.js accessOf).
@@ -24,6 +25,13 @@ function tablesForSystem() {
       [t.auditPlan]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['area_id', 'int', true], ['month', 'int', true], ['week', 'int', true], ['round', 'int'], ['team', 'text']] },
       [t.setting]: { db: 'tx', pk: ['key'], columns: [['key', 'text', true], ['value', 'text', true]] },
       [t.plan]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['title', 'text', true], ['detail', 'text'], ['start_date', 'date', true], ['end_date', 'date', true], ['responsible', 'text'], ['status', 'text', true], ['created_by', 'read']] }
+    });
+  }
+  for (const activity of PLANNER_ON) {
+    const t = tablesOf(activity);
+    Object.assign(out, {
+      [t.team]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['employee_id', 'text', true], ['role', 'actrole', true], ['team', 'text'], ['area_id', 'int'], ['status', 'status', true]] },
+      [t.task]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['parent_id', 'int'], ['sort_no', 'int', true], ['title', 'text', true], ['start_date', 'date'], ['end_date', 'date'], ['progress', 'int', true], ['owner_id', 'text'], ['color', 'text'], ['note', 'text'], ['created_by', 'read']] }
     });
   }
   return out;
@@ -85,6 +93,7 @@ export default defineModule({
         if (error && error.code !== 'PGRST205') throw error;
         for (const row of data || []) events.push({ ...row, activity: ACTIVITIES[i] });
       });
+      events.push(...(await plannerEvents(range.from, range.to)));
       events.sort((a, b) => a.start_date.localeCompare(b.start_date));
       res.json({ events });
     }));
@@ -158,5 +167,6 @@ export default defineModule({
 
     mountAudit(app);
     mountTransaction(app);
+    mountPlanner(app);
   }
 });

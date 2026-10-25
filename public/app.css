@@ -478,3 +478,51 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 @media(max-width:900px){
   .page-bar-left{flex-wrap:wrap}
 }
+/* Project Planner (act-planner.js): sticky left columns, week or day columns on the right */
+.apl-scroll{overflow:auto;max-height:calc(100vh - 190px);border:1px solid var(--mo-border);border-radius:var(--mo-radius)}
+.apl-grid{min-width:max-content}
+.apl-row{display:grid;grid-template-columns:384px var(--apl-tl);border-bottom:1px solid var(--mo-border)}
+.apl-row:last-child{border-bottom:0}
+.apl-left{position:sticky;left:0;z-index:3;display:grid;grid-template-columns:40px 200px 104px 40px;align-items:center;background:var(--mo-surface);border-right:1px solid var(--mo-border)}
+.apl-left > div{padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.apl-head{position:sticky;top:0;z-index:4}
+.apl-head .apl-left,.apl-head .apl-track{background:var(--mo-surface-2);color:var(--mo-text-muted);font-size:11px}
+.apl-head .apl-track{height:auto}
+.apl-months,.apl-ticks{display:grid}
+.apl-months > div{text-align:center;padding:4px 0;border-left:1px solid var(--mo-border);color:var(--mo-text);font-weight:500}
+.apl-ticks > div{text-align:center;padding:2px 0 4px;border-left:1px solid var(--mo-border);font-variant-numeric:tabular-nums}
+.apl-ticks > div.is-weekend{background:var(--mo-input)}
+.apl-track{position:relative;height:36px}
+.apl-lines{position:absolute;inset:0;display:grid;pointer-events:none}
+.apl-lines > div{border-left:1px solid color-mix(in srgb,var(--mo-border) 45%,transparent)}
+.apl-lines > div.is-month{border-left-color:var(--mo-border)}
+.apl-lines > div.is-weekend{background:var(--mo-surface-2)}
+.apl-today{position:absolute;top:0;bottom:0;width:0;border-left:2px solid var(--mo-danger);z-index:1;pointer-events:none}
+.apl-row.is-phase .apl-left{font-weight:600}
+.apl-row[data-task]{cursor:default}
+.apl-row.is-selected .apl-left,.apl-row.is-selected .apl-track{background:var(--mo-row)}
+.apl-code{color:var(--mo-text-muted);font-variant-numeric:tabular-nums}
+.apl-title{display:flex;align-items:center;gap:4px}
+.apl-title > span{overflow:hidden;text-overflow:ellipsis}
+.apl-title.is-sub{padding-left:22px !important;font-weight:400}
+.apl-tog{border:0;background:none;color:var(--mo-text-muted);width:16px;padding:0;flex:0 0 16px}
+.apl-add{margin-left:auto;flex:0 0 auto;border:1px dashed var(--mo-border);background:none;color:var(--mo-primary);border-radius:4px;padding:0 6px;line-height:18px}
+.apl-pct{text-align:right;font-variant-numeric:tabular-nums}
+.apl-bar{position:absolute;top:6px;height:24px;border-radius:12px;background:color-mix(in srgb,var(--bar) 35%,var(--mo-surface));overflow:hidden;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font-size:11px;z-index:2;touch-action:none}
+.apl-row.is-phase .apl-bar{background:color-mix(in srgb,var(--bar) 22%,var(--mo-surface))}
+.apl-bar.is-editable{cursor:grab}
+.apl-bar.is-dragging{cursor:grabbing;box-shadow:0 0 0 2px var(--mo-primary)}
+.apl-fill{position:absolute;inset:0 auto 0 0;background:var(--bar);opacity:.8}
+.apl-row.is-phase .apl-fill{opacity:1}
+.apl-bar > span{position:relative;font-weight:600;color:var(--mo-text)}
+.apl-handle{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:1}
+.apl-handle.is-l{left:0}.apl-handle.is-r{right:0}
+.apl-dates{position:absolute;top:10px;font-size:11px;color:var(--mo-text-muted);white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums;z-index:2}
+.apl-link{border:0;background:none;color:var(--mo-primary);padding:0}
+.apl-owner{display:flex;gap:4px}.apl-owner input{flex:1 1 auto;min-width:0;width:auto}.popup-fields .apl-owner > .btn{flex:0 0 auto;width:auto}
+.apl-swatches{display:flex;gap:6px}
+.apl-swatch input{position:absolute;opacity:0;pointer-events:none}
+.apl-swatch span{display:block;width:24px;height:24px;border-radius:50%;background:var(--bar);border:2px solid transparent;cursor:pointer}
+.apl-swatch input:checked + span{border-color:var(--mo-text)}
+.apl-swatch input:focus-visible + span{outline:2px solid var(--mo-primary);outline-offset:1px}
+@media (max-width:640px){.apl-row{grid-template-columns:260px var(--apl-tl)}.apl-left{grid-template-columns:36px 184px 40px}.apl-left > div:nth-child(3){display:none}}

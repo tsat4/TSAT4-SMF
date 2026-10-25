@@ -15,6 +15,7 @@ const one = async (db, sql) => (await db.query(sql)).rows[0];
 const throws = async (db, sql) => { try { await db.exec(sql); return false; } catch { return true; } };
 
 ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '5s.sql'), 'utf8') === actSql('5s'), 'db/act/5s.sql is up to date (node scripts/act-sql.js 5s)');
+ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '100p.sql'), 'utf8') === actSql('100p', { audit: false, task: true }), 'db/act/100p.sql is up to date (node scripts/act-sql.js 100p --plan --task)');
 
 const db = new PGlite();
 await db.exec(`do $$ begin create role anon; create role authenticated; exception when duplicate_object then null; end $$;`);
@@ -53,6 +54,32 @@ ok(await throws(db, `insert into mt_safety_team (year, employee_id, role, area_i
 await db.exec(`delete from mt_safety_area where code = 'X2'`);
 ok((await one(db, `select count(*)::int n from mt_safety_team where role = 'owner' and employee_id = '7'`)).n === 1, 'deleting an area removes its owner rows');
 ok((await one(db, `select count(*)::int n from mt_5s_setting`)).n === 5, 'settings seeded');
+
+// Project Planner (100P): main items and sub items in one table
+await db.exec(actSql('100p', { audit: false, task: true }));
+await db.exec(actSql('100p', { audit: false, task: true }));
+ok((await one(db, `select to_regclass('public.mt_100p_task') is not null t, to_regclass('public.mt_5s_task') is null n`)).t, 'planner table only where asked (--task)');
+await db.exec(`insert into mt_100p_task (year, title, created_by) values (2026, 'เตรียมโครงการ', '1')`);
+ok(true, 'a main item may wait for dates');
+await db.exec(`insert into mt_100p_task (year, parent_id, title, start_date, end_date, progress, created_by) select 2026, id, 'ตั้งทีม', '2026-01-05', '2026-01-30', 100, '1' from mt_100p_task`);
+ok(await throws(db, `insert into mt_100p_task (year, parent_id, title, created_by) select 2026, id, 'x', '1' from mt_100p_task where parent_id is null`), 'a sub item needs dates');
+ok(await throws(db, `insert into mt_100p_task (year, title, start_date, created_by) values (2026, 'x', '2026-01-01', '1')`), 'start and end come together');
+ok(await throws(db, `insert into mt_100p_task (year, title, start_date, end_date, created_by) values (2026, 'x', '2026-02-02', '2026-02-01', '1')`), 'task end date not before start');
+ok(await throws(db, `insert into mt_100p_task (year, title, progress, created_by) values (2026, 'x', 101, '1')`), 'progress 0-100');
+await db.exec(`delete from mt_100p_task where parent_id is null`);
+ok((await one(db, `select count(*)::int n from mt_100p_task`)).n === 0, 'deleting a main item removes its sub items');
+{
+  const { withSpans } = await import('../server/modules/act/planner.js');
+  const rows = withSpans([
+    { id: 1, parent_id: null, start_date: null, end_date: null, progress: 0 },
+    { id: 2, parent_id: 1, start_date: '2026-01-01', end_date: '2026-01-10', progress: 100 },
+    { id: 3, parent_id: 1, start_date: '2026-01-21', end_date: '2026-02-19', progress: 20 },
+    { id: 4, parent_id: null, start_date: '2026-03-01', end_date: '2026-03-02', progress: 40 }
+  ]);
+  ok(rows[0].derived && rows[0].start_date === '2026-01-01' && rows[0].end_date === '2026-02-19', 'main item spans its sub items');
+  ok(rows[0].progress === 40, `main item % weighted by days (got ${rows[0].progress})`);
+  ok(!rows[3].derived && rows[3].progress === 40 && !rows[1].derived, 'items without sub items keep their own values');
+}
 
 if (!fs.existsSync(importFile)) {
   console.log('skip real data: inbox/import_5s.sql not found (python -I scripts/import_5s_excel.py)');

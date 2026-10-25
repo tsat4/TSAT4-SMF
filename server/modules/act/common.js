@@ -15,6 +15,7 @@ export function tablesOf(activity) {
     team: `mt_${k}_team`,
     setting: `mt_${k}_setting`,
     plan: `mt_${k}_plan`,
+    task: `mt_${k}_task`, // Project Planner (planner.js)
     area: `mt_${k}_area`,
     checklist: `mt_${k}_checklist`,
     auditPlan: `mt_${k}_audit_plan`,
