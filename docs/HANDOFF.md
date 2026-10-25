@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-25 · Claude · 5S transaction แบ่ง 2 หน้า Audit / Issue · หน้า Audit เหมือนระบบเดิม (ไตรมาส/ประเภท/ประเภทพื้นที่/พื้นที่/ค้นหา, เปิด Audit/แก้ไข/ลบ, ดับเบิลคลิกดูรายละเอียด) · เพิ่มแก้ไขใบตรวจ PATCH /api/act/:activity/audits/:id (คนบันทึกหรือ admin; ข้อที่ Issue เดิมไม่มี Action ยังล็อก 0, Issue ของใบนี้ที่ยังไม่มีใครแก้จะถูกลบเมื่อคะแนนขึ้นเกินเกณฑ์, ข้อที่ต่ำลงใหม่เปิด Issue)
 - 2026-10-25 · Claude · 5S transaction: ฟอร์มตรวจ Self/Committee (ให้คะแนนรายข้อ, Issue เดิมไม่มี Action ล็อก 0, ข้อ ≤ 3 เปิด Issue + รูป 16:9), รายการใบตรวจ (admin ลบได้), Issue (ส่ง Action + รูปหลังแก้, admin แก้กำหนด) · กติกา verifyIssues/dueDateFor/scoreAudit ทดสอบใน test:act · ต้องรัน db/act/storage.sql ใน Tx Data
 - 2026-10-25 · Claude · แยกโฟลเดอร์ทำงาน: Claude ใช้ `C:\Work\projects\SMF-act` (worktree branch claude-act → push `HEAD:main`) · Cursor ใช้ `C:\Work\projects\SMF` (main) · ทำพร้อมกันได้ ดูหัวข้อ 0 ใน AGENTS.md · Claude ดูแลระบบกิจกรรม Cursor ดูแลระบบงาน + งาน SQL
 - 2026-10-25 · Cursor · ลบของเก่าตามที่ผู้ใช้สั่ง: Mx Data ไม่มี mt_act_* / tx_act_* แล้ว (พนักงาน 309 และใบเบิก 1 ใบยังอยู่) · Tx Data ไม่มี tx_sto_* แล้ว (พื้นที่ 34 ใบตรวจ 33 Issue 52 ยังอยู่)

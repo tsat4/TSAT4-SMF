@@ -36,6 +36,7 @@ GET /api/system/tables/:name auth creator
 GET /api/usage-materials auth sto:3
 GET /api/users auth sto:3
 PATCH /api/act/:activity/areas/:id auth
+PATCH /api/act/:activity/audits/:id auth
 PATCH /api/act/:activity/checklist/:id auth
 PATCH /api/act/:activity/issues/:id auth
 PATCH /api/act/:activity/plan/:id auth

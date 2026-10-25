@@ -88,9 +88,12 @@ export function mountTransaction(app) {
   };
 
   // Open Issues of an area with how many after photos they have (for the committee form and verification).
-  const openIssuesOf = async (t, areaId) => {
-    const issues = must(await tx.from(t.issue).select('id,issue_no,checklist_id,score,description,issue_date,due_date,action_description,action_date,status,responsible_id')
-      .eq('area_id', areaId).neq('status', 'CLOSED').order('issue_no'));
+  // exceptAuditId leaves out the Issues an audit opened itself (used when that audit is edited).
+  const openIssuesOf = async (t, areaId, exceptAuditId = 0) => {
+    let query = tx.from(t.issue).select('id,issue_no,audit_id,checklist_id,score,description,issue_date,due_date,action_description,action_date,status,responsible_id,verify_audit_no')
+      .eq('area_id', areaId).neq('status', 'CLOSED').order('issue_no');
+    if (exceptAuditId) query = query.neq('audit_id', exceptAuditId);
+    const issues = must(await query);
     const photos = await fetchIn(() => tx.from(t.photo).select('issue_id,kind,url'), 'issue_id', issues.map((i) => i.id));
     return issues.map((i) => ({
       ...i,
@@ -126,8 +129,78 @@ export function mountTransaction(app) {
         team: letter,
         members: team.filter((m) => m.team === letter).map((m) => ({ employeeId: String(m.employee_id), name: names.get(String(m.employee_id))?.name || '' }))
       })),
-      openIssues: areaId ? await openIssuesOf(t, areaId) : []
+      openIssues: areaId ? await openIssuesOf(t, areaId, Number(req.query.audit) || 0) : []
     });
+  });
+
+  // Edit an audit's scores, date, and people. Items locked at 0 by an unanswered Issue stay 0.
+  // Its own Issues: an item that rose above the issue score drops its untouched Issue; a newly low committee item opens one.
+  route('patch', '/api/act/:activity/audits/:id', async (req, res, activity, t) => {
+    const body = req.body || {};
+    const audit = must(await tx.from(t.audit).select('*').eq('id', Number(req.params.id)).maybeSingle());
+    if (!audit) return fail(res, 404, 'ไม่พบใบตรวจ');
+    const access = await accessOf(req, activity, audit.year);
+    if (!(access.admin || audit.created_by === req.user.employeeId)) return fail(res, 403, 'แก้ได้เฉพาะคนที่บันทึกใบนี้หรือ admin');
+    const auditedAt = dateOf(body.auditedAt) || audit.audited_at.slice(0, 10);
+    if (auditedAt > todayIso()) return fail(res, 400, 'วันที่ตรวจต้องไม่เกินวันนี้');
+    if (Number(auditedAt.slice(0, 4)) !== audit.year) return fail(res, 400, `วันที่ตรวจต้องอยู่ในปี ${audit.year}`);
+    const team = audit.audit_type === 'COMMITTEE' ? String(body.team || audit.team || '').trim().toUpperCase() : null;
+    if (audit.audit_type === 'COMMITTEE' && !/^[A-Z]$/.test(team || '')) return fail(res, 400, 'เลือกทีมที่ตรวจ');
+
+    const settings = await settingsOf(activity);
+    const items = must(await tx.from(t.checklist).select('id,item_no,s_group,title,score_max').eq('year', audit.year).eq('status', 'Active').order('item_no'));
+    const locked = new Set(must(await tx.from(t.issue).select('checklist_id').eq('verify_audit_no', audit.audit_no).eq('status', 'OVERDUE')).map((r) => r.checklist_id));
+    const scores = new Map();
+    for (const item of items) {
+      if (locked.has(item.id)) { scores.set(item.id, 0); continue; }
+      const value = Number(body.scores?.[item.id]);
+      scores.set(item.id, Number.isInteger(value) && value >= 1 && value <= Number(item.score_max) ? value : null);
+    }
+    const missing = items.filter((i) => scores.get(i.id) == null).map((i) => i.item_no);
+    if (missing.length) return fail(res, 400, `ให้คะแนนให้ครบ (ข้อที่ ${missing.join(', ')})`);
+
+    const own = must(await tx.from(t.issue).select('id,checklist_id,score,status,action_description').eq('audit_id', audit.id));
+    const ownPhotos = await fetchIn(() => tx.from(t.photo).select('issue_id,kind'), 'issue_id', own.map((i) => i.id));
+    const carried = audit.audit_type === 'COMMITTEE' ? new Set((await openIssuesOf(t, audit.area_id, audit.id)).map((i) => i.checklist_id)) : new Set();
+    const low = (id) => scores.get(id) <= settings.issue_score;
+    // Drop own Issues whose item is no longer low, only while nobody has worked on them yet.
+    const drop = own.filter((i) => !low(i.checklist_id) && i.status === 'OPEN' && !String(i.action_description || '').trim() && !ownPhotos.some((p) => p.issue_id === i.id && p.kind === 'AFTER'));
+    const stillOwn = new Set(own.filter((i) => !drop.includes(i)).map((i) => i.checklist_id));
+    const needIssue = audit.audit_type === 'COMMITTEE' ? items.filter((i) => low(i.id) && !stillOwn.has(i.id) && !carried.has(i.id) && !locked.has(i.id)) : [];
+    const described = new Map((Array.isArray(body.issues) ? body.issues : []).map((x) => [Number(x.checklistId), String(x.description || '').trim().slice(0, 2000)]));
+    const undescribed = needIssue.filter((i) => !described.get(i.id)).map((i) => i.item_no);
+    if (undescribed.length) return fail(res, 400, `ข้อที่ได้ ≤ ${settings.issue_score} ต้องเปิด Issue พร้อมรายละเอียด (ข้อที่ ${undescribed.join(', ')})`);
+
+    const score = scoreAudit(items, scores, settings.pass_percent);
+    must(await tx.from(t.audit).update({ audited_at: `${auditedAt}T05:00:00Z`, team, total_score: score.total, percent_score: score.percent, result: score.result }).eq('id', audit.id));
+    must(await tx.from(t.score).delete().eq('audit_id', audit.id));
+    must(await tx.from(t.score).insert(items.map((i) => ({ audit_id: audit.id, checklist_id: i.id, score: scores.get(i.id) }))));
+    if (Array.isArray(body.participated) || Array.isArray(body.receivers)) {
+      const ids = (list) => [...new Set((Array.isArray(list) ? list : []).map((x) => String(x).trim()).filter(Boolean))];
+      const participated = ids(body.participated).length ? ids(body.participated) : [audit.created_by].filter(Boolean);
+      must(await tx.from(t.person).delete().eq('audit_id', audit.id));
+      const people = participated.flatMap((id) => [{ audit_id: audit.id, employee_id: id, kind: 'participated' }, { audit_id: audit.id, employee_id: id, kind: 'assigned' }])
+        .concat(ids(body.receivers).map((id) => ({ audit_id: audit.id, employee_id: id, kind: 'receiver' })));
+      if (people.length) must(await tx.from(t.person).insert(people));
+    }
+    if (drop.length) must(await tx.from(t.issue).delete().in('id', drop.map((i) => i.id)));
+    let created = [];
+    if (needIssue.length) {
+      const owner = must(await tx.from(t.owner).select('employee_id').eq('year', audit.year).eq('area_id', audit.area_id).maybeSingle());
+      const plans = must(await tx.from(t.auditPlan).select('year,month,week').eq('area_id', audit.area_id).gte('year', audit.year));
+      const due = dueDateFor(plans, auditedAt, settings.issue_due_days_before_next);
+      const last = must(await tx.from(t.issue).select('issue_no').order('issue_no', { ascending: false }).limit(1));
+      let n = Number(String(last[0]?.issue_no || 'ISS0000').replace(/\D/g, '')) || 0;
+      created = must(await tx.from(t.issue).insert(needIssue.map((i) => ({
+        issue_no: `ISS${String(++n).padStart(4, '0')}`, audit_id: audit.id, area_id: audit.area_id, checklist_id: i.id, score: scores.get(i.id),
+        description: described.get(i.id), issue_date: auditedAt, responsible_id: owner?.employee_id || null, due_date: due, status: 'OPEN'
+      }))).select('id,issue_no,checklist_id'));
+    }
+    // Keep the score on the audit's own remaining Issues in step with the edited item scores.
+    for (const i of own.filter((x) => !drop.includes(x))) {
+      if (Number(scores.get(i.checklist_id)) !== Number(i.score)) must(await tx.from(t.issue).update({ score: scores.get(i.checklist_id) }).eq('id', i.id));
+    }
+    res.json({ id: audit.id, auditNo: audit.audit_no, ...score, issues: created, dropped: drop.length });
   });
 
   route('post', '/api/act/:activity/audits', async (req, res, activity, t) => {
@@ -234,9 +307,10 @@ export function mountTransaction(app) {
       year,
       canDelete: access.admin,
       audits: audits.map((a) => {
+        const canEdit = access.admin || a.created_by === req.user.employeeId;
         const area = areas.find((x) => x.id === a.area_id) || {};
         const own = issues.filter((i) => i.audit_id === a.id);
-        return { ...a, areaCode: area.code, areaName: area.name, areaType: area.area_type, issues: own.length, openIssues: own.filter((i) => i.status !== 'CLOSED').length };
+        return { ...a, canEdit, areaCode: area.code, areaName: area.name, areaType: area.area_type, issues: own.length, openIssues: own.filter((i) => i.status !== 'CLOSED').length };
       })
     });
   });
