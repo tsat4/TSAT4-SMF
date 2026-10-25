@@ -62,7 +62,8 @@
 - audit_id = `C|S-<area>-<ddMMyy>-<seq>` เช่น C-A01-040926-01 · issue_id = ISS0001
 - สถานะ Issue: OPEN → ON_PLAN (มี Action ก่อนกำหนด) / WAIT_VERIFY (Action หลังกำหนด) / OVERDUE (เลยกำหนดไม่มี Action) → CLOSED
 - ตรวจรอบถัดไป: ไม่มี Action = ข้อนั้นได้ 0 และ Issue เป็น OVERDUE · มี Action และได้ ≥ 4 = ปิด Issue · ได้ ≤ 3 = ยกไปต่อ
-- Dashboard: Summary (% ราย ส และรายเดือน), Ranking (ราย ส ต่อพื้นที่ แยกโรงงาน/สำนักงาน), Schedule (พื้นที่ × สัปดาห์ สีตามทีม), Team Auditor
+- Dashboard: Summary (% ราย ส และรายเดือน), Ranking (ราย ส ต่อพื้นที่ แยกโรงงาน/สำนักงาน), Schedule (Project Planner ดูอย่างเดียว), Audit Plan (พื้นที่ × สัปดาห์ สีตามทีม), Team Auditor
+- Setting: แผนงาน (Project Planner admin แก้ docs/specs/act-planner.md), พื้นที่, ทีม, หัวข้อตรวจ, แผนตรวจ
 
 ## โมเดลข้อมูลที่เสนอ v2 (ยังไม่ได้สร้าง รอผู้ใช้ยืนยัน)
 
@@ -76,7 +77,8 @@ mt_<k>_team        id | year | employee_id | role (admin/chairman/auditor/owner)
 mt_<k>_checklist   id | year | item_no | s_group | title | score_max | status              unique(year, item_no)
 mt_<k>_audit_plan  id | year | area_id | month | week 1–4 | round 1–6 | team              unique(year, area_id, month, week)
 mt_<k>_setting     key | value      (pass_percent 80, issue_score 3, ...)
-mt_<k>_plan        แผน Gantt / ปฏิทินรวม
+mt_<k>_plan        แผน Gantt เดิม (เลิกใช้หลังรัน db/act/5s_task.sql ข้อมูลคัดลอกไป mt_<k>_task)
+mt_<k>_task        Project Planner (แผนงาน / Schedule / ปฏิทินรวม)
 tx_<k>_audit        id | audit_no | year | audit_type SELF/COMMITTEE | area_id | plan_id | team | auditors[] | receivers[] | audited_at | total | percent | result | status | created_by
 tx_<k>_audit_score  audit_id | checklist_id | score 0–5                                     pk(audit_id, checklist_id)
 tx_<k>_issue        id | issue_no | audit_id | area_id | checklist_id | score | description | photo_before[] | photo_after[] | issue_date | responsible_id

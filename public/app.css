@@ -177,18 +177,17 @@ html[data-theme="dark"] .badge-warning{color:#fbbf24}
 .toast.error{background:var(--mo-danger)}
 /* Scroll bars of tables sit under the sticky header row and beside sticky left columns, never over them.
    Chrome/Edge use ::-webkit-scrollbar (track margin = header height); Firefox keeps a thin bar. */
-@supports not selector(::-webkit-scrollbar){.table-wrap,.apl-scroll,.gantt-scroll,.a5-sched-wrap{scrollbar-width:thin;scrollbar-color:#80868b var(--mo-surface-2)}}
-.table-wrap::-webkit-scrollbar,.apl-scroll::-webkit-scrollbar,.gantt-scroll::-webkit-scrollbar{height:12px;width:12px}
-.table-wrap::-webkit-scrollbar-thumb,.apl-scroll::-webkit-scrollbar-thumb,.gantt-scroll::-webkit-scrollbar-thumb{background:#80868b;border-radius:6px;border:2px solid var(--mo-surface)}
-.table-wrap::-webkit-scrollbar-track,.apl-scroll::-webkit-scrollbar-track,.gantt-scroll::-webkit-scrollbar-track{background:var(--mo-surface-2)}
-.table-wrap::-webkit-scrollbar-corner,.apl-scroll::-webkit-scrollbar-corner,.gantt-scroll::-webkit-scrollbar-corner{background:var(--mo-surface)}
+@supports not selector(::-webkit-scrollbar){.table-wrap,.apl-scroll{scrollbar-width:thin;scrollbar-color:#80868b var(--mo-surface-2)}}
+.table-wrap::-webkit-scrollbar,.apl-scroll::-webkit-scrollbar{height:12px;width:12px}
+.table-wrap::-webkit-scrollbar-thumb,.apl-scroll::-webkit-scrollbar-thumb-thumb{background:#80868b;border-radius:6px;border:2px solid var(--mo-surface)}
+.table-wrap::-webkit-scrollbar-track,.apl-scroll::-webkit-scrollbar-track-track{background:var(--mo-surface-2)}
+.table-wrap::-webkit-scrollbar-corner,.apl-scroll::-webkit-scrollbar-corner-corner{background:var(--mo-surface)}
 .table-wrap::-webkit-scrollbar-track:vertical{margin-top:var(--table-head,40px)}
 /* The gap above the vertical bar keeps the header colour and its bottom line (painted on the box, does not scroll). */
 .table-wrap{background:linear-gradient(var(--mo-surface-2) calc(var(--table-head,40px) - 1px),var(--mo-line) 0) right top/12px var(--table-head,40px) no-repeat border-box,var(--mo-surface)}
 .apl-scroll::-webkit-scrollbar-track:vertical{margin-top:var(--apl-head,46px)}
 .apl-scroll::-webkit-scrollbar-track:horizontal{margin-left:var(--apl-left,384px)}
-.gantt-scroll::-webkit-scrollbar-track:horizontal{margin-left:var(--gantt-label,200px)}
-html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="dark"] .apl-scroll::-webkit-scrollbar-thumb,html[data-theme="dark"] .gantt-scroll::-webkit-scrollbar-thumb{background:#9aa0a6;border-color:var(--mo-surface)}
+html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="dark"] .apl-scroll::-webkit-scrollbar-thumb{background:#9aa0a6;border-color:var(--mo-surface)}
 @media(min-width:651px){
   body.sidebar-collapsed{--drive-sidebar:52px}
   body.sidebar-collapsed .sidebar{padding:12px 8px;overflow-x:hidden}
@@ -259,36 +258,6 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 .plan-legends{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
 .plan-legend{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--mo-text-muted)}
 .plan-legend::before{content:"";width:10px;height:10px;border-radius:2px;background:var(--chip)}
-
-/* Gantt plan (public/js/act-gantt.js) */
-.gantt-scroll{overflow-x:auto;border:1px solid var(--mo-border);border-radius:var(--mo-radius)}
-.gantt{--gantt-label:200px;min-width:760px}
-.gantt-row{display:grid;grid-template-columns:var(--gantt-label) minmax(0,1fr);border-bottom:1px solid var(--mo-border);position:relative;z-index:1}
-.gantt-row:last-child{border-bottom:0}
-.gantt-head{background:var(--mo-surface-2);position:sticky;top:0;z-index:3}
-.gantt-label{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;padding:6px 8px;border:0;border-right:1px solid var(--mo-border);background:var(--mo-surface);color:var(--mo-text);font-size:12px;font-weight:500;text-align:left;border-left:4px solid var(--bar,transparent)}
-.gantt-head .gantt-label{background:var(--mo-surface-2);color:var(--mo-text-muted);font-weight:500}
-.gantt-label span{font-size:10.5px;color:var(--mo-text-muted);font-weight:400}
-button.gantt-label{cursor:default}
-button.gantt-label.is-editable{cursor:pointer}
-button.gantt-label.is-editable:hover{background:var(--drive-hover)}
-.gantt-axis{display:grid}
-.gantt-tick{font-size:10.5px;color:var(--mo-text-muted);text-align:center;padding:6px 0;border-left:1px solid var(--mo-border);overflow:hidden;white-space:nowrap}
-.gantt-tick.is-weekend{background:var(--mo-input)}
-.gantt-body{position:relative}
-.gantt-lines{position:absolute;top:0;bottom:0;left:var(--gantt-label);right:0;display:grid;pointer-events:none;z-index:0}
-.gantt-lines > div{border-left:1px solid var(--mo-border)}
-.gantt-lines > div.is-weekend{background:var(--mo-surface-2)}
-.gantt-today{position:absolute;top:0;bottom:0;width:0;border-left:2px solid var(--mo-danger);z-index:2}
-.gantt-key{display:inline-block;width:12px;height:0;border-top:2px solid var(--mo-danger);vertical-align:middle}
-.gantt-track{position:relative;min-height:36px}
-.gantt-bar{position:absolute;top:7px;height:22px;min-width:6px;border:0;border-radius:4px;background:var(--bar);color:#111;font-size:10.5px;font-weight:500;padding:0 6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:0 1px 1px rgba(0,0,0,.15)}
-.gantt-bar:hover{filter:brightness(1.08)}
-.gantt-bar.is-auto{cursor:default;opacity:.55;background:repeating-linear-gradient(135deg,var(--bar) 0 6px,transparent 6px 9px)}
-.gantt-bar.plan-cancelled{opacity:.35;text-decoration:line-through}
-@media(max-width:650px){
-  .gantt{--gantt-label:120px}
-}
 
 /* Checklist audit pages (public/js/act-5s.js) */
 .a5-year .field{width:110px}
@@ -472,9 +441,6 @@ body[data-zone] .sto-track i,
 body[data-zone] .a5-bar{
   background:var(--zone-fill);box-shadow:inset 0 0 0 1px var(--zone);opacity:1;border-radius:0
 }
-body[data-zone="act"] .gantt-bar{border:1px solid var(--zone);background:var(--zone-fill);box-shadow:none;color:var(--mo-text)}
-body[data-zone="act"] .gantt-bar.is-auto{background:repeating-linear-gradient(135deg,var(--zone-fill) 0 6px,transparent 6px 9px)}
-body[data-zone="act"] .gantt-label{border-left-color:var(--zone)}
 body[data-zone] .plan-chip,
 body[data-zone] .plan-item{border:1px solid var(--zone);background:var(--zone-fill);color:var(--mo-text)}
 body[data-zone] .plan-chip.plan-cancelled,

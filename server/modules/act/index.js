@@ -88,12 +88,13 @@ export default defineModule({
       if (!range) return;
       const results = await Promise.all(ACTIVITIES.map((activity) => tx.from(tablesOf(activity).plan).select(PLAN_COLUMNS)
         .lte('start_date', range.to).gte('end_date', range.from).order('start_date').order('id').limit(1000)));
-      const events = [];
+      const planner = await plannerEvents(range.from, range.to);
+      const events = [...planner.events];
       results.forEach(({ data, error }, i) => {
         if (error && error.code !== 'PGRST205') throw error;
+        if (planner.active.has(ACTIVITIES[i])) return;
         for (const row of data || []) events.push({ ...row, activity: ACTIVITIES[i] });
       });
-      events.push(...(await plannerEvents(range.from, range.to)));
       events.sort((a, b) => a.start_date.localeCompare(b.start_date));
       res.json({ events });
     }));

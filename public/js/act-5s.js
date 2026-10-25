@@ -1,4 +1,5 @@
-// ระบบกิจกรรม > <activity>: Dashboard (Summary / Ranking / Schedule / Team) and Setting (Gantt / areas / team / checklist / audit plan)
+// ระบบกิจกรรม > <activity>: Dashboard (Summary / Ranking / Schedule / Audit Plan / Team) and Setting (plan / areas / team / checklist / audit plan)
+// Schedule (Dashboard, read only) and แผนงาน (Setting, admins edit) are the Project Planner (act-planner.js).
 // for checklist-audit activities. Server: server/modules/act/audit.js · spec: docs/specs/act-5s.md
 // Turn it on for another activity by adding its id to A5_ON (and its group names to A5_GROUPS).
 const A5_ON = ['5s'];
@@ -7,7 +8,7 @@ const A5_TEAMS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 const A5_TEAM_COLORS = { A: '#1f2937', B: '#ec4899', C: '#f97316', D: '#ca8a04', E: '#0d9488', F: '#2563eb', G: '#9333ea', H: '#06b6d4', I: '#9ca3af' };
 const A5_AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
 const A5_ROLE_LABEL = { admin: 'Admin', chairman: 'หัวหน้าทีม', auditor: 'ผู้ตรวจ' };
-const A5_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', team: 'Team Auditor' };
+const A5_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', audit: 'Audit Plan', team: 'Team Auditor' };
 const A5_SET_TABS = { gantt: 'แผนงาน', areas: 'พื้นที่', team: 'ทีม', checklist: 'หัวข้อตรวจ', plan: 'แผนตรวจ' };
 let a5Year = new Date().getFullYear();
 let a5DashTab = 'summary';
@@ -78,7 +79,8 @@ async function a5Dashboard(target, activity) {
   target.querySelectorAll('[data-a5dash]').forEach((node) => { node.onclick = () => { a5DashTab = node.dataset.a5dash; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   const body = $('a5-body');
-  const draw = { summary: a5DrawSummary, ranking: a5DrawRanking, schedule: a5DrawSchedule, team: a5DrawTeam }[a5DashTab] || a5DrawSummary;
+  if (a5DashTab === 'schedule') return aplRender(body, activity, { inPage: true, readOnly: true });
+  const draw = { summary: a5DrawSummary, ranking: a5DrawRanking, audit: a5DrawSchedule, team: a5DrawTeam }[a5DashTab] || a5DrawSummary;
   await draw(body, activity, me);
 }
 
@@ -204,7 +206,7 @@ async function a5Setting(target, activity) {
   const me = await a5Api(activity, `me?year=${a5Year}`);
   const admin = me.access.admin;
   target.innerHTML = `<div class="view-body"><section class="card">
-    ${pageBar(a5Seg('data-a5set', A5_SET_TABS, a5SetTab), a5SetTab === 'gantt' ? '' : `<div class="a5-year">${a5YearSelect(me.years)}</div>`, 'a5')}
+    ${pageBar(a5Seg('data-a5set', A5_SET_TABS, a5SetTab), `<div class="a5-year">${a5YearSelect(me.years)}</div>`, 'a5')}
     ${admin ? '' : `<p class="page-note">ดูอย่างเดียว · แก้ได้เฉพาะ admin ปี ${a5Year}</p>`}
     <div id="a5-body"><div class="empty">กำลังโหลด...</div></div>
   </section></div>`;
@@ -212,7 +214,7 @@ async function a5Setting(target, activity) {
   target.querySelectorAll('[data-a5set]').forEach((node) => { node.onclick = () => { a5SetTab = node.dataset.a5set; rerender(); }; });
   if ($('a5-year')) $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   const body = $('a5-body');
-  if (a5SetTab === 'gantt') return actGanttRender(body, activity);
+  if (a5SetTab === 'gantt') return aplRender(body, activity, { inPage: true });
   const draw = { areas: a5SetAreas, team: a5SetTeam, checklist: a5SetChecklist, plan: a5SetPlan }[a5SetTab] || a5SetAreas;
   await draw(body, activity, admin, rerender);
 }

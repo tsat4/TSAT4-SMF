@@ -1,12 +1,14 @@
 import { tx } from '../../core/db.js';
 import { fail, wrap } from '../../core/http.js';
 import { requireUser } from '../../core/users.js';
-import { accessOf, activityOf, dateOf, fetchAll, missingTables, namesOf, requireAdmin, tablesOf, yearOf } from './common.js';
+import { accessOf, activityOf, dateOf, fetchAll, namesOf, requireAdmin, tablesOf, yearOf } from './common.js';
 
 // Project Planner (100P): one year's plan as main items (parent_id null) with sub items, shown as a Gantt with
 // year (W1–W4) and month (day) views. Everyone reads; the year's admins create, edit, drag and delete.
 // Table: mt_<act>_task (scripts/act-sql.js --task). A main item with sub items takes its dates and % from them.
-export const PLANNER_ON = ['100p'];
+export const PLANNER_ON = ['100p', '5s'];
+// SQL that creates the Planner table: a new activity gets it with its tables, a running one from an add-on file.
+const PLANNER_SQL = { '5s': 'db/act/5s_task.sql' };
 const COLORS = ['p1', 'p2', 'p3', 'p4', 'p5'];
 const COLUMNS = 'id,year,parent_id,sort_no,title,start_date,end_date,progress,owner_id,color,note';
 
@@ -48,7 +50,7 @@ export function mountPlanner(app) {
     try {
       await handler(req, res, activity, tablesOf(activity).task);
     } catch (err) {
-      if (missingTables(res, err, activity)) return;
+      if (err?.code === 'PGRST205') return fail(res, 503, `ยังไม่ได้สร้างตาราง Planner ใน Tx Data (${PLANNER_SQL[activity] || tablesOf(activity).sql})`);
       throw err;
     }
   }));
@@ -186,13 +188,16 @@ export function mountPlanner(app) {
 }
 
 // ระบบตั้งค่า > ปฏิทิน: items with their own dates (sub items, and main items without sub items) as calendar events.
+// `active` = activities whose Planner table exists; their old Gantt plan (mt_<act>_plan) is no longer shown.
 export async function plannerEvents(from, to) {
   const out = [];
+  const active = new Set();
   for (const activity of PLANNER_ON) {
     const { data, error } = await tx.from(tablesOf(activity).task).select(COLUMNS)
       .lte('start_date', to).gte('end_date', from).order('start_date').limit(1000);
     if (error?.code === 'PGRST205') continue;
     if (error) throw error;
+    active.add(activity);
     const rows = data || [];
     // Main items with sub items anywhere in the year are shown through their sub items.
     const subs = await fetchAll(() => tx.from(tablesOf(activity).task).select('parent_id').not('parent_id', 'is', null).order('id'));
@@ -212,5 +217,5 @@ export async function plannerEvents(from, to) {
       });
     }
   }
-  return out;
+  return { events: out, active };
 }

@@ -1,5 +1,5 @@
 // ระบบตั้งค่า > ปฏิทิน: every activity's plan with week / month / year views, read-only (server: server/modules/act).
-// Shared plan helpers (dates, form, popup) are also used by act-gantt.js.
+// Shared date helpers (actIso, actDate, actShort ...) are also used by act-planner.js.
 // One color per activity, in ACTIVITIES order (units.js).
 const ACT_COLORS = ['#ff6b6b', '#ff9f43', '#f7c948', '#2ed573', '#1dd1a1', '#54a0ff', '#5f6dff', '#a55eea', '#ee5a9b'];
 const ACT_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
@@ -114,58 +114,7 @@ function actYearBody(events) {
   }).join('')}</div>`;
 }
 
-function actForm(event, day, title = '', titles = []) {
-  const row = event || { title, start_date: day, end_date: day, status: 'planned' };
-  return [
-    field('ชื่อกิจกรรม (ชื่อเดียวกันอยู่แถวเดียวกันในแผน)', `<input id="act-title" maxlength="200" list="act-titles" value="${esc(row.title || '')}"><datalist id="act-titles">${titles.map((name) => `<option value="${esc(name)}">`).join('')}</datalist>`),
-    field('วันเริ่ม', `<input id="act-start" type="date" value="${esc(row.start_date || '')}">`),
-    field('วันจบ', `<input id="act-end" type="date" value="${esc(row.end_date || '')}">`),
-    field('ผู้รับผิดชอบ', `<input id="act-resp" maxlength="200" value="${esc(row.responsible || '')}">`),
-    field('สถานะ', `<select id="act-status">${options(Object.keys(ACT_STATUS), row.status, (value) => ACT_STATUS[value])}</select>`),
-    field('รายละเอียด', `<textarea id="act-detail" rows="3" maxlength="2000">${esc(row.detail || '')}</textarea>`)
-  ].join('');
-}
-
-function actOpenForm(activity, event, day, title = '', titles = []) {
-  openPopup(event ? 'แก้ไขรายการในแผน' : 'เพิ่มรายการในแผน', actForm(event, day, title, titles), async () => {
-    const body = {
-      title: $('act-title').value.trim(),
-      startDate: $('act-start').value,
-      endDate: $('act-end').value || $('act-start').value,
-      responsible: $('act-resp').value.trim(),
-      status: $('act-status').value,
-      detail: $('act-detail').value.trim()
-    };
-    if (!body.title) throw new Error('ระบุชื่อกิจกรรม');
-    if (!body.startDate) throw new Error('ระบุวันเริ่ม');
-    if (body.endDate < body.startDate) throw new Error('วันจบต้องไม่ก่อนวันเริ่ม');
-    const path = `/api/act/${encodeURIComponent(activity)}/plan${event ? `/${event.id}` : ''}`;
-    await api(path, { method: event ? 'PATCH' : 'POST', body });
-    toast('บันทึกแล้ว');
-    closePopup();
-    openView(view);
-  });
-}
-
-function actOpenEvent(activity, event, editable, titles = []) {
-  const body = `<div class="plan-detail">
-    <p><strong>${esc(event.title)}</strong></p>
-    <p class="sum-meta">${actSpan(event)} ${actDate(event.start_date).getFullYear()} · ${esc(ACT_STATUS[event.status] || event.status)}</p>
-    ${event.responsible ? `<p>ผู้รับผิดชอบ: ${esc(event.responsible)}</p>` : ''}
-    ${event.detail ? `<p class="plan-note">${esc(event.detail)}</p>` : ''}
-    ${editable ? button('act-del', 'ลบรายการ', 'danger') : ''}
-  </div>`;
-  openPopup('รายการในแผน', body, () => (editable ? actOpenForm(activity, event, '', '', titles) : closePopup()), editable ? 'แก้ไข' : 'ปิด');
-  if (editable) {
-    $('act-del').onclick = () => confirmPopup('ลบรายการ', `ตรวจ "${esc(event.title)}" อีกครั้งก่อนลบ`, async () => {
-      await api(`/api/act/${encodeURIComponent(activity)}/plan/${event.id}`, { method: 'DELETE' });
-      toast('ลบแล้ว');
-      openView(view);
-    });
-  }
-}
-
-// Read-only: plans are edited in each activity's Setting (act-gantt.js).
+// Read-only: plans are edited in each activity's Setting (Project Planner, act-planner.js).
 function actOpenCalendarEvent(event) {
   const planView = `${event.activity}-setting`;
   const body = `<div class="plan-detail">

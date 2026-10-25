@@ -43,11 +43,10 @@ public/
   js/core.js                 helper, popup, api(), หน้า login, router (VIEWS / TITLES / ACCESS)
   js/sto.js                  หน้า Usage: Dashboard / transaction / Setting
   js/units.js                รายชื่อหน่วยงาน PLANTS / ACTIVITIES และหน้าชั่วคราว
-  js/act.js                  ระบบตั้งค่า > ปฏิทิน: แผนของทุกกิจกรรม (สัปดาห์ / เดือน / ปี) ดูอย่างเดียว + helper กลางของแผน
-  js/act-gantt.js            แผนประจำปีแบบ Gantt (สัปดาห์ / เดือน / ปี) เปิดใช้ตาม ACT_GANTT_ON
+  js/act.js                  ระบบตั้งค่า > ปฏิทิน: แผนของทุกกิจกรรม (สัปดาห์ / เดือน / ปี) ดูอย่างเดียว + helper วันที่
   js/act-5s.js               <กิจกรรม> > Dashboard (Summary/Ranking/Schedule/Team) + Setting (แผนงาน/พื้นที่/ทีม/หัวข้อ/แผนตรวจ) เปิดใช้ตาม A5_ON
   js/act-tx.js               <กิจกรรม> > transaction: รายการใบตรวจ + ฟอร์มตรวจ + Issue (ใช้ helper ของ act-5s.js)
-  js/act-planner.js          <กิจกรรม> > Setting: Project Planner รายปี (W1–W4) / รายเดือน (วัน) ลากแท่งได้ เปิดใช้ตาม APL_ON
+  js/act-planner.js          Project Planner รายปี (W1–W4) / รายเดือน (วัน) ลากแท่งได้: 100P > Setting (APL_ON), 5S > Setting > แผนงาน (แก้) และ Dashboard > Schedule (ดูอย่างเดียว)
   js/system.js               หน้าแก้ตารางของ creator
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)
 db/                          SQL ที่ผู้ใช้รันเองใน Supabase + คู่มือ (README.md)
@@ -117,8 +116,8 @@ scripts/
 - ทุกคนที่ login ดูแผนได้
 - สิทธิ์ของแต่ละกิจกรรมมาจาก `mt_<กิจกรรม>_team` รายปี: role `admin` = แก้ Setting และแผน, `chairman` / `auditor` / เจ้าของพื้นที่ (`mt_<กิจกรรม>_team` role owner) = transaction, ทุกคน = Dashboard · creator ทำได้ทุกอย่าง
 - route เขียนข้อมูลของ act ตรวจ admin ของปีนั้นใน handler (`requireAdmin` / `guardYear`) snapshot จึงแสดงแค่ `auth`
-- แผนแบบ Gantt อยู่ที่ <กิจกรรม> > Setting รายการที่ชื่อเหมือนกันอยู่แถวเดียวกัน แถวที่ระบบสร้างเอง (เช่น Self Audit วันที่ 1–10 ทุกเดือน) กำหนดใน `ACT_GANTT_AUTO`
-- เปิดใช้กับกิจกรรมอื่น: เพิ่ม id ใน `ACT_GANTT_ON` ใน public/js/act-gantt.js (server รองรับทุกกิจกรรมใน `ACTIVITIES` แล้ว)
+- แผนของกิจกรรมคือ Project Planner (`mt_<กิจกรรม>_task`, docs/specs/act-planner.md) แก้ที่ Setting · ปฏิทินรวมอ่านจาก Planner ถ้ามีตาราง ไม่งั้นอ่านแผน Gantt เดิม `mt_<กิจกรรม>_plan` (ไม่มีหน้าแก้แล้ว)
+- เปิดใช้กับกิจกรรมอื่น: ดูหัวข้อท้าย docs/specs/act-planner.md
 - ปฏิทินรวมอยู่ที่ ระบบตั้งค่า > ปฏิทิน แสดงทุกกิจกรรม แยกสีตามกิจกรรม ดูอย่างเดียว กดรายการแล้วไปที่แผนของกิจกรรมนั้นได้
 - ตั้งค่าทีมและเจ้าของพื้นที่ที่ <กิจกรรม> > Setting (หรือ System > Setting สำหรับ creator)
 

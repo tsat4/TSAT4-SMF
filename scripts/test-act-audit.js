@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
-import { actSql } from './act-sql.js';
+import { actSql, actTaskSql } from './act-sql.js';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const importFile = path.join(ROOT, 'inbox', 'import_5s.sql');
@@ -14,13 +14,14 @@ const ok = (c, label) => { console.log(`${c ? 'ok  ' : 'FAIL'} ${label}`); if (!
 const one = async (db, sql) => (await db.query(sql)).rows[0];
 const throws = async (db, sql) => { try { await db.exec(sql); return false; } catch { return true; } };
 
-ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '5s.sql'), 'utf8') === actSql('5s'), 'db/act/5s.sql is up to date (node scripts/act-sql.js 5s)');
+ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '5s.sql'), 'utf8') === actSql('5s', { task: true }), 'db/act/5s.sql is up to date (node scripts/act-sql.js 5s --task)');
+ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '5s_task.sql'), 'utf8') === actTaskSql('5s'), 'db/act/5s_task.sql is up to date (node scripts/act-sql.js 5s --add-task)');
 ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '100p.sql'), 'utf8') === actSql('100p', { audit: false, task: true }), 'db/act/100p.sql is up to date (node scripts/act-sql.js 100p --plan --task)');
 
 const db = new PGlite();
 await db.exec(`do $$ begin create role anon; create role authenticated; exception when duplicate_object then null; end $$;`);
-await db.exec(actSql('5s'));
-await db.exec(actSql('5s'));
+await db.exec(actSql('5s', { task: true }));
+await db.exec(actSql('5s', { task: true }));
 await db.exec(actSql('safety'));
 await db.exec(actSql('kaizen', { audit: false }));
 ok(true, 'schemas run twice; another activity (safety) and a plan-only activity (kaizen) build from the same template');
@@ -58,7 +59,29 @@ ok((await one(db, `select count(*)::int n from mt_5s_setting`)).n === 5, 'settin
 // Project Planner (100P): main items and sub items in one table
 await db.exec(actSql('100p', { audit: false, task: true }));
 await db.exec(actSql('100p', { audit: false, task: true }));
-ok((await one(db, `select to_regclass('public.mt_100p_task') is not null t, to_regclass('public.mt_5s_task') is null n`)).t, 'planner table only where asked (--task)');
+{
+  const r = await one(db, `select to_regclass('public.mt_100p_task') is not null t, to_regclass('public.mt_5s_task') is not null f, to_regclass('public.mt_safety_task') is null n`);
+  ok(r.t && r.f && r.n, 'planner table only where asked (--task)');
+}
+// Adding the Planner to a running activity copies its old Gantt plan once (db/act/<act>_task.sql), on the safety tables.
+await db.exec(`insert into mt_safety_plan (title, start_date, end_date, status, responsible, created_by) values
+  ('Kick off', '2026-01-05', '2026-01-09', 'done', 'สมชาย', '1'),
+  ('Patrol', '2026-03-02', '2026-03-06', 'planned', null, '1'),
+  ('Patrol', '2026-06-01', '2026-06-05', 'planned', null, '1'),
+  ('Old', '2026-02-02', '2026-02-03', 'cancelled', null, '1')`);
+await db.exec(actTaskSql('safety'));
+await db.exec(actTaskSql('safety'));
+{
+  const r = await one(db, `select
+    (select count(*)::int from mt_safety_task where parent_id is null) main,
+    (select count(*)::int from mt_safety_task where parent_id is not null) sub,
+    (select progress from mt_safety_task where title = 'Kick off') kick,
+    (select note from mt_safety_task where title = 'Kick off') note,
+    (select start_date is null from mt_safety_task where title = 'Patrol' and parent_id is null) patrol_main`);
+  ok(r.main === 2 && r.sub === 2 && r.kick === 100 && r.note === 'ผู้รับผิดชอบ: สมชาย' && r.patrol_main, `old plan copied once: one title = one item, two ranges = main + 2 sub items, cancelled skipped (got ${JSON.stringify(r)})`);
+  const cols = async (t) => (await db.query(`select column_name, data_type, is_nullable from information_schema.columns where table_name = '${t}' order by column_name`)).rows.map((c) => Object.values(c).join(':')).join(',');
+  ok((await cols('mt_safety_task')) === (await cols('mt_100p_task')), 'added planner table has the same columns as a fresh one');
+}
 await db.exec(`insert into mt_100p_task (year, title, created_by) values (2026, 'เตรียมโครงการ', '1')`);
 ok(true, 'a main item may wait for dates');
 await db.exec(`insert into mt_100p_task (year, parent_id, title, start_date, end_date, progress, created_by) select 2026, id, 'ตั้งทีม', '2026-01-05', '2026-01-30', 100, '1' from mt_100p_task`);

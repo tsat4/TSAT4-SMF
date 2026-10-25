@@ -1,8 +1,14 @@
-# Project Planner (เริ่มที่ 100P)
+# Project Planner (100P และ 5S)
 
 ผู้ใช้สั่ง 2026-10-25 · โค้ด: `server/modules/act/planner.js`, `public/js/act-planner.js` · ตาราง: `scripts/act-sql.js --task`
 
-## หน้าจอ (100P > Setting)
+## ใช้ที่ไหน
+
+- 100P > Setting (หน้าเต็ม)
+- 5S > Setting > แผนงาน (admin วางแผน) และ 5S > Dashboard > Schedule (ดูอย่างเดียว แม้เป็น admin) แทนแผน Gantt เดิม (ผู้ใช้สั่ง 2026-10-25) · ตารางวงกลมแผนตรวจพื้นที่ย้ายไปแท็บ Dashboard > Audit Plan
+- ในแท็บของ 5S ใช้ปีของหน้า 5S (`a5Year`) และวางปุ่มลงแถวเครื่องมือของหน้า (`aplRender(body, act, { inPage, readOnly })`)
+
+## หน้าจอ
 
 - แถวเครื่องมือ (กฎ pageBar): ซ้าย = รายปี / รายเดือน + ค้นหา · ขวา = เลื่อนเดือน (เฉพาะรายเดือน) → สร้าง / แก้ไข / ลบ → ปี
 - คอลัมน์ซ้าย: ลำดับ (1, 1.1), รายการ, ผู้รับผิดชอบ, %
@@ -46,5 +52,5 @@
 
 ## เปิดใช้กับกิจกรรมอื่น
 
-1. `node scripts/act-sql.js <act> --plan --task` (หรือไม่มี `--plan` ถ้ามีระบบตรวจด้วย) แล้วรันใน Tx Data
+1. กิจกรรมใหม่: `node scripts/act-sql.js <act> --plan --task` (หรือไม่มี `--plan` ถ้ามีระบบตรวจด้วย) · กิจกรรมที่ใช้งานอยู่: `node scripts/act-sql.js <act> --add-task` → `db/act/<act>_task.sql` (สร้างตารางและคัดลอกแผน Gantt เดิมครั้งเดียว: 1 ชื่อ = 1 ข้อหลัก ชื่อที่มีหลายช่วง = ข้อหลัก + ข้อรอง ไม่เอาที่ยกเลิก) แล้วรันใน Tx Data
 2. เพิ่ม id ใน `PLANNER_ON` (planner.js) และ `APL_ON` (act-planner.js) · ถ้ากิจกรรมนั้นใช้หน้า Setting ของ 5S อยู่แล้วต้องวางหน้า Planner เป็นแท็บแทน

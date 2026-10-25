@@ -1,7 +1,8 @@
 // ระบบกิจกรรม > <activity> > Setting: Project Planner (server: server/modules/act/planner.js).
 // Main items with sub items on a Gantt: year view = 12 months × W1–W4 (longer when items run into next year), month view = days. The year's admins
 // drag bars (whole bar = move, edge = resize), add rows with +, and create / edit / delete. Others read only.
-// Turn it on for another activity by adding its id here and to PLANNER_ON in planner.js.
+// 100P: its own Setting page (APL_ON). 5S: a tab inside Setting (edit) and Dashboard (read only), see act-5s.js.
+// Turn it on for another activity by adding its id to PLANNER_ON in planner.js and here (or calling aplRender from a tab).
 const APL_ON = ['100p'];
 const APL_COLORS = { p1: '#ec6f73', p2: '#3fbfbf', p3: '#e3a52f', p4: '#8b6fd8', p5: '#4b8bea' };
 // Narrowest column in px; wider screens stretch the columns so the last month ends at the right edge.
@@ -144,10 +145,12 @@ function aplLines(g) {
 function aplRow(task, code, color, g, lines, canEdit, phase) {
   const pos = aplPlace(task, g);
   const span = task.start_date ? `${actShort(task.start_date)} – ${actShort(task.end_date)}` : '';
+  // A bar shorter than about 3 weeks (year view) has no room for its %: the % goes beside it with the dates.
+  const narrow = pos && (pos.b - pos.a + 1) / g.cols < 0.06;
   const bar = pos ? `<div class="apl-bar${canEdit ? ' is-editable' : ''}" data-bar="${task.id}" data-a="${pos.a}" data-b="${pos.b}" style="left:${aplPct(pos.a, g)};width:${aplPct(pos.b - pos.a + 1, g)};--bar:${color}" title="${esc(task.title)} · ${span} · ${task.progress}%">
-      <div class="apl-fill" style="width:${task.progress}%"></div><span>${task.progress}%</span>
+      <div class="apl-fill" style="width:${task.progress}%"></div>${narrow ? '' : `<span>${task.progress}%</span>`}
       ${canEdit && !task.derived ? '<div class="apl-handle is-l" data-h="l"></div><div class="apl-handle is-r" data-h="r"></div>' : ''}</div>
-    <div class="apl-dates" style="${pos.b + 1 > g.cols * 0.8 ? `right:calc(${aplPct(g.cols - pos.a, g)} + 6px)` : `left:calc(${aplPct(pos.b + 1, g)} + 6px)`}">${span}</div>` : '';
+    <div class="apl-dates" style="${pos.b + 1 > g.cols * 0.8 ? `right:calc(${aplPct(g.cols - pos.a, g)} + 6px)` : `left:calc(${aplPct(pos.b + 1, g)} + 6px)`}">${span}${narrow ? ` · ${task.progress}%` : ''}</div>` : '';
   const title = phase
     ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(task.title)}</span>${canEdit ? `<button class="apl-add" type="button" data-add="${task.id}" title="เพิ่มข้อรอง" aria-label="เพิ่มข้อรองใต้ ${esc(task.title)}">+</button>` : ''}</div>`
     : `<div class="apl-title is-sub"><span>${esc(task.title)}</span></div>`;
@@ -156,10 +159,21 @@ function aplRow(task, code, color, g, lines, canEdit, phase) {
     <div class="apl-track">${lines}${bar}</div></div>`;
 }
 
-async function aplRender(target, activity) {
-  const data = await api(`/api/act/${encodeURIComponent(activity)}/tasks?year=${aplYear}`);
+// inPage: inside a tab of another page that has its own year (a5Year) and page bar (slot a5-tools).
+// readOnly: no create / edit / drag even for admins (Dashboard).
+async function aplRender(target, activity, opts = {}) {
+  const { inPage = false, readOnly = false } = opts;
+  if (inPage) aplYear = a5Year;
+  let data;
+  try {
+    data = await api(`/api/act/${encodeURIComponent(activity)}/tasks?year=${aplYear}`);
+  } catch (err) {
+    if (inPage) $('a5-tools').innerHTML = '';
+    target.innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+    return;
+  }
   const tasks = data.tasks || [];
-  const canEdit = Boolean(data.canEdit);
+  const canEdit = Boolean(data.canEdit) && !readOnly;
   if (!tasks.some((t) => t.id === aplSelected)) aplSelected = null;
   const g = aplGeometry(tasks);
   const kidsOf = (id) => tasks.filter((t) => t.parent_id === id).sort((a, b) => a.sort_no - b.sort_no || a.id - b.id);
@@ -182,7 +196,7 @@ async function aplRender(target, activity) {
   const search = field('ค้นหา', `<input id="apl-q" placeholder="ชื่อรายการหรือผู้รับผิดชอบ" value="${esc(aplQuery)}">`);
   // All on the right (the page has no sub-pages), large to small: year → year/month view → month → search →
   // create / edit / delete at the far right.
-  const tools = `<div class="a5-year">${field('ปี', `<select id="apl-year">${years.map((y) => `<option value="${y}"${y === aplYear ? ' selected' : ''}>${y}</option>`).join('')}</select>`)}</div>
+  const tools = `${inPage ? '' : `<div class="a5-year">${field('ปี', `<select id="apl-year">${years.map((y) => `<option value="${y}"${y === aplYear ? ' selected' : ''}>${y}</option>`).join('')}</select>`)}</div>`}
     ${seg}
     ${aplView === 'month' ? `<div class="plan-nav">${button('apl-prev', '‹', 'secondary', 'aria-label="เดือนก่อน"')}${button('apl-next', '›', 'secondary', 'aria-label="เดือนถัดไป"')}</div><strong class="plan-label">${aplMonthName(aplMonth, true)}</strong>` : ''}
     ${search}
@@ -190,15 +204,19 @@ async function aplRender(target, activity) {
   const admins = data.admins?.length ? `admin ปี ${aplYear}: ${data.admins.map(esc).join(', ')}` : `ยังไม่กำหนด admin ปี ${aplYear}`;
   const keepScroll = target.querySelector('.apl-scroll');
   const scroll = keepScroll ? [keepScroll.scrollLeft, keepScroll.scrollTop] : null;
-  target.innerHTML = `<div class="view-body"><section class="card plan-card">
-    ${pageBar('', tools, 'apl')}
-    <p class="page-note">${admins} · ${tasks.length} รายการ${canEdit ? ' · ลากแท่งเพื่อย้าย ลากขอบเพื่อยืด/หด (รายปีทีละสัปดาห์ รายเดือนทีละวัน) · ดับเบิลคลิกแถวเพื่อแก้ไข' : ''}</p>
+  const hint = canEdit ? ' · ลากแท่งเพื่อย้าย ลากขอบเพื่อยืด/หด (รายปีทีละสัปดาห์ รายเดือนทีละวัน) · ดับเบิลคลิกแถวเพื่อแก้ไข' : readOnly ? ' · ดูอย่างเดียว แก้ไขที่ Setting > แผนงาน' : '';
+  const content = `<p class="page-note">${admins} · ${tasks.length} รายการ${hint}</p>
     <div class="apl-scroll"><div class="apl-grid" style="--apl-tl:${g.cols * g.min}px">
       <div class="apl-row apl-head"><div class="apl-left"><div>ลำดับ</div><div>รายการ</div><div>ผู้รับผิดชอบ</div><div class="apl-pct">%</div></div><div class="apl-track">${aplHead(g)}</div></div>
       ${rows}
     </div></div>
-    ${tasks.length ? '' : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}
-  </section></div>`;
+    ${tasks.length ? '' : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}`;
+  if (inPage) {
+    $('a5-tools').innerHTML = tools;
+    target.innerHTML = content;
+  } else {
+    target.innerHTML = `<div class="view-body"><section class="card plan-card">${pageBar('', tools, 'apl')}${content}</section></div>`;
+  }
   const box = target.querySelector('.apl-scroll');
   // The scrollbars start below the header row and right of the left columns (app.css .apl-scroll).
   box.style.setProperty('--apl-head', `${box.querySelector('.apl-head').offsetHeight}px`);
@@ -209,10 +227,10 @@ async function aplRender(target, activity) {
     box.scrollLeft = Math.max(0, ((aplTodayCol(g) ?? 0) / g.cols) * track - (box.clientWidth - APL_LEFT) / 2);
   }
 
-  const rerender = () => aplRender(target, activity).catch(onErr);
+  const rerender = () => aplRender(target, activity, opts).catch(onErr);
   const byId = (id) => tasks.find((t) => t.id === Number(id));
-  target.querySelectorAll('[data-aplview]').forEach((node) => { node.onclick = () => { aplView = node.dataset.aplview; rerender(); }; });
-  $('apl-year').onchange = () => { aplYear = Number($('apl-year').value); aplMonth %= 12; aplSelected = null; rerender(); };
+  document.querySelectorAll('[data-aplview]').forEach((node) => { node.onclick = () => { aplView = node.dataset.aplview; rerender(); }; });
+  if ($('apl-year')) $('apl-year').onchange = () => { aplYear = Number($('apl-year').value); aplMonth %= 12; aplSelected = null; rerender(); };
   let typing;
   $('apl-q').oninput = () => { clearTimeout(typing); typing = setTimeout(() => { aplQuery = $('apl-q').value; rerender().then(() => { const input = $('apl-q'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); }); }, 250); };
   if ($('apl-prev')) {
