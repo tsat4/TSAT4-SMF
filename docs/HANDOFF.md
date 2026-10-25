@@ -2,15 +2,15 @@
 
 ## กำลังทำอยู่
 
-- งาน: แยกฐาน **Mx Data = master + ระบบงาน** · **Tx Data = ระบบกิจกรรม** ชื่อตาราง `mt_5s_*` / `tx_5s_*` (ผู้ใช้สั่ง 2026-10-25)
-- ใคร: Claude ทำโค้ดเสร็จและ deploy แล้ว (โค้ดรองรับกรณีตารางยังไม่มี หน้า 5S จะขึ้นข้อความแจ้งแทนการพัง)
-- ขั้นตอนที่เหลือ (ผู้ใช้ / Cursor ทำตามลำดับ):
-  1. [x] **Tx Data**: รัน `db/act/5s.sql` แล้ว (Cursor 2026-10-25)
-  2. [x] **Tx Data**: ใส่ข้อมูล 5S แล้ว นับได้ พื้นที่ 34 / เจ้าของ 34 / ทีม 19 / หัวข้อ 25 / แผน 14 / ใบตรวจ 33 / คะแนน 825 / คนในใบ 108 / Issue 52 / รูป 54 หมวด ส1–ส5 = 85.2/82.5/87.0/88.7/89.8
-  3. [ ] **Render** → Environment: `TX_SUPABASE_URL` = `https://loeyrgavlpdnrbczjxpl.supabase.co` และ `TX_SUPABASE_SECRET_KEY` = secret key ของ Tx Data (Supabase → Tx Data → Settings → API Keys) แล้ว Save — ตอนนี้ค่า TX ยังชี้ไป Mx Data จากรอบรวมฐานก่อนหน้า ถ้าไม่สลับกลับ หน้า 5S จะขึ้นว่ายังไม่มีตาราง
-  4. [ ] ตรวจบนเว็บ: Store เบิก/รับยังทำงาน (ใช้ Mx Data) · 5S Dashboard ขึ้นตัวเลข 85.2/82.5/87.0/88.7/89.8
-  5. [x] **Mx Data**: ล้างตารางกิจกรรมชุดเก่าแล้ว (`db/07_drop_act_from_mx.sql`) และ **Tx Data**: ล้างตารางใบเบิกชุดเก่าแล้ว (`db/08_drop_sto_from_tx.sql`) — ผู้ใช้สั่ง 2026-10-25 แผน Gantt เก่าใน Mx Data มี 0 แถวจึงไม่ได้คัดลอก
-- หมายเหตุ: ใบเบิกที่ระบบใช้ตอนนี้อยู่ใน Mx Data เท่านั้น (ยังมี 1 ใบ) กิจกรรม 5S อยู่ใน Tx Data เท่านั้น
+- งาน: 5S → transaction (ฟอร์มตรวจ Self / Committee + Issue) ตาม docs/specs/act-5s.md
+- ใคร / เริ่มเมื่อ: Claude (โฟลเดอร์ SMF-act), 2026-10-25
+- ขั้นตอน:
+  - [ ] server: /api/act/:activity/audits (list, form, save, delete) + /issues (list, photo, action, edit)
+  - [ ] หน้า transaction: แท็บ ตรวจประเมิน / Issue
+  - [ ] SQL: bucket รูป `act-img` ใน Tx Data (db/act/storage.sql) — ให้ผู้ใช้/Cursor รัน
+  - [ ] ทดสอบ + deploy
+- ไฟล์ที่ยังแก้ไม่เสร็จ: (อัปเดตระหว่างทำ)
+- เสร็จแล้วก่อนหน้า: แยกฐาน Mx/Tx เสร็จ ผู้ใช้สลับ env TX_* ไป Tx Data แล้ว (2026-10-25)
 <!-- ถ้าเริ่มงานใหญ่ ให้เขียนตามนี้:
 - งาน: ...
 - ใคร / เริ่มเมื่อ: Cursor | Claude, YYYY-MM-DD HH:MM
