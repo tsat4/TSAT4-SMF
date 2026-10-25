@@ -12,7 +12,7 @@ let txPage = 'issue';
 Object.assign(TITLES, {
   store: ['Store', 'ระบบงาน > Store'],
   locked: ['Usage', USAGE],
-  home: ['ภาพรวม', USAGE],
+  home: ['Dashboard', USAGE],
   edit: ['transaction', USAGE],
   setting: ['Setting', USAGE]
 });
@@ -272,7 +272,7 @@ async function openAddPopup() {
 }
 
 async function renderHome(target) {
-  await stoDashRender(target, 'overview');
+  await stoDashRender(target);
 }
 
 function centerText(row) {

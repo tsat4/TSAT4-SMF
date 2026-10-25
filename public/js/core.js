@@ -216,7 +216,7 @@ function showShell() {
 function zoneOf(name) {
   if (name === 'setup' || name === 'act-plan' || name === 'system') return 'setup';
   if (name === 'activity') return 'act';
-  if (name === 'work' || name === 'store' || name === 'home' || name === 'edit' || name === 'setting' || name === 'locked' || name === 'dash-flow' || name === 'dash-month') return 'work';
+  if (name === 'work' || name === 'store' || name === 'home' || name === 'edit' || name === 'setting' || name === 'locked') return 'work';
   if (typeof plantOf === 'function') {
     const unit = plantOf(name);
     if (unit) return unit.group === 'ระบบงาน' ? 'work' : 'act';

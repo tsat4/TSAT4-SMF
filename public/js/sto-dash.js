@@ -1,6 +1,7 @@
-// Store > Usage dashboards. renderHome in sto.js opens the overview page.
+// Store > Usage dashboard. The sidebar has one Dashboard button. The pages are buttons inside that page.
 const STO_DASH_COLORS = ['#3b82f6', '#ff8a1f', '#3ecf8e', '#a78bfa', '#f87171', '#f59e0b', '#14b8a6', '#71717a'];
 let stoDashYear = new Date().getFullYear();
+let stoDashPage = 'overview';
 
 function stoDashNum(value, digits = 0) {
   return Number(value || 0).toLocaleString('th-TH', { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -105,27 +106,26 @@ function stoDashMonth(data) {
     </div>`;
 }
 
-async function stoDashRender(target, page) {
+async function stoDashRender(target) {
+  const page = stoDashPage;
   const data = await api(`/api/usage-dashboard?year=${stoDashYear}`);
   const years = [stoDashYear - 1, stoDashYear, stoDashYear + 1];
+  const tabs = [['overview', 'ภาพรวม'], ['flow', 'รับเข้า-จ่ายออก'], ['month', 'รายเดือน']];
+  const seg = `<div class="seg" role="group" aria-label="หน้า Dashboard">${tabs.map(([id, label]) => `<button class="seg-btn${id === page ? ' is-active' : ''}" type="button" data-sto-dash="${id}">${label}</button>`).join('')}</div>`;
   const year = field('ปี', `<select id="sto-dash-year">${years.map((item) => `<option value="${item}"${item === data.year ? ' selected' : ''}>${item}</option>`).join('')}</select>`);
   target.innerHTML = `<div class="view-body sto-dash">
-    ${pageBar('', year, 'sto-dash')}
+    ${pageBar(seg, year, 'sto-dash')}
     <p class="page-note">รายการใช้งานทั้งระบบ · จ่ายออกของ ${esc(data.scope)}</p>
     ${page === 'flow' ? stoDashFlow(data) : page === 'month' ? stoDashMonth(data) : stoDashOverview(data)}
   </div>`;
+  target.querySelectorAll('[data-sto-dash]').forEach((node) => {
+    node.onclick = () => {
+      stoDashPage = node.dataset.stoDash;
+      stoDashRender(target).catch(onErr);
+    };
+  });
   $('sto-dash-year').onchange = () => {
     stoDashYear = Number($('sto-dash-year').value);
-    stoDashRender(target, page).catch(onErr);
+    stoDashRender(target).catch(onErr);
   };
 }
-
-Object.assign(TITLES, {
-  'dash-flow': ['รับเข้า-จ่ายออก', USAGE],
-  'dash-month': ['รายเดือน', USAGE]
-});
-Object.assign(ACCESS, { 'dash-flow': ['sto', 1], 'dash-month': ['sto', 1] });
-Object.assign(VIEWS, {
-  'dash-flow': (target) => stoDashRender(target, 'flow'),
-  'dash-month': (target) => stoDashRender(target, 'month')
-});
