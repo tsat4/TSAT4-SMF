@@ -115,7 +115,6 @@ async function stoDashRender(target) {
   const year = field('ปี', `<select id="sto-dash-year">${years.map((item) => `<option value="${item}"${item === data.year ? ' selected' : ''}>${item}</option>`).join('')}</select>`);
   target.innerHTML = `<div class="view-body sto-dash">
     ${pageBar(seg, year, 'sto-dash')}
-    <p class="page-note">รายการใช้งานทั้งระบบ · จ่ายออกของ ${esc(data.scope)}</p>
     ${page === 'flow' ? stoDashFlow(data) : page === 'month' ? stoDashMonth(data) : stoDashOverview(data)}
   </div>`;
   target.querySelectorAll('[data-sto-dash]').forEach((node) => {
