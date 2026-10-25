@@ -317,10 +317,8 @@ async function atxIssues(body, activity) {
     status: i.shownStatus || i.status,
     photos: i.photos?.length || 0
   }[key]));
-  const count = (s) => data.issues.filter((i) => i.shownStatus === s).length;
   body.innerHTML = `
-    <div class="toolbar a5-filters">${a5Seg('data-iall', { open: 'ยังไม่ปิด', all: 'ทั้งหมด' }, atxIssueAll ? 'all' : 'open')}
-      <span class="sum-meta">ทั้งหมด ${data.issues.length} · รอแก้ ${count('OPEN')} · เลยกำหนด ${count('OVERDUE')} · แก้แล้วรอตรวจ ${count('ON_PLAN') + count('WAIT_VERIFY')} · ปิดแล้ว ${count('CLOSED')}</span></div>
+    <div class="toolbar a5-filters">${a5Seg('data-iall', { open: 'ยังไม่ปิด', all: 'ทั้งหมด' }, atxIssueAll ? 'all' : 'open')}</div>
     <div class="table-wrap sheet" id="atx-rows"></div>`;
   fillTable('atx-rows', [{ label: 'เลขที่', key: 'issue_no' }, { label: 'พื้นที่', key: 'area' }, { label: 'ข้อ', key: 'item_no' }, { label: 'คะแนน', key: 'score' }, { label: 'ปัญหา', key: 'description' }, { label: 'ผู้รับผิดชอบ', key: 'responsible' }, { label: 'กำหนดแก้', key: 'due_date' }, { label: 'สถานะ', key: 'status' }, { label: 'รูป', key: 'photos' }], list.map((i) => `<tr data-pick="${i.id}">
     <td>${esc(i.issue_no)}</td><td>${esc(i.area.code || '')} ${esc(i.area.name || '')}</td><td>${i.item.item_no || ''}</td><td>${Number(i.score)}</td>

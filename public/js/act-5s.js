@@ -188,7 +188,6 @@ async function a5DrawTeam(body, activity) {
   const chairs = active.filter((m) => m.role === 'chairman');
   const teams = A5_TEAMS.filter((t) => active.some((m) => m.team === t)).concat([...new Set(active.filter((m) => m.team && !A5_TEAMS.includes(m.team)).map((m) => m.team))]);
   body.innerHTML = `
-    <p class="sum-meta">ปี ${a5Year} · ${active.length} รายชื่อ</p>
     <div class="a5-team-grid a5-team-top">
       <div class="a5-team" style="--team:var(--mo-primary)"><div class="a5-team-head"><span class="a5-badge">A</span>Admin ผู้ดูแลกิจกรรม<span>${admins.length}</span></div>${admins.map(person).join('') || '<div class="a5-person">-</div>'}</div>
       <div class="a5-team" style="--team:#475569"><div class="a5-team-head"><span class="a5-badge">H</span>หัวหน้าทีมตรวจประเมิน<span>${chairs.length}</span></div>${chairs.map(person).join('') || '<div class="a5-person">-</div>'}</div>
@@ -371,8 +370,7 @@ async function a5SetPlan(body, activity, admin) {
   const [areas, plan] = await Promise.all([a5Api(activity, `areas?year=${a5Year}`), a5Api(activity, `audit-plan?year=${a5Year}`)]);
   const list = areas.areas.filter((a) => a.area_type === a5AreaType && (a.status === 'Active' || plan.plans.some((p) => p.area_id === a.id)));
   const today = new Date();
-  body.innerHTML = `<div class="toolbar a5-filters">${a5Seg('data-a5atype', { โรงงาน: 'แผนโรงงาน', สำนักงาน: 'แผนสำนักงาน' }, a5AreaType)}
-      <p class="sum-meta">${admin ? 'กดช่องเพื่อกำหนดทีมและครั้งที่ตรวจ' : 'ดูอย่างเดียว'} · ${plan.plans.length} ช่องที่วางแผนแล้วทั้งปี</p></div>
+  body.innerHTML = `<div class="toolbar a5-filters">${a5Seg('data-a5atype', { โรงงาน: 'แผนโรงงาน', สำนักงาน: 'แผนสำนักงาน' }, a5AreaType)}</div>
     ${a5Legend()}
     ${a5Grid(a5Year, list, plan.plans, [], (p) => a5Dot(a5Year, p, null, today))}`;
   const redraw = () => a5SetPlan(body, activity, admin).catch(onErr);
