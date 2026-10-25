@@ -108,8 +108,8 @@ async function actGanttRender(target, activity) {
     return `<div class="gantt-row">${label}<div class="gantt-track">${row.items.map((event) => actGanttBar(event, range, total, color)).join('')}</div></div>`;
   }).join('');
   const lines = `<div class="gantt-lines" style="grid-template-columns:${template}">${columns.map(([, , weekend]) => `<div class="${weekend ? 'is-weekend' : ''}"></div>`).join('')}${todayLine}</div>`;
-  // Page bar rule: view switch on the left, period navigation and add on the right. Inside Setting the
-  // controls go into Setting's own bar (slots a5-left / a5-tools) so the page keeps one toolbar row.
+  // Page bar rule: view switch, period navigation and add all on the right (left is for sub-page tabs only).
+  // Inside Setting the controls go into Setting's own bar (slot a5-tools) so the page keeps one toolbar row.
   const modeSeg = `<div class="seg" role="group" aria-label="มุมมอง">${Object.entries(ACT_MODES).map(([mode, name]) => `<button class="seg-btn${mode === actGanttMode ? ' is-active' : ''}" type="button" data-gmode="${mode}" aria-pressed="${mode === actGanttMode}">${name}</button>`).join('')}</div>`;
   const navTools = `<div class="plan-nav">${button('gantt-prev', '‹', 'secondary', 'aria-label="ก่อนหน้า"')}${button('gantt-today', 'วันนี้')}${button('gantt-next', '›', 'secondary', 'aria-label="ถัดไป"')}</div>
         <strong class="plan-label">${range.label}</strong>
@@ -118,11 +118,11 @@ async function actGanttRender(target, activity) {
   const slotTools = $('a5-tools');
   const inPage = Boolean(slotLeft && slotTools && !target.contains(slotTools));
   if (inPage) {
-    slotLeft.innerHTML = modeSeg;
-    slotTools.innerHTML = navTools;
+    slotLeft.innerHTML = '';
+    slotTools.innerHTML = `${modeSeg}${navTools}`;
   }
   target.innerHTML = `<div class="${inPage ? '' : 'view-body'}"><section class="${inPage ? '' : 'card '}plan-card">
-    ${inPage ? '' : pageBar(modeSeg, navTools, 'gantt')}
+    ${inPage ? '' : pageBar('', `${modeSeg}${navTools}`, 'gantt')}
     <p class="page-note">${owner} · ${events.length} รายการ · <span class="gantt-key"></span> วันนี้${current.canEdit ? ' · กดชื่อแถวเพื่อเพิ่มช่วงใหม่ในแถวนั้น' : ''}</p>
     <div class="gantt-scroll"><div class="gantt">${head}<div class="gantt-body">${lines}${body || ''}</div></div></div>
     ${events.length ? '' : `<p class="empty">ยังไม่มีรายการในช่วงนี้${current.canEdit ? ' กด "เพิ่ม" เพื่อวางแผน' : ''}</p>`}

@@ -212,7 +212,8 @@ function onEnter(id, run) {
 }
 
 // Page toolbar rule (AGENTS.md "หน้าจอ"): no title card (the header already names the page), one row:
-// left = tabs / sub-pages / table picker, right = year and filters from large to small → search → create/edit/delete
+// left = only buttons that open sub-pages (tabs, table picker), right = year → view switch (ปี/เดือน/สัปดาห์) and filters
+// from large to small → search → create/edit/delete
 // at the far right. `right` comes first (the year); a tab fills the slots <id>-left / <id>-tools after it.
 function pageBar(left, right = '', id = 'page') {
   return `<div class="page-bar"><div class="page-bar-left">${left}<span class="page-bar-slot" id="${id}-left"></span></div><div class="page-bar-right">${right}<span class="page-bar-slot" id="${id}-tools"></span></div></div>`;
