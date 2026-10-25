@@ -44,21 +44,25 @@ function a5WeekEnd(year, month, week) {
   return new Date(year, month - 1, week === 4 ? last : week * 7);
 }
 
-// Move a tab's filters and buttons from its body up into the page bar (core.js pageBar, slots a5-left / a5-tools):
-// search goes left, everything else right. Notes (p, .sum-meta) stay in the body. Bind events before calling.
+// Move a tab's search, filters and buttons from its body up into the right side of the page bar (core.js pageBar,
+// slot a5-tools): search first, then filters and buttons. The left side keeps only tabs. Notes (p, .sum-meta)
+// stay in the body. Bind events before calling.
 function a5Lift(body) {
   const left = $('a5-left');
   const tools = $('a5-tools');
   if (!tools) return;
   tools.innerHTML = '';
   if (left) left.innerHTML = '';
+  const searches = [];
   body.querySelectorAll(':scope > .a5-actions, :scope > .a5-filters').forEach((box) => {
     [...box.children].forEach((child) => {
       if (child.matches('p, .sum-meta')) return;
-      (child.matches('.search-slot') && left ? left : tools).appendChild(child);
+      if (child.matches('.search-slot')) searches.push(child);
+      else tools.appendChild(child);
     });
     if (!box.children.length) box.remove();
   });
+  tools.prepend(...searches);
 }
 
 // ---------- Dashboard ----------

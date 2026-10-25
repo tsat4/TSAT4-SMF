@@ -187,7 +187,7 @@ async function aplRender(target, activity) {
   const keepScroll = target.querySelector('.apl-scroll');
   const scroll = keepScroll ? [keepScroll.scrollLeft, keepScroll.scrollTop] : null;
   target.innerHTML = `<div class="view-body"><section class="card plan-card">
-    ${pageBar(`${seg}${search}`, tools, 'apl')}
+    ${pageBar(seg, `${search}${tools}`, 'apl')}
     <p class="page-note">${admins} · ${tasks.length} รายการ${canEdit ? ' · ลากแท่งเพื่อย้าย ลากขอบเพื่อยืด/หด (รายปีทีละสัปดาห์ รายเดือนทีละวัน) · ดับเบิลคลิกแถวเพื่อแก้ไข' : ''}</p>
     <div class="apl-scroll"><div class="apl-grid" style="--apl-tl:${g.cols * g.min}px">
       <div class="apl-row apl-head"><div class="apl-left"><div>ลำดับ</div><div>รายการ</div><div>ผู้รับผิดชอบ</div><div class="apl-pct">%</div></div><div class="apl-track">${aplHead(g)}</div></div>

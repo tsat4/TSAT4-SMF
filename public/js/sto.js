@@ -64,7 +64,7 @@ async function renderEdit(target) {
   const admin = rankOf('sto') >= 3;
   const seg = `<div class="seg" role="group" aria-label="หน้า transaction">${Object.entries(TX_PAGE).map(([id, label]) => `<button class="seg-btn${id === txPage ? ' is-active' : ''}" type="button" data-tx="${id}">${label}</button>`).join('')}</div>`;
   target.innerHTML = `<div class="view-body">
-    ${pageBar(`${seg}${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'ค้นหา' })}`, '<div class="action-bar" id="edit-actions"></div>', 'edit')}
+    ${pageBar(seg, `${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'ค้นหา' })}<div class="action-bar" id="edit-actions"></div>`, 'edit')}
     <div class="table-wrap sheet" id="edit-rows"></div>
     <div class="table-foot">
       <div class="sum-meta" id="edit-count"></div>
