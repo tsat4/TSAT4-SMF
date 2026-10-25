@@ -2,15 +2,15 @@
 
 ## กำลังทำอยู่
 
-- งาน: **5S โครงสร้าง v2 — ยุบ 12 ตารางเหลือ 9** (ผู้ใช้สั่ง 2026-10-25) Claude เตรียมเสร็จ **รอ Cursor ทำตามขั้นด้านล่าง**
-  - mt_5s_area_owner → mt_5s_team (role `owner` + `area_id`) · tx_5s_audit_person → tx_5s_audit.`auditors` / `receivers` · tx_5s_issue_photo → tx_5s_issue.`photo_before` / `photo_after`
-  - โค้ดใหม่อยู่ที่ branch **`origin/5s-v2`** (ยังไม่ deploy) · SQL อยู่บน main: `db/act/5s_v2_step1.sql`, `db/act/5s_v2_step2.sql`
+- งาน: **5S โครงสร้าง v2 — ยุบ 12 ตารางเหลือ 9** ขั้น 1–4 เสร็จแล้ว 2026-10-25 · **หยุดรอผู้ใช้ยืนยันก่อนขั้น 5**
+  - mt_5s_area_owner คัดลอกเข้า mt_5s_team แล้ว · tx_5s_audit_person คัดลอกเข้า auditors/receivers แล้ว · tx_5s_issue_photo คัดลอกเข้า photo_before/photo_after แล้ว · ตารางเก่ายังอยู่
+  - โค้ด v2 อยู่บน main แล้ว (`5096efa`) และเว็บตอบ health ปกติ
 - ขั้นตอนสำหรับ Cursor (ทำตามลำดับ ห้ามข้าม):
-  1. [ ] **Tx Data** SQL Editor: รัน `db/act/5s_v2_step1.sql` (เพิ่มคอลัมน์ + คัดลอก ไม่ลบอะไร โค้ดที่ใช้อยู่ยังทำงานได้) ผลท้ายไฟล์ต้องได้ owners ≥ 34 · audits_with_auditors ≥ 33 · photos ≥ 54
-  2. [ ] ในโฟลเดอร์ SMF: `git pull --rebase` → `git merge origin/5s-v2` → `npm run check` และ `npm run test:act` ต้องผ่าน → `git push origin main` (deploy)
-  3. [ ] รอเว็บขึ้นเวอร์ชันใหม่ (~1 นาที, `/api/health`) แล้วรัน `db/act/5s_v2_step1.sql` **อีกครั้ง** (เติมข้อมูลที่โค้ดเก่าอาจเขียนระหว่าง deploy รันซ้ำได้ ไม่ทับของใหม่)
-  4. [ ] ตรวจบนเว็บ: 5S > Setting > พื้นที่ เห็นเจ้าของปี 2026 ครบ · Setting > ทีม ไม่มีแถวเจ้าของปน · transaction > Audit ดับเบิลคลิกเห็นผู้ตรวจ · Issue เห็นรูป · Dashboard 85.2/82.5/87.0/88.7/89.8
-  5. [ ] **Tx Data**: รัน `db/act/5s_v2_step2.sql` (ลบ 3 ตารางเก่า)
+  1. [x] **Tx Data** รัน `db/act/5s_v2_step1.sql` ได้ owners 34 · audits_with_auditors 33 · photos 54
+  2. [x] merge `origin/5s-v2` แล้ว `npm run check` และ `npm run test:act` ผ่าน และ push main แล้ว
+  3. [x] เว็บขึ้นเวอร์ชันใหม่แล้ว รัน step1 ซ้ำได้ตัวเลขเดิม
+  4. [x] ตรวจจากข้อมูล Tx Data: เจ้าของปี 2026 ครบ 34 พื้นที่ · ทีมปี 2026 ที่ไม่ใช่ owner มี 19 แถว (หน้าทีมกรอง owner ออก) · ผู้ตรวจครบ 33 ใบ · รูป 54 อยู่ใน Issue · หมวด 85.2/82.5/87.0/88.7/89.8 และ ก.ย. 86.67 จาก 33 ใบ · ยังไม่ได้กดไล่ในหน้าจอหลังล็อกอิน
+  5. [ ] **หยุดถามผู้ใช้ก่อนทำ** **Tx Data**: รัน `db/act/5s_v2_step2.sql` (ลบ 3 ตารางเก่า)
   6. [ ] ลบ branch `git push origin --delete 5s-v2` และย้ายงานนี้ลงบันทึก
 - ถ้าขั้น 2–4 มีปัญหา: `git revert` commit ที่ merge แล้ว push (ตารางเก่ายังอยู่จนถึงขั้น 5 จึงย้อนได้)
 - หมายเหตุ: `inbox/import_5s/` สร้างใหม่เป็นรูปแบบ v2 แล้ว ใช้กับฐานใหม่ที่ว่างเท่านั้น **ห้ามรันกับ Tx Data ที่มีข้อมูลแล้ว**
@@ -23,7 +23,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- **Tx Data**: `db/act/5s_v2_step1.sql` แล้วต่อด้วยขั้นตอนในหัวข้อ "กำลังทำอยู่"
+- **Tx Data**: `db/act/5s_v2_step2.sql` ยังไม่รัน รอผู้ใช้ยืนยันก่อนลบตาราง `mt_5s_area_owner`, `tx_5s_audit_person`, `tx_5s_issue_photo`
 
 ## ข้อควรระวัง
 
