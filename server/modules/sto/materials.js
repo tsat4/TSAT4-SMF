@@ -102,12 +102,28 @@ export function mountMaterials(app, mod) {
   }));
 
   app.get('/api/materials', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+    if (req.query.part === 'groups') {
+      const groups = new Map();
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await mx.from('mt_sto_usage').select('usage_group').eq('status', 'Active').range(from, from + 999);
+        if (error) return fail(res, 400, 'อ่านกลุ่มไม่ได้');
+        for (const row of data || []) groups.set(row.usage_group || '', (groups.get(row.usage_group || '') || 0) + 1);
+        if (!data || data.length < 1000) break;
+      }
+      return res.json({ groups: [...groups.entries()].map(([name, count]) => ({ name, count })) });
+    }
     const term = cleanTerm(req.query.q);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const group = String(req.query.group || '');
     let query = mx.from('mt_sto_usage')
       .select('material,material_description,bun,price,status,usage_group,img', { count: 'exact' })
       .eq('status', 'Active');
+    if (group === '-') query = query.is('usage_group', null);
+    else if (group) {
+      const name = cleanTerm(group);
+      if (name) query = query.eq('usage_group', name);
+    }
     query = applyListQuery(query, req, {
       usage_group: 'text', material: 'text', material_description: 'text', price: 'num', bun: 'text'
     }, 'material').range(offset, offset + limit - 1);

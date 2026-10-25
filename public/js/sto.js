@@ -60,10 +60,28 @@ function stockBadge(min, current, max) {
 }
 
 async function renderEdit(target) {
-  const state = { offset: 0 };
+  const state = { offset: 0, group: '' };
   const admin = rankOf('sto') >= 3;
   const seg = `<div class="seg" role="group" aria-label="หน้า transaction">${Object.entries(TX_PAGE).map(([id, label]) => `<button class="seg-btn${id === txPage ? ' is-active' : ''}" type="button" data-tx="${id}">${label}</button>`).join('')}</div>`;
-  target.innerHTML = `<div class="view-body">
+  const catalog = txPage === 'catalog';
+  target.innerHTML = catalog ? `<div class="view-body">
+    ${pageBar(seg, '', 'edit')}
+    <div class="tx-board">
+      <section class="tx-list">
+        <div class="tx-groups" id="edit-groups"></div>
+        ${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'หมายเลข ชื่อ หรือ group' })}
+        <div class="table-wrap sheet" id="edit-rows"></div>
+        ${tableFoot('edit')}
+      </section>
+      <aside class="tx-order">
+        <h2>สรุปคำสั่ง</h2>
+        <div class="tx-order-label">ชื่อ</div>
+        <div class="tx-order-name" id="edit-order-name">ยังไม่เลือก</div>
+        <div class="tx-order-lines" id="edit-order"></div>
+        <div id="edit-confirm-host"></div>
+      </aside>
+    </div>
+  </div>` : `<div class="view-body">
     ${pageBar(seg, `${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'ค้นหา' })}<div class="action-bar" id="edit-actions"></div>`, 'edit')}
     <div class="table-wrap sheet" id="edit-rows"></div>
     ${tableFoot('edit')}
@@ -75,24 +93,73 @@ async function renderEdit(target) {
     setPager('edit', state.offset, total);
   };
   const pageOf = (rows) => rows.slice(state.offset, state.offset + PAGE);
+  let groups = null;
   const load = async () => {
-    if (txPage === 'catalog') await loadCatalog();
-    else if (txPage === 'stock') await loadStock();
+    if (txPage === 'catalog') {
+      if (!groups) groups = (await api('/api/materials?part=groups')).groups || [];
+      await loadCatalog();
+    } else if (txPage === 'stock') await loadStock();
     else if (txPage === 'receive') await loadReceive();
     else if (editMode === 'summary') await loadSummary();
     else await loadList();
   };
+  const drawGroups = () => {
+    const named = (groups || []).filter((row) => row.name).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+    const blank = (groups || []).some((row) => !row.name);
+    const buttonOf = (value, label) => `<button class="tx-group${state.group === value ? ' is-active' : ''}" type="button" data-group="${esc(value)}">${esc(label)}</button>`;
+    $('edit-groups').innerHTML = [
+      buttonOf('', 'ทั้งหมด'),
+      ...named.map((row) => buttonOf(row.name, row.name)),
+      blank ? buttonOf('-', 'ยังไม่จัดกลุ่ม') : ''
+    ].join('');
+    $('edit-groups').querySelectorAll('[data-group]').forEach((node) => {
+      node.onclick = () => {
+        state.group = node.dataset.group;
+        state.offset = 0;
+        load().catch(onErr);
+      };
+    });
+  };
+  const loadOrder = async () => {
+    const mine = await api('/api/requisitions?scope=mine');
+    const header = mine.requisitions.find((row) => row.status === 'cart');
+    const cart = header ? (await api(`/api/requisitions/${header.id}`)).requisition : null;
+    const lines = cart?.lines || [];
+    $('edit-order-name').textContent = cart && cart.costcenter !== '-'
+      ? `${cart.costcenter}${cart.costcenterName ? ` · ${cart.costcenterName}` : ''}`
+      : 'ยังไม่เลือก';
+    $('edit-order').innerHTML = lines.length
+      ? lines.map((line) => `<div class="tx-line"><span class="tx-line-name">${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span><button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button></div>`).join('')
+      : '<p class="sum-meta">ยังไม่มีรายการ</p>';
+    $('edit-confirm-host').innerHTML = `<button class="btn btn-primary hold-btn" type="button" id="edit-confirm" title="กดค้าง 2 วินาที" ${lines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">ยืนยัน</span></button>`;
+    $('edit-order').querySelectorAll('[data-drop]').forEach((node) => {
+      node.onclick = () => confirmPopup('เอาออกจากสรุป', `ตรวจ ${esc(node.dataset.name)} อีกครั้งก่อนเอาออก`, async () => {
+        await api(`/api/requisitions/${cart.id}/lines/${node.dataset.drop}`, { method: 'DELETE' });
+        await loadOrder();
+      });
+    });
+    if (lines.length) {
+      bindHold($('edit-confirm'), async () => {
+        try {
+          await postStatus(cart.id, 'submitted', { costcenter: cart.costcenter });
+          toast('บันทึกการเบิกแล้ว');
+        } catch (err) { onErr(err); }
+        await loadOrder();
+      });
+    }
+  };
   const loadCatalog = async () => {
-    $('edit-q').placeholder = 'หมายเลข ชื่อ หรือ group';
-    $('edit-actions').innerHTML = '';
+    drawGroups();
     const params = tableParams(new URLSearchParams({ q: $('edit-q').value.trim(), offset: String(state.offset), limit: String(PAGE) }), head);
+    if (state.group) params.set('group', state.group);
     const data = await api(`/api/materials?${params}`);
     const rows = data.materials || [];
     fillTable('edit-rows', [{ label: 'กลุ่ม', key: 'usage_group' }, 'รูปภาพ', { label: 'รหัสรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'material_description' }, { label: 'ราคา', key: 'price' }, ''], rows.map((row) => `<tr><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}">+</button></td></tr>`).join(''), 'ไม่พบรายการ', columnHead());
     setFoot(rows.length, data.total || 0);
     $('edit-rows').querySelectorAll('[data-add]').forEach((node) => {
-      node.onclick = () => openCartPopup({ material: node.dataset.add, name: node.dataset.name || '', bun: node.dataset.bun || '' }).catch(onErr);
+      node.onclick = () => openCartPopup({ material: node.dataset.add, name: node.dataset.name || '', bun: node.dataset.bun || '' }, loadOrder).catch(onErr);
     });
+    await loadOrder();
   };
   const loadReceive = async () => {
     $('edit-q').placeholder = 'เลขที่หรือรายการ';
@@ -257,7 +324,7 @@ async function putInCart(material, qty, costcenter) {
   await api(`/api/requisitions/${id}/lines`, { method: 'POST', body: { material, qty, costcenter } });
 }
 
-async function openCartPopup(item) {
+async function openCartPopup(item, onDone) {
   const pay = await api('/api/pay-centers');
   const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
   const mine = await api('/api/requisitions?scope=mine');
@@ -280,6 +347,7 @@ async function openCartPopup(item) {
     await putInCart(item.material, qty, costcenter);
     toast('ใส่ตะกร้าแล้ว');
     closePopup();
+    if (onDone) await onDone();
   }, 'ใส่ตะกร้า');
 }
 
