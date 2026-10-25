@@ -24,6 +24,8 @@ function columnControl(column, value) {
 async function renderSystem(target) {
   const catalog = await api('/api/system/tables');
   const state = { offset: 0, editing: null, rows: [], selected: null };
+  const head = { sort: '', dir: 'asc', filters: {} };
+  const columnHead = () => ({ ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; state.offset = 0; loadRows().catch(onErr); } });
   target.innerHTML = tablePage('sys', `
     ${field('ตาราง', `<select id="sys-table">${catalog.tables.map((table) => `<option value="${esc(table.name)}">${esc(table.name)}</option>`).join('')}</select>`, 'grow')}
     ${searchSlot('ค้นหา', 'sys-q', 'sys-search', { grow: true })}
@@ -37,16 +39,19 @@ async function renderSystem(target) {
     $('sys-del').disabled = true;
     let data;
     try {
-      data = await api(`/api/system/tables/${encodeURIComponent(table.name)}?q=${encodeURIComponent($('sys-q').value.trim())}&offset=${state.offset}`);
+      const params = tableParams(new URLSearchParams({ q: $('sys-q').value.trim(), offset: String(state.offset) }), head);
+      data = await api(`/api/system/tables/${encodeURIComponent(table.name)}?${params}`);
     } catch (err) {
       fillTable('sys-rows', [], '', esc(err.message));
       countText('sys-count', 0, 0);
+      setPager('sys', 0, 0);
       throw err;
     }
     state.rows = data.rows;
     countText('sys-count', state.rows.length, data.total);
+    setPager('sys', state.offset, data.total);
     const visible = table.columns.filter((column) => column.type !== 'password');
-    fillTable('sys-rows', visible.map((column) => column.name), state.rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}</tr>`).join(''), 'ไม่มีแถว');
+    fillTable('sys-rows', visible.map((column) => ({ label: column.name, key: column.name })), state.rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}</tr>`).join(''), 'ไม่มีแถว', columnHead());
     bindRowSelect($('sys-rows'), (pick) => {
       state.selected = state.rows[Number(pick)];
       $('sys-edit').disabled = false;
@@ -80,7 +85,7 @@ async function renderSystem(target) {
     const fields = table.columns.map((column) => (column.type === 'read' ? '' : columnControl(column, state.editing ? state.editing[column.name] : ''))).join('');
     openPopup(`${state.editing ? 'แก้ไขแถว' : 'เพิ่มแถว'} ${esc(table.name)}`, fields, saveRow);
   };
-  $('sys-table').onchange = () => { state.offset = 0; state.editing = null; closePopup(); loadRows().catch(onErr); };
+  $('sys-table').onchange = () => { state.offset = 0; head.sort = ''; head.dir = 'asc'; head.filters = {}; state.editing = null; closePopup(); loadRows().catch(onErr); };
   $('sys-add').onclick = () => { state.editing = null; drawForm(); };
   $('sys-edit').onclick = () => { if (!state.selected) return toast('เลือกแถวก่อน', 'error'); state.editing = state.selected; drawForm(); };
   $('sys-del').onclick = () => {

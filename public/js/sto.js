@@ -66,15 +66,13 @@ async function renderEdit(target) {
   target.innerHTML = `<div class="view-body">
     ${pageBar(seg, `${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'ค้นหา' })}<div class="action-bar" id="edit-actions"></div>`, 'edit')}
     <div class="table-wrap sheet" id="edit-rows"></div>
-    <div class="table-foot">
-      <div class="sum-meta" id="edit-count"></div>
-      <div class="action-bar">${button('edit-prev', 'ก่อนหน้า')}${button('edit-next', 'ถัดไป')}</div>
-    </div>
+    ${tableFoot('edit')}
   </div>`;
+  const head = { sort: '', dir: 'asc', filters: {} };
+  const columnHead = () => ({ ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; state.offset = 0; load().catch(onErr); } });
   const setFoot = (shown, total) => {
     countText('edit-count', shown, total);
-    $('edit-prev').disabled = state.offset <= 0;
-    $('edit-next').disabled = state.offset + PAGE >= total;
+    setPager('edit', state.offset, total);
   };
   const pageOf = (rows) => rows.slice(state.offset, state.offset + PAGE);
   const load = async () => {
@@ -87,9 +85,10 @@ async function renderEdit(target) {
   const loadCatalog = async () => {
     $('edit-q').placeholder = 'หมายเลข ชื่อ หรือ group';
     $('edit-actions').innerHTML = '';
-    const data = await api(`/api/materials?q=${encodeURIComponent($('edit-q').value.trim())}&offset=${state.offset}&limit=${PAGE}`);
+    const params = tableParams(new URLSearchParams({ q: $('edit-q').value.trim(), offset: String(state.offset), limit: String(PAGE) }), head);
+    const data = await api(`/api/materials?${params}`);
     const rows = data.materials || [];
-    fillTable('edit-rows', ['กลุ่ม', 'รูปภาพ', 'รหัสรายการ', 'ชื่อรายการ', 'ราคา', ''], rows.map((row) => `<tr><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}">+</button></td></tr>`).join(''), 'ไม่พบรายการ');
+    fillTable('edit-rows', [{ label: 'กลุ่ม', key: 'usage_group' }, 'รูปภาพ', { label: 'รหัสรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'material_description' }, { label: 'ราคา', key: 'price' }, ''], rows.map((row) => `<tr><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}">+</button></td></tr>`).join(''), 'ไม่พบรายการ', columnHead());
     setFoot(rows.length, data.total || 0);
     $('edit-rows').querySelectorAll('[data-add]').forEach((node) => {
       node.onclick = () => openCartPopup({ material: node.dataset.add, name: node.dataset.name || '', bun: node.dataset.bun || '' }).catch(onErr);
@@ -104,9 +103,10 @@ async function renderEdit(target) {
   const loadStock = async () => {
     $('edit-q').placeholder = 'หมายเลขหรือชื่อ';
     $('edit-actions').innerHTML = '';
-    const data = await api(`/api/stock?q=${encodeURIComponent($('edit-q').value.trim())}&offset=${state.offset}`);
+    const params = tableParams(new URLSearchParams({ q: $('edit-q').value.trim(), offset: String(state.offset) }), head);
+    const data = await api(`/api/stock?${params}`);
     const rows = data.stock || [];
-    fillTable('edit-rows', ['costcenter', 'หมายเลขเลขรายการ', 'ชื่อรายการ', 'หน่วย', 'Min', 'Current', 'Max', 'สถานะ'], rows.map((row) => `<tr><td>${esc(row.costcenter)}</td><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${esc(row.bun)}</td><td>${row.minQty}</td><td>${row.currentQty}</td><td>${row.maxQty}</td><td>${stockBadge(row.minQty, row.currentQty, row.maxQty)}</td></tr>`).join(''), 'ยังไม่มียอดในขอบเขตของคุณ');
+    fillTable('edit-rows', [{ label: 'costcenter', key: 'costcenter' }, { label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'Min', key: 'minQty' }, { label: 'Current', key: 'currentQty' }, { label: 'Max', key: 'maxQty' }, 'สถานะ'], rows.map((row) => `<tr><td>${esc(row.costcenter)}</td><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${esc(row.bun)}</td><td>${row.minQty}</td><td>${row.currentQty}</td><td>${row.maxQty}</td><td>${stockBadge(row.minQty, row.currentQty, row.maxQty)}</td></tr>`).join(''), 'ยังไม่มียอดในขอบเขตของคุณ', columnHead());
     setFoot(rows.length, data.total || 0);
   };
   const loadList = async () => {
@@ -120,6 +120,7 @@ async function renderEdit(target) {
     }
     rows.sort((a, b) => Number(b.id) - Number(a.id));
     rows = rows.filter((row) => !term || `${row.id} ${row.requested_by} ${row.costcenter} ${row.costcenterName} ${STATUS[row.status] || ''}`.toLowerCase().includes(term));
+    rows = listQuery(rows, head, (row, key) => (key === 'status' ? STATUS[row.status] || row.status : key === 'costcenter' ? (row.costcenter === '-' ? '' : `${row.costcenter} ${row.costcenterName || ''}`) : row[key]));
     const page = pageOf(rows);
     $('edit-actions').innerHTML = [
       button('edit-withdraw', 'เบิก', 'primary'),
@@ -128,7 +129,7 @@ async function renderEdit(target) {
       admin ? button('edit-prepare', 'จัดเตรียม', 'secondary', 'disabled') + button('edit-issue', 'จ่าย', 'secondary', 'disabled') : '',
       button('edit-receive', 'รับ', 'primary', 'disabled')
     ].join('');
-    fillTable('edit-rows', ['เลขที่', 'ผู้เบิก', 'costcenter', 'สถานะ'], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก');
+    fillTable('edit-rows', [{ label: 'เลขที่', key: 'id' }, { label: 'ผู้เบิก', key: 'requested_by' }, { label: 'costcenter', key: 'costcenter' }, { label: 'สถานะ', key: 'status' }], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก', columnHead());
     setFoot(page.length, rows.length);
     bindRowSelect($('edit-rows'), (_id, row) => {
       const own = row.dataset.own === '1';
@@ -183,7 +184,7 @@ async function renderEdit(target) {
     const cart = (await api(`/api/requisitions/${cartHeader.id}`)).requisition;
     const term = $('edit-q').value.trim().toLowerCase();
     const allLines = cart.lines || [];
-    const lines = allLines.filter((line) => !term || `${line.material} ${line.materialDescription}`.toLowerCase().includes(term));
+    const lines = listQuery(allLines.filter((line) => !term || `${line.material} ${line.materialDescription}`.toLowerCase().includes(term)), head, (line, key) => (key === 'materialDescription' ? line.materialDescription : key === 'qty' ? line.qty : line[key]));
     const page = pageOf(lines);
     let picked = null;
     $('edit-q').placeholder = 'รหัสหรือชื่อในสรุป';
@@ -194,7 +195,7 @@ async function renderEdit(target) {
       button('edit-line-del', 'ลบ', 'danger', 'disabled'),
       `<button class="btn btn-primary hold-btn" type="button" id="edit-hold" ${allLines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">กดค้าง 2 วินาที</span></button>`
     ].join('');
-    fillTable('edit-rows', [...LINE_HEAD, 'จำนวน', 'costcenter'], page.map((line) => `<tr data-pick="${esc(line.id)}" data-qty="${Number(line.qty)}" data-material="${esc(line.material)}" data-name="${esc(line.materialDescription)}" data-bun="${esc(line.bun)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${esc(line.bun)}</td><td>${Number(line.qty)}</td><td>${esc(line.costcenter === '-' ? cart.costcenter : line.costcenter)}</td></tr>`).join(''), 'ยังไม่มีรายการ กดเพิ่ม');
+    fillTable('edit-rows', [{ label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'จำนวน', key: 'qty' }, { label: 'costcenter', key: 'costcenter' }], page.map((line) => `<tr data-pick="${esc(line.id)}" data-qty="${Number(line.qty)}" data-material="${esc(line.material)}" data-name="${esc(line.materialDescription)}" data-bun="${esc(line.bun)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${esc(line.bun)}</td><td>${Number(line.qty)}</td><td>${esc(line.costcenter === '-' ? cart.costcenter : line.costcenter)}</td></tr>`).join(''), 'ยังไม่มีรายการ กดเพิ่ม', columnHead());
     setFoot(page.length, lines.length);
     bindRowSelect($('edit-rows'), (_id, row) => { picked = row; $('edit-line').disabled = false; $('edit-line-del').disabled = false; });
     $('edit-back').onclick = () => { $('edit-q').value = ''; state.offset = 0; showEdit('list'); };
@@ -338,6 +339,8 @@ function centerText(row) {
 
 async function renderUsers(target) {
   const state = { offset: 0, selected: null, rows: [], formMode: 'add' };
+  const head = { sort: '', dir: 'asc', filters: {} };
+  const columnHead = () => ({ ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; state.offset = 0; loadRows().catch(onErr); } });
   target.innerHTML = tablePage('usage', `
     ${field('ตาราง', '<select id="usage-table"><option value="members">mt_sto_user</option><option value="materials">mt_sto_usage</option></select>', 'grow')}
     ${searchSlot('ค้นหา', 'usage-q', 'usage-search', { grow: true })}
@@ -399,17 +402,20 @@ async function renderUsers(target) {
     $('usage-edit').disabled = true;
     $('usage-del').disabled = true;
     if (kind() === 'materials') {
-      const data = await api(`/api/usage-materials?q=${encodeURIComponent($('usage-q').value.trim())}&offset=${state.offset}`);
+      const params = tableParams(new URLSearchParams({ q: $('usage-q').value.trim(), offset: String(state.offset) }), head);
+      const data = await api(`/api/usage-materials?${params}`);
       state.rows = data.materials;
       countText('usage-count', state.rows.length, data.total);
-      fillTable('usage-rows', ['กลุ่ม', 'รูปภาพ', 'รหัสรายการ', 'ชื่อรายการ', 'ราคา', 'หน่วย', 'สกุลเงิน', 'สถานะ'], state.rows.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td>${esc(row.bun)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีรายการ');
+      setPager('usage', state.offset, data.total);
+      fillTable('usage-rows', [{ label: 'กลุ่ม', key: 'usage_group' }, 'รูปภาพ', { label: 'รหัสรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'material_description' }, { label: 'ราคา', key: 'price' }, { label: 'หน่วย', key: 'bun' }, { label: 'สกุลเงิน', key: 'crcy' }, { label: 'สถานะ', key: 'status' }], state.rows.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td>${esc(row.bun)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีรายการ', columnHead());
     } else {
       const term = $('usage-q').value.trim().toLowerCase();
-      const filtered = (await api('/api/users')).users.filter((row) => !term || [row.employeeId, row.name, row.department, centerText(row), row.role].join(' ').toLowerCase().includes(term));
+      const filtered = listQuery((await api('/api/users')).users.filter((row) => !term || [row.employeeId, row.name, row.department, centerText(row), row.role].join(' ').toLowerCase().includes(term)), head, (row, key) => (key === 'costcenter' ? centerText(row) : key === 'role' ? USAGE_ROLE[row.role] || row.role : row[key]));
       const page = filtered.slice(state.offset, state.offset + PAGE);
       state.rows = page;
       countText('usage-count', page.length, filtered.length);
-      fillTable('usage-rows', ['รหัส', 'ชื่อ', 'หน่วยงาน', 'costcenter', 'บทบาท', 'สถานะ'], page.map((row, index) => `<tr data-pick="${index}" data-creator="${row.creator ? '1' : '0'}"><td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีแถว');
+      setPager('usage', state.offset, filtered.length);
+      fillTable('usage-rows', [{ label: 'รหัส', key: 'employeeId' }, { label: 'ชื่อ', key: 'name' }, { label: 'หน่วยงาน', key: 'department' }, { label: 'costcenter', key: 'costcenter' }, { label: 'บทบาท', key: 'role' }, { label: 'สถานะ', key: 'status' }], page.map((row, index) => `<tr data-pick="${index}" data-creator="${row.creator ? '1' : '0'}"><td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีแถว', columnHead());
     }
     bindRowSelect($('usage-rows'), (pick, row) => {
       state.selected = state.rows[Number(pick)];
@@ -433,7 +439,7 @@ async function renderUsers(target) {
     closePopup();
     await loadRows();
   };
-  $('usage-table').onchange = () => { state.offset = 0; $('usage-q').value = ''; closePopup(); loadRows().catch(onErr); };
+  $('usage-table').onchange = () => { state.offset = 0; head.sort = ''; head.dir = 'asc'; head.filters = {}; $('usage-q').value = ''; closePopup(); loadRows().catch(onErr); };
   $('usage-add').onclick = () => { state.selected = null; state.formMode = 'add'; drawForm(); };
   $('usage-edit').onclick = () => { if (!state.selected) return toast('เลือกแถวก่อน', 'error'); state.formMode = 'edit'; drawForm(); };
   $('usage-del').onclick = () => {

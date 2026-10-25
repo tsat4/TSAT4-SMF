@@ -27,6 +27,33 @@ export function cleanTerm(value) {
   return String(value || '').trim().replace(/[%_,]/g, '').slice(0, 40);
 }
 
+// Column filter + A–Z sort for paged tables. `fields` maps an allowed column to 'text' or 'num'.
+export function listFilters(req) {
+  try {
+    const raw = JSON.parse(String(req.query.filters || '').slice(0, 500) || '{}');
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    return raw;
+  } catch {
+    return {};
+  }
+}
+
+export function applyListQuery(query, req, fields, fallback) {
+  const filters = listFilters(req);
+  for (const [key, value] of Object.entries(filters)) {
+    const kind = fields[key];
+    const term = cleanTerm(value);
+    if (!kind || !term) continue;
+    if (kind === 'num') {
+      const n = Number(term);
+      if (Number.isFinite(n)) query = query.eq(key, n);
+    } else query = query.ilike(key, `%${term}%`);
+  }
+  const sort = fields[req.query.sort] ? req.query.sort : fallback;
+  const ascending = req.query.sort ? req.query.dir !== 'desc' : true;
+  return query.order(sort, { ascending, nullsFirst: false });
+}
+
 export function adminWriteError(error, fallback) {
   const code = error?.code;
   const message = String(error?.message || '');

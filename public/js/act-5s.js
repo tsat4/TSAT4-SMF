@@ -229,6 +229,11 @@ function a5EmployeeSearch(activity, onPick) {
 }
 
 const A5_EMP_FIELDS = searchBlock(searchSlot('ค้นพนักงาน', 'a5-emp-q', 'a5-emp-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน' }), 'a5-emp-list');
+const a5Heads = { areas: { sort: '', dir: 'asc', filters: {} }, team: { sort: '', dir: 'asc', filters: {} }, check: { sort: '', dir: 'asc', filters: {} } };
+function a5ColumnHead(key, reload) {
+  const head = a5Heads[key];
+  return { ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; reload(); } };
+}
 
 async function a5SetAreas(body, activity, admin, rerender) {
   const data = await a5Api(activity, `areas?year=${a5Year}`);
@@ -237,7 +242,8 @@ async function a5SetAreas(body, activity, admin, rerender) {
     ${admin ? `<div class="action-bar a5-actions">${button('a5-add', 'เพิ่มพื้นที่', 'primary')}${button('a5-edit', 'แก้ไข', 'secondary', 'disabled')}${button('a5-owner', 'กำหนดเจ้าของปี ' + a5Year, 'secondary', 'disabled')}${button('a5-del', 'ลบ', 'danger', 'disabled')}</div>` : ''}
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${data.areas.length} พื้นที่ · เจ้าของพื้นที่แยกตามปี (ปี ${a5Year})</p>`;
-  fillTable('a5-rows', ['รหัส', 'ประเภท', 'ชื่อพื้นที่', 'Section', `เจ้าของปี ${a5Year}`, 'สถานะ'], data.areas.map((a) => `<tr data-pick="${a.id}"><td>${esc(a.code)}</td><td>${esc(a.area_type)}</td><td>${esc(a.name)}</td><td>${esc(a.section || '')}</td><td>${a.owner ? `${esc(a.owner.employeeId)} · ${esc(a.owner.name)}` : '<span class="sum-meta">ยังไม่กำหนด</span>'}</td><td>${esc(a.status)}</td></tr>`).join(''), 'ยังไม่มีพื้นที่');
+  const areas = listQuery(data.areas, a5Heads.areas, (a, key) => (key === 'owner' ? (a.owner ? `${a.owner.employeeId} ${a.owner.name}` : '') : a[key] || ''));
+  fillTable('a5-rows', [{ label: 'รหัส', key: 'code' }, { label: 'ประเภท', key: 'area_type' }, { label: 'ชื่อพื้นที่', key: 'name' }, { label: 'Section', key: 'section' }, { label: `เจ้าของปี ${a5Year}`, key: 'owner' }, { label: 'สถานะ', key: 'status' }], areas.map((a) => `<tr data-pick="${a.id}"><td>${esc(a.code)}</td><td>${esc(a.area_type)}</td><td>${esc(a.name)}</td><td>${esc(a.section || '')}</td><td>${a.owner ? `${esc(a.owner.employeeId)} · ${esc(a.owner.name)}` : '<span class="sum-meta">ยังไม่กำหนด</span>'}</td><td>${esc(a.status)}</td></tr>`).join(''), 'ยังไม่มีพื้นที่', a5ColumnHead('areas', () => a5SetAreas(body, activity, admin, rerender).catch(onErr)));
   a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => {
@@ -282,12 +288,12 @@ async function a5SetTeam(body, activity, admin, rerender) {
   const data = await a5Api(activity, `team?year=${a5Year}`);
   let picked = null;
   const order = { admin: 0, chairman: 1, auditor: 2 };
-  const rows = [...data.members].sort((a, b) => order[a.role] - order[b.role] || String(a.team || '').localeCompare(String(b.team || '')) || String(a.employee_id).localeCompare(String(b.employee_id)));
+  const rows = listQuery([...data.members].sort((a, b) => order[a.role] - order[b.role] || String(a.team || '').localeCompare(String(b.team || '')) || String(a.employee_id).localeCompare(String(b.employee_id))), a5Heads.team, (m, key) => (key === 'role' ? A5_ROLE_LABEL[m.role] || m.role : m[key] || ''));
   body.innerHTML = `
     ${admin ? `<div class="action-bar a5-actions">${button('a5-add', 'เพิ่มรายชื่อ', 'primary')}${button('a5-del', 'ลบ', 'danger', 'disabled')}${button('a5-copy', `คัดลอกจากปี ${a5Year - 1}`)}</div>` : ''}
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${rows.length} รายชื่อ · Admin เข้า Setting ได้ · หัวหน้าทีม / ผู้ตรวจ / เจ้าของพื้นที่ เข้า transaction ได้</p>`;
-  fillTable('a5-rows', ['บทบาท', 'ทีม', 'รหัส', 'ชื่อ', 'หน่วยงาน', 'สถานะ'], rows.map((m) => `<tr data-pick="${m.id}"><td>${esc(A5_ROLE_LABEL[m.role] || m.role)}</td><td>${m.team ? `<span class="a5-dot is-done" style="--team:${a5TeamColor(m.team)}"></span> ${esc(m.team)}` : ''}</td><td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td>${esc(m.department)}</td><td>${esc(m.status)}</td></tr>`).join(''), `ยังไม่มีทีมปี ${a5Year}`);
+  fillTable('a5-rows', [{ label: 'บทบาท', key: 'role' }, { label: 'ทีม', key: 'team' }, { label: 'รหัส', key: 'employee_id' }, { label: 'ชื่อ', key: 'name' }, { label: 'หน่วยงาน', key: 'department' }, { label: 'สถานะ', key: 'status' }], rows.map((m) => `<tr data-pick="${m.id}"><td>${esc(A5_ROLE_LABEL[m.role] || m.role)}</td><td>${m.team ? `<span class="a5-dot is-done" style="--team:${a5TeamColor(m.team)}"></span> ${esc(m.team)}` : ''}</td><td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td>${esc(m.department)}</td><td>${esc(m.status)}</td></tr>`).join(''), `ยังไม่มีทีมปี ${a5Year}`, a5ColumnHead('team', () => a5SetTeam(body, activity, admin, rerender).catch(onErr)));
   a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => { picked = rows.find((m) => String(m.id) === id); $('a5-del').disabled = !picked; });
@@ -327,7 +333,8 @@ async function a5SetChecklist(body, activity, admin, rerender) {
     ${admin ? `<div class="action-bar a5-actions">${button('a5-add', 'เพิ่มหัวข้อ', 'primary')}${button('a5-edit', 'แก้ไข', 'secondary', 'disabled')}${button('a5-del', 'ลบ', 'danger', 'disabled')}${button('a5-copy', `คัดลอกจากปี ${a5Year - 1}`)}</div>` : ''}
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${data.items.length} ข้อ · คะแนนเต็มรวม ${total} · หัวข้อแยกตามปี แก้ปีนี้ไม่กระทบผลตรวจปีก่อน</p>`;
-  fillTable('a5-rows', ['ข้อที่', 'หมวด', 'หัวข้อตรวจ', 'คะแนนเต็ม', 'สถานะ'], data.items.map((i) => `<tr data-pick="${i.id}"><td>${i.item_no}</td><td>${esc(a5GroupName(activity, i.s_group))}</td><td>${esc(i.title)}</td><td>${i.score_max}</td><td>${esc(i.status)}</td></tr>`).join(''), `ยังไม่มีหัวข้อปี ${a5Year}`);
+  const items = listQuery(data.items, a5Heads.check, (i, key) => (key === 's_group' ? a5GroupName(activity, i.s_group) : i[key]));
+  fillTable('a5-rows', [{ label: 'ข้อที่', key: 'item_no' }, { label: 'หมวด', key: 's_group' }, { label: 'หัวข้อตรวจ', key: 'title' }, { label: 'คะแนนเต็ม', key: 'score_max' }, { label: 'สถานะ', key: 'status' }], items.map((i) => `<tr data-pick="${i.id}"><td>${i.item_no}</td><td>${esc(a5GroupName(activity, i.s_group))}</td><td>${esc(i.title)}</td><td>${i.score_max}</td><td>${esc(i.status)}</td></tr>`).join(''), `ยังไม่มีหัวข้อปี ${a5Year}`, a5ColumnHead('check', () => a5SetChecklist(body, activity, admin, rerender).catch(onErr)));
   a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => { picked = data.items.find((i) => String(i.id) === id); $('a5-edit').disabled = !picked; $('a5-del').disabled = !picked; });

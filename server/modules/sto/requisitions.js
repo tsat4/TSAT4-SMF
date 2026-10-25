@@ -1,5 +1,5 @@
 import { mx } from '../../core/db.js';
-import { fail, wrap, qtyOf, cleanTerm } from '../../core/http.js';
+import { fail, wrap, qtyOf, cleanTerm, listFilters } from '../../core/http.js';
 import { atLeast, rankIn } from '../../core/access.js';
 import { requireUser } from '../../core/users.js';
 import { centersForDepartments, costcenterMap, ownCenter } from '../../core/master.js';
@@ -125,11 +125,27 @@ export function mountRequisitions(app, mod) {
     if (!codes.length) return res.json({ stock: [], total: 0 });
     const term = cleanTerm(req.query.q);
     const offset = Math.max(0, Number(req.query.offset) || 0);
+    const filters = listFilters(req);
+    const nameTerm = cleanTerm(filters.materialDescription);
+    const bunTerm = cleanTerm(filters.bun);
+    const embed = nameTerm || bunTerm ? 'mt_sto_usage!inner(material_description,bun)' : 'mt_sto_usage(material_description,bun)';
     let query = mx.from('mt_sto_stock')
-      .select('costcenter,material,min_qty,current_qty,max_qty,mt_sto_usage(material_description,bun)', { count: 'exact' })
-      .in('costcenter', codes)
-      .order('material')
-      .range(offset, offset + 49);
+      .select(`costcenter,material,min_qty,current_qty,max_qty,${embed}`, { count: 'exact' })
+      .in('costcenter', codes);
+    if (cleanTerm(filters.costcenter)) query = query.ilike('costcenter', `%${cleanTerm(filters.costcenter)}%`);
+    if (cleanTerm(filters.material)) query = query.ilike('material', `%${cleanTerm(filters.material)}%`);
+    for (const [key, column] of [['minQty', 'min_qty'], ['currentQty', 'current_qty'], ['maxQty', 'max_qty']]) {
+      const n = Number(cleanTerm(filters[key]));
+      if (Number.isFinite(n) && cleanTerm(filters[key])) query = query.eq(column, n);
+    }
+    if (nameTerm) query = query.ilike('mt_sto_usage.material_description', `%${nameTerm}%`);
+    if (bunTerm) query = query.ilike('mt_sto_usage.bun', `%${bunTerm}%`);
+    const ascending = req.query.sort ? req.query.dir !== 'desc' : true;
+    const localSort = { costcenter: 'costcenter', material: 'material', minQty: 'min_qty', currentQty: 'current_qty', maxQty: 'max_qty' };
+    if (req.query.sort === 'materialDescription') query = query.order('material_description', { foreignTable: 'mt_sto_usage', ascending, nullsFirst: false });
+    else if (req.query.sort === 'bun') query = query.order('bun', { foreignTable: 'mt_sto_usage', ascending, nullsFirst: false });
+    else query = query.order(localSort[req.query.sort] || 'material', { ascending, nullsFirst: false });
+    query = query.range(offset, offset + 49);
     if (term) {
       const found = await mx.from('mt_sto_usage').select('material').or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`).limit(200);
       const materials = (found.data || []).map((row) => row.material);

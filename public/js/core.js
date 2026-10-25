@@ -72,19 +72,127 @@ function crudBar(prefix) {
   return `<div class="action-bar">${button(`${prefix}-add`, 'เพิ่ม', 'primary')}${button(`${prefix}-edit`, 'แก้ไข', 'secondary', 'disabled')}${button(`${prefix}-del`, 'ลบ', 'danger', 'disabled')}</div>`;
 }
 
-function tablePage(prefix, toolbar) {
-  return `<div class="toolbar">${toolbar}</div>
-    <div class="table-wrap sheet" id="${prefix}-rows"></div>
-    <div class="table-foot">
+function tableFoot(prefix) {
+  return `<div class="table-foot">
       <div class="sum-meta" id="${prefix}-count"></div>
-      <div class="action-bar">${button(`${prefix}-prev`, 'ก่อนหน้า')}${button(`${prefix}-next`, 'ถัดไป')}</div>
+      <div class="pager">${button(`${prefix}-prev`, 'ก่อนหน้า')}<span class="pager-page" id="${prefix}-page"></span>${button(`${prefix}-next`, 'ถัดไป')}</div>
+      <div class="table-foot-end"></div>
     </div>`;
 }
 
-function fillTable(id, headers, rows, emptyText) {
-  $(id).innerHTML = rows
-    ? `<table class="mo-data-table"><thead><tr>${headers.map((name) => `<th>${esc(name)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`
-    : `<p class="empty">${emptyText}</p>`;
+function tablePage(prefix, toolbar) {
+  return `<div class="toolbar">${toolbar}</div>
+    <div class="table-wrap sheet" id="${prefix}-rows"></div>
+    ${tableFoot(prefix)}`;
+}
+
+function setPager(prefix, offset, total) {
+  const pages = Math.max(1, Math.ceil(Number(total) / PAGE) || 1);
+  const page = total > 0 ? Math.min(pages, Math.floor(offset / PAGE) + 1) : 1;
+  const label = $(`${prefix}-page`);
+  if (label) label.textContent = `หน้า ${page} / ${pages}`;
+  const prev = $(`${prefix}-prev`);
+  const next = $(`${prefix}-next`);
+  if (prev) prev.disabled = page <= 1;
+  if (next) next.disabled = page >= pages || !(total > 0);
+}
+
+function listQuery(rows, head, valueOf) {
+  const filters = head?.filters || {};
+  const filtered = rows.filter((row) => Object.entries(filters).every(([key, term]) => {
+    const want = String(term || '').trim().toLowerCase();
+    if (!want) return true;
+    return String(valueOf(row, key) ?? '').toLowerCase().includes(want);
+  }));
+  if (!head?.sort) return filtered;
+  const dir = head.dir === 'desc' ? -1 : 1;
+  const compare = (a, b) => {
+    const as = String(a ?? '').trim();
+    const bs = String(b ?? '').trim();
+    if (!as && bs) return 1;
+    if (as && !bs) return -1;
+    if (/^-?\d+(\.\d+)?$/.test(as) && /^-?\d+(\.\d+)?$/.test(bs)) return Number(as) - Number(bs);
+    return as.localeCompare(bs, 'th', { numeric: true, sensitivity: 'base' });
+  };
+  return [...filtered].sort((a, b) => dir * compare(valueOf(a, head.sort), valueOf(b, head.sort)));
+}
+
+function fillTable(id, headers, rows, emptyText, head) {
+  document.querySelector('.col-menu')?.remove();
+  const cells = headers.map((header) => {
+    const label = typeof header === 'string' ? header : header.label;
+    const key = typeof header === 'string' ? '' : header.key;
+    if (!head || !key) return `<th>${esc(label)}</th>`;
+    const filtered = String(head.filters?.[key] || '').trim();
+    const asc = head.sort === key && head.dir !== 'desc';
+    const desc = head.sort === key && head.dir === 'desc';
+    return `<th class="has-menu"><div class="th-line"><span class="th-label">${esc(label)}</span><button class="th-tool${filtered ? ' is-active' : ''}" type="button" data-col-filter="${esc(key)}" aria-label="กรอง"><span class="material-symbols-rounded">filter_alt</span></button><button class="th-tool${asc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" data-dir="asc" aria-label="เรียง A ไป Z">A-Z</button><button class="th-tool${desc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" data-dir="desc" aria-label="เรียง Z ไป A">Z-A</button></div></th>`;
+  }).join('');
+  const body = rows || `<tr><td class="empty" colspan="${Math.max(headers.length, 1)}">${emptyText}</td></tr>`;
+  const node = $(id);
+  if (!rows && !head) {
+    node.innerHTML = `<p class="empty">${emptyText}</p>`;
+    return;
+  }
+  node.innerHTML = `<table class="mo-data-table"><thead><tr>${cells}</tr></thead><tbody>${body}</tbody></table>`;
+  if (!head) return;
+  node.querySelectorAll('[data-col-sort]').forEach((btn) => {
+    btn.onclick = (event) => {
+      event.stopPropagation();
+      const key = btn.dataset.colSort;
+      const dir = btn.dataset.dir === 'desc' ? 'desc' : 'asc';
+      const same = head.sort === key && head.dir === dir;
+      head.onChange({ sort: same ? '' : key, dir: same ? 'asc' : dir, filters: head.filters || {} });
+    };
+  });
+  node.querySelectorAll('[data-col-filter]').forEach((btn) => {
+    btn.onclick = (event) => {
+      event.stopPropagation();
+      openColumnFilter(btn, head);
+    };
+  });
+}
+
+function openColumnFilter(button, head) {
+  document.querySelector('.col-menu')?.remove();
+  const key = button.dataset.colFilter;
+  const menu = document.createElement('div');
+  menu.className = 'col-menu';
+  menu.innerHTML = `<label class="field">กรอง<input id="col-filter-q" value="${esc(head.filters?.[key] || '')}"></label><div class="popup-actions">${button('col-filter-clear', 'ล้าง')}${button('col-filter-apply', 'กรอง', 'primary')}</div>`;
+  document.body.appendChild(menu);
+  const rect = button.getBoundingClientRect();
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 220))}px`;
+  const apply = (clear) => {
+    const filters = { ...(head.filters || {}) };
+    const term = clear ? '' : $('col-filter-q').value.trim();
+    if (term) filters[key] = term;
+    else delete filters[key];
+    menu.remove();
+    head.onChange({ sort: head.sort || '', dir: head.dir === 'desc' ? 'desc' : 'asc', filters });
+  };
+  $('col-filter-apply').onclick = () => apply(false);
+  $('col-filter-clear').onclick = () => apply(true);
+  onEnter('col-filter-q', () => apply(false));
+  setTimeout(() => {
+    const close = (event) => {
+      if (menu.contains(event.target)) return;
+      menu.remove();
+      document.removeEventListener('mousedown', close);
+    };
+    document.addEventListener('mousedown', close);
+  }, 0);
+  $('col-filter-q')?.focus();
+}
+
+function tableParams(query, head) {
+  if (head?.sort) {
+    query.set('sort', head.sort);
+    query.set('dir', head.dir === 'desc' ? 'desc' : 'asc');
+  }
+  const filters = Object.fromEntries(Object.entries(head?.filters || {}).filter(([, value]) => String(value || '').trim()));
+  if (Object.keys(filters).length) query.set('filters', JSON.stringify(filters));
+  return query;
 }
 
 function countText(id, shown, total) {

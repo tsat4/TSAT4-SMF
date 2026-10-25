@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { mx, tx } from '../../core/db.js';
-import { fail, wrap, cleanTerm, adminWriteError } from '../../core/http.js';
+import { fail, wrap, cleanTerm, adminWriteError, listFilters } from '../../core/http.js';
 import { CREATOR_ID, MEMBER_TABLES, creatorOnly, defineModule } from '../../core/access.js';
 import { requireUser } from '../../core/users.js';
 import { MAIN_TABLES } from '../../core/tables.js';
@@ -101,7 +101,17 @@ export default defineModule({
       const offset = Math.max(0, Number(req.query.offset) || 0);
       const readable = spec.columns.filter((column) => column.type !== 'password').map((column) => column.name);
       let query = client.from(req.params.name).select(readable.join(','), { count: 'exact' }).range(offset, offset + 49);
-      query = query.order(spec.pk[0], { ascending: true });
+      const filters = listFilters(req);
+      for (const column of spec.columns) {
+        const term = cleanTerm(filters[column.name]);
+        if (!term || !readable.includes(column.name)) continue;
+        if (['int', 'qty', 'money'].includes(column.type)) {
+          const n = Number(term);
+          if (Number.isFinite(n)) query = query.eq(column.name, n);
+        } else query = query.ilike(column.name, `%${term}%`);
+      }
+      const sort = readable.includes(req.query.sort) ? req.query.sort : spec.pk[0];
+      query = query.order(sort, { ascending: req.query.sort ? req.query.dir !== 'desc' : true, nullsFirst: false });
       if (term) {
         const filters = spec.columns.filter((column) => column.type === 'text' || CHOICES[column.type]).map((column) => `${column.name}.ilike.%${term}%`);
         if (filters.length) query = query.or(filters.join(','));

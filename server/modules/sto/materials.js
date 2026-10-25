@@ -1,5 +1,5 @@
 import { mx } from '../../core/db.js';
-import { fail, wrap, amountOf, cleanTerm, adminWriteError } from '../../core/http.js';
+import { fail, wrap, amountOf, cleanTerm, adminWriteError, applyListQuery } from '../../core/http.js';
 import { atLeast } from '../../core/access.js';
 import { requireUser } from '../../core/users.js';
 
@@ -26,9 +26,10 @@ export function mountMaterials(app, mod) {
     const term = cleanTerm(req.query.q);
     const offset = Math.max(0, Number(req.query.offset) || 0);
     let query = mx.from('mt_sto_usage')
-      .select('no,material,material_description,bun,price,crcy,status,usage_group,img', { count: 'exact' })
-      .order('material')
-      .range(offset, offset + 49);
+      .select('no,material,material_description,bun,price,crcy,status,usage_group,img', { count: 'exact' });
+    query = applyListQuery(query, req, {
+      usage_group: 'text', material: 'text', material_description: 'text', price: 'num', bun: 'text', crcy: 'text', status: 'text'
+    }, 'material').range(offset, offset + 49);
     if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`);
     const { data, error, count } = await query;
     if (error) return fail(res, 400, 'อ่านรายการไม่ได้');
@@ -106,9 +107,10 @@ export function mountMaterials(app, mod) {
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     let query = mx.from('mt_sto_usage')
       .select('material,material_description,bun,price,status,usage_group,img', { count: 'exact' })
-      .eq('status', 'Active')
-      .order('material')
-      .range(offset, offset + limit - 1);
+      .eq('status', 'Active');
+    query = applyListQuery(query, req, {
+      usage_group: 'text', material: 'text', material_description: 'text', price: 'num', bun: 'text'
+    }, 'material').range(offset, offset + limit - 1);
     if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`);
     const { data, error, count } = await query;
     if (error) return fail(res, 400, 'ค้นหารายการไม่ได้');

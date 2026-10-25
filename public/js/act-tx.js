@@ -86,6 +86,12 @@ async function atxPage(target, activity) {
 const atxFilter = { quarter: '', type: '', areaType: '', area: '', q: '' };
 const ATX_QUARTERS = { '': 'ทั้งปี', 1: 'Q1 (ม.ค.–มี.ค.)', 2: 'Q2 (เม.ย.–มิ.ย.)', 3: 'Q3 (ก.ค.–ก.ย.)', 4: 'Q4 (ต.ค.–ธ.ค.)' };
 
+const atxHeads = { audits: { sort: '', dir: 'asc', filters: {} }, issues: { sort: '', dir: 'asc', filters: {} } };
+function atxColumnHead(key, reload) {
+  const head = atxHeads[key];
+  return { ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; reload(); } };
+}
+
 async function atxAudits(body, activity, me) {
   const data = await a5Api(activity, `audits?year=${a5Year}`);
   const canAudit = me.access.admin || me.access.chairman || me.access.auditor || me.access.ownerAreaIds.length > 0;
@@ -105,22 +111,22 @@ async function atxAudits(body, activity, me) {
   let picked = null;
   const draw = () => {
     const term = atxFilter.q.trim().toLowerCase();
-    const rows = data.audits.filter((a) => {
+    const rows = listQuery(data.audits.filter((a) => {
       const month = actDate(String(a.audited_at).slice(0, 10)).getMonth() + 1;
       return (!atxFilter.quarter || Math.ceil(month / 3) === Number(atxFilter.quarter))
         && (!atxFilter.type || a.audit_type === atxFilter.type)
         && (!atxFilter.areaType || a.areaType === atxFilter.areaType)
         && (!atxFilter.area || String(a.area_id) === String(atxFilter.area))
         && (!term || `${a.audit_no} ${a.areaCode} ${a.areaName}`.toLowerCase().includes(term));
-    });
-    fillTable('atx-rows', ['วันที่', 'Audit ID', 'ประเภท', 'ประเภทพื้นที่', 'พื้นที่', 'ทีม', 'คะแนน', '%', 'ผล', 'สถานะ'], rows.map((a) => `<tr data-pick="${a.id}">
+    }), atxHeads.audits, (a, key) => (key === 'audited_at' ? String(a.audited_at).slice(0, 10) : a[key] ?? ''));
+    fillTable('atx-rows', [{ label: 'วันที่', key: 'audited_at' }, { label: 'Audit ID', key: 'audit_no' }, { label: 'ประเภท', key: 'audit_type' }, { label: 'ประเภทพื้นที่', key: 'areaType' }, { label: 'พื้นที่', key: 'areaName' }, { label: 'ทีม', key: 'team' }, { label: 'คะแนน', key: 'total_score' }, { label: '%', key: 'percent_score' }, { label: 'ผล', key: 'result' }, { label: 'สถานะ', key: 'status' }], rows.map((a) => `<tr data-pick="${a.id}">
       <td>${String(a.audited_at).slice(0, 10)}</td><td>${esc(a.audit_no)}</td>
       <td><span class="badge ${a.audit_type === 'COMMITTEE' ? 'badge-primary' : 'badge-warning'}">${esc(a.audit_type)}</span></td>
       <td>${esc(a.areaType || '')}</td><td>${esc(a.areaName || '')}</td>
       <td>${a.team ? `<span class="a5-dot is-done" style="--team:${a5TeamColor(a.team)}"></span> ${esc(a.team)}` : '-'}</td>
       <td>${Number(a.total_score)}</td><td>${Number(a.percent_score)}%</td>
       <td><span class="badge ${a.result === 'PASS' ? '' : 'badge-danger'}">${esc(a.result || '-')}</span></td>
-      <td><span class="badge ${a.status === 'COMPLETED' ? 'badge-success' : 'badge-warning'}">${esc(a.status)}</span>${a.openIssues ? ` <span class="sum-meta">Issue ค้าง ${a.openIssues}</span>` : ''}</td></tr>`).join(''), `ยังไม่มีใบตรวจปี ${a5Year}`);
+      <td><span class="badge ${a.status === 'COMPLETED' ? 'badge-success' : 'badge-warning'}">${esc(a.status)}</span>${a.openIssues ? ` <span class="sum-meta">Issue ค้าง ${a.openIssues}</span>` : ''}</td></tr>`).join(''), `ยังไม่มีใบตรวจปี ${a5Year}`, atxColumnHead('audits', () => draw()));
     $('atx-count').textContent = `แสดง ${rows.length} จาก ${data.audits.length} ใบตรวจ · เลือกแถวแล้วแก้ไขคะแนนหรือลบ · ดับเบิลคลิกดูรายละเอียด`;
     picked = null;
     $('atx-edit').disabled = true;
@@ -300,16 +306,26 @@ function atxSave(body, activity, me, state, form, open) {
 
 async function atxIssues(body, activity) {
   const data = await a5Api(activity, `issues?year=${a5Year}`);
-  const list = data.issues.filter((i) => atxIssueAll || i.status !== 'CLOSED');
+  const list = listQuery(data.issues.filter((i) => atxIssueAll || i.status !== 'CLOSED'), atxHeads.issues, (i, key) => ({
+    issue_no: i.issue_no,
+    area: `${i.area?.code || ''} ${i.area?.name || ''}`,
+    item_no: i.item?.item_no || '',
+    score: i.score,
+    description: i.description,
+    responsible: i.responsibleName || i.responsible_id || '',
+    due_date: i.due_date || '',
+    status: i.shownStatus || i.status,
+    photos: i.photos?.length || 0
+  }[key]));
   const count = (s) => data.issues.filter((i) => i.shownStatus === s).length;
   body.innerHTML = `
     <div class="toolbar a5-filters">${a5Seg('data-iall', { open: 'ยังไม่ปิด', all: 'ทั้งหมด' }, atxIssueAll ? 'all' : 'open')}
       <span class="sum-meta">ทั้งหมด ${data.issues.length} · รอแก้ ${count('OPEN')} · เลยกำหนด ${count('OVERDUE')} · แก้แล้วรอตรวจ ${count('ON_PLAN') + count('WAIT_VERIFY')} · ปิดแล้ว ${count('CLOSED')}</span></div>
     <div class="table-wrap sheet" id="atx-rows"></div>`;
-  fillTable('atx-rows', ['เลขที่', 'พื้นที่', 'ข้อ', 'คะแนน', 'ปัญหา', 'ผู้รับผิดชอบ', 'กำหนดแก้', 'สถานะ', 'รูป'], list.map((i) => `<tr data-pick="${i.id}">
+  fillTable('atx-rows', [{ label: 'เลขที่', key: 'issue_no' }, { label: 'พื้นที่', key: 'area' }, { label: 'ข้อ', key: 'item_no' }, { label: 'คะแนน', key: 'score' }, { label: 'ปัญหา', key: 'description' }, { label: 'ผู้รับผิดชอบ', key: 'responsible' }, { label: 'กำหนดแก้', key: 'due_date' }, { label: 'สถานะ', key: 'status' }, { label: 'รูป', key: 'photos' }], list.map((i) => `<tr data-pick="${i.id}">
     <td>${esc(i.issue_no)}</td><td>${esc(i.area.code || '')} ${esc(i.area.name || '')}</td><td>${i.item.item_no || ''}</td><td>${Number(i.score)}</td>
     <td>${esc(i.description)}</td><td>${esc(i.responsibleName || i.responsible_id || '-')}</td><td>${i.due_date ? atxDate(i.due_date) : '<span class="sum-meta">รอกำหนด</span>'}</td>
-    <td>${atxBadge(i.shownStatus)}</td><td>${i.photos.length}</td></tr>`).join(''), 'ไม่มี Issue');
+    <td>${atxBadge(i.shownStatus)}</td><td>${i.photos.length}</td></tr>`).join(''), 'ไม่มี Issue', atxColumnHead('issues', () => atxIssues(body, activity).catch(onErr)));
   body.querySelectorAll('[data-iall]').forEach((node) => { node.onclick = () => { atxIssueAll = node.dataset.iall === 'all'; atxIssues(body, activity).catch(onErr); }; });
   a5Lift(body);
   bindRowSelect($('atx-rows'), (id) => atxIssueDetail(activity, data.issues.find((i) => String(i.id) === id), () => atxIssues(body, activity).catch(onErr)));
