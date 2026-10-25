@@ -129,9 +129,9 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .hold-btn .hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.42);pointer-events:none}
 html[data-theme="dark"] .hold-btn .hold-fill{background:rgba(232,160,32,.4)}
 .hold-btn .hold-label{position:relative;z-index:1}
-.table-foot{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;flex:0 0 auto}
-.table-foot .sum-meta{margin:0;justify-self:start}
-.table-foot .pager{justify-self:center;display:flex;align-items:center;gap:8px}
+.table-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto}
+.table-foot .sum-meta{margin:0}
+.table-foot .pager{margin-left:auto;display:flex;align-items:center;gap:8px}
 .pager-page{min-width:72px;text-align:center;font-size:12px;color:var(--mo-text)}
 .th-line{display:flex;align-items:center;gap:2px}
 .th-label{margin-right:2px}

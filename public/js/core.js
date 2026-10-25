@@ -76,7 +76,6 @@ function tableFoot(prefix) {
   return `<div class="table-foot">
       <div class="sum-meta" id="${prefix}-count"></div>
       <div class="pager">${button(`${prefix}-prev`, 'ก่อนหน้า')}<span class="pager-page" id="${prefix}-page"></span>${button(`${prefix}-next`, 'ถัดไป')}</div>
-      <div class="table-foot-end"></div>
     </div>`;
 }
 
