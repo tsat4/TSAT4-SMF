@@ -207,11 +207,25 @@ function showShell() {
   openView(view);
 }
 
+function zoneOf(name) {
+  if (name === 'setup' || name === 'act-plan' || name === 'system') return 'setup';
+  if (name === 'activity') return 'act';
+  if (name === 'work' || name === 'store' || name === 'home' || name === 'edit' || name === 'setting' || name === 'locked' || name === 'dash-flow' || name === 'dash-month') return 'work';
+  if (typeof plantOf === 'function') {
+    const unit = plantOf(name);
+    if (unit) return unit.group === 'ระบบงาน' ? 'work' : 'act';
+  }
+  return '';
+}
+
 function openView(name) {
   const rule = ACCESS[name];
   if (rule && rankOf(rule[0]) < rule[1]) name = 'locked';
   if (name === 'system' && !me.creator) name = 'main';
   view = name;
+  const zone = zoneOf(view);
+  if (zone) document.body.dataset.zone = zone;
+  else delete document.body.dataset.zone;
   const [title, subtitle] = TITLES[name];
   $('header-page-title').textContent = title;
   $('header-page-subtitle').textContent = subtitle;

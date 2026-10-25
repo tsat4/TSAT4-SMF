@@ -394,7 +394,67 @@ button.gantt-label.is-editable:hover{background:var(--drive-hover)}
 .sto-ranks span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sto-track{height:8px;background:var(--mo-surface-2);border-radius:0}
 .sto-track i{display:block;height:100%;border-radius:0;background:var(--mo-primary)}
+.sto-area{fill:var(--zone-fill,transparent)}
 @media(max-width:900px){
   .sto-kpis,.sto-split,.sto-three{grid-template-columns:1fr}
 }
+
+/* Section tone: work orange, activity green, settings blue. Charts and buttons use a solid border and a 50% fill. */
+body[data-zone="work"]{--zone:#ff8a1f;--zone-fill:rgb(255 138 31 / 50%);--slice-1:rgb(255 138 31 / 50%);--slice-2:rgb(229 106 0 / 50%);--slice-3:rgb(255 176 102 / 50%);--slice-4:rgb(194 65 12 / 50%);--slice-5:rgb(253 186 116 / 50%);--slice-6:rgb(154 52 18 / 50%);--slice-7:rgb(255 214 170 / 50%);--slice-8:rgb(124 45 18 / 50%)}
+body[data-zone="act"]{--zone:#3ecf8e;--zone-fill:rgb(62 207 142 / 50%);--slice-1:rgb(62 207 142 / 50%);--slice-2:rgb(31 138 91 / 50%);--slice-3:rgb(134 239 172 / 50%);--slice-4:rgb(22 101 52 / 50%);--slice-5:rgb(187 247 208 / 50%);--slice-6:rgb(20 83 45 / 50%);--slice-7:rgb(74 222 128 / 50%);--slice-8:rgb(5 46 22 / 50%)}
+body[data-zone="setup"]{--zone:#3b82f6;--zone-fill:rgb(59 130 246 / 50%);--slice-1:rgb(59 130 246 / 50%);--slice-2:rgb(29 78 216 / 50%);--slice-3:rgb(147 197 253 / 50%);--slice-4:rgb(30 58 138 / 50%);--slice-5:rgb(191 219 254 / 50%);--slice-6:rgb(30 64 175 / 50%);--slice-7:rgb(96 165 250 / 50%);--slice-8:rgb(23 37 84 / 50%)}
+body[data-zone] .btn-primary,
+body[data-zone] .seg-btn.is-active,
+body[data-zone] .nav-btn.active,
+body[data-zone] .nav-sub .nav-btn.active,
+html[data-theme="dark"] body[data-zone] .btn-primary,
+html[data-theme="dark"] body[data-zone] .nav-btn.active,
+html[data-theme="dark"] body[data-zone] .nav-sub .nav-btn.active{
+  background:var(--zone-fill);color:var(--zone);border:1px solid var(--zone);border-radius:var(--mo-radius)
+}
+body[data-zone] .btn-primary:hover,
+body[data-zone] .nav-btn.active:hover,
+body[data-zone] .nav-sub .nav-btn.active:hover,
+html[data-theme="dark"] body[data-zone] .btn-primary:hover,
+html[data-theme="dark"] body[data-zone] .nav-btn.active:hover,
+html[data-theme="dark"] body[data-zone] .nav-sub .nav-btn.active:hover{
+  background:var(--zone-fill);color:var(--zone);border-color:var(--zone);filter:brightness(1.08)
+}
+body[data-zone] .nav-btn.active .material-symbols-rounded,
+body[data-zone] .nav-sub .nav-btn.active .material-symbols-rounded,
+html[data-theme="dark"] body[data-zone] .nav-btn.active .material-symbols-rounded,
+html[data-theme="dark"] body[data-zone] .nav-sub .nav-btn.active .material-symbols-rounded{color:var(--zone)}
+body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-parent,
+body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-parent .material-symbols-rounded,
+body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-split .nav-parent,
+body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-split .nav-parent .material-symbols-rounded,
+body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-split .nav-caret,
+html[data-theme="dark"] body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-parent,
+html[data-theme="dark"] body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-parent .material-symbols-rounded,
+html[data-theme="dark"] body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-split .nav-parent,
+html[data-theme="dark"] body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-split .nav-parent .material-symbols-rounded,
+html[data-theme="dark"] body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-split .nav-caret{color:var(--zone)}
+body[data-zone] button.module-card{border:1px solid var(--zone);background:var(--zone-fill)}
+body[data-zone] button.module-card .material-symbols-rounded,
+body[data-zone] button.module-card:hover{color:var(--zone);border-color:var(--zone)}
+body[data-zone] .sto-line{color:var(--zone)}
+body[data-zone] .sto-line circle{fill:var(--zone-fill);stroke:var(--zone);stroke-width:1}
+body[data-zone] .sto-col i.is-out,
+body[data-zone] .sto-key.is-out,
+body[data-zone] .sto-track i,
+body[data-zone] .a5-bar{
+  background:var(--zone-fill);box-shadow:inset 0 0 0 1px var(--zone);opacity:1;border-radius:0
+}
+body[data-zone] .sto-donut,
+body[data-zone] .sto-legend i{box-shadow:inset 0 0 0 1px var(--zone)}
+body[data-zone="act"] .gantt-bar{border:1px solid var(--zone);background:var(--zone-fill);box-shadow:none;color:var(--mo-text)}
+body[data-zone="act"] .gantt-bar.is-auto{background:repeating-linear-gradient(135deg,var(--zone-fill) 0 6px,transparent 6px 9px)}
+body[data-zone="act"] .gantt-label{border-left-color:var(--zone)}
+body[data-zone] .plan-chip,
+body[data-zone] .plan-item{border:1px solid var(--zone);background:var(--zone-fill);color:var(--mo-text)}
+body[data-zone] .plan-chip.plan-cancelled,
+body[data-zone] .plan-item.plan-cancelled{border-color:var(--mo-secondary);background:var(--mo-surface-2);color:var(--mo-text-muted)}
+body[data-zone] .plan-cell.is-today .plan-day,
+body[data-zone] .plan-col.is-today .plan-col-head{color:var(--zone)}
+body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 

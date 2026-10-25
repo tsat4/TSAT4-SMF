@@ -1,5 +1,15 @@
 // Store > Usage dashboards. renderHome in sto.js opens the overview page.
-const STO_DASH_COLORS = ['#3ecf8e', '#1f8a5b', '#60a5fa', '#f59e0b', '#a78bfa', '#f87171', '#71717a', '#0ea5e9'];
+const STO_DASH_COLORS = ['#ff8a1f', '#e56a00', '#ffb066', '#c2410c', '#fdba74', '#9a3412', '#ffd6aa', '#7c2d12'];
+
+function stoDashColors() {
+  const style = getComputedStyle(document.body);
+  const colors = [];
+  for (let i = 1; i <= 8; i += 1) {
+    const value = style.getPropertyValue(`--slice-${i}`).trim();
+    if (value) colors.push(value);
+  }
+  return colors.length ? colors : STO_DASH_COLORS.map((color) => color);
+}
 let stoDashYear = new Date().getFullYear();
 
 function stoDashNum(value, digits = 0) {
@@ -24,19 +34,21 @@ function stoDashLine(months) {
   const max = Math.max(...values, 1);
   const step = 320 / Math.max(values.length - 1, 1);
   const points = values.map((value, index) => `${index * step},${110 - (value / max) * 96}`).join(' ');
+  const area = `0,110 ${points} ${(values.length - 1) * step},110`;
   const labels = months.map((row) => `<span>${row.label}</span>`).join('');
-  return `<div class="sto-line"><svg viewBox="0 0 320 120" role="img" aria-label="จ่ายออกรายเดือน"><polyline points="${points}" fill="none" stroke="currentColor" stroke-width="2"></polyline>${values.map((value, index) => `<circle cx="${index * step}" cy="${110 - (value / max) * 96}" r="2.5"></circle>`).join('')}</svg><div class="sto-line-axis">${labels}</div></div>`;
+  return `<div class="sto-line"><svg viewBox="0 0 320 120" role="img" aria-label="จ่ายออกรายเดือน"><polygon class="sto-area" points="${area}"></polygon><polyline points="${points}" fill="none" stroke="currentColor" stroke-width="2"></polyline>${values.map((value, index) => `<circle cx="${index * step}" cy="${110 - (value / max) * 96}" r="2.5"></circle>`).join('')}</svg><div class="sto-line-axis">${labels}</div></div>`;
 }
 
 function stoDashDonut(slices) {
+  const colors = stoDashColors();
   let cursor = 0;
   const stops = slices.map((slice, index) => {
     const start = cursor;
     cursor += Number(slice.share) || 0;
-    return `${STO_DASH_COLORS[index % STO_DASH_COLORS.length]} ${start}% ${cursor}%`;
+    return `${colors[index % colors.length]} ${start}% ${cursor}%`;
   }).join(', ');
   const paint = slices.length ? stops : '#d4d4d8 0% 100%';
-  const legend = slices.map((slice, index) => `<li><i style="background:${STO_DASH_COLORS[index % STO_DASH_COLORS.length]}"></i><span>${esc(slice.name)}</span><b>${stoDashNum(slice.value, 2)}</b><em>${stoDashNum(slice.share, 1)}%</em></li>`).join('');
+  const legend = slices.map((slice, index) => `<li><i style="background:${colors[index % colors.length]}"></i><span>${esc(slice.name)}</span><b>${stoDashNum(slice.value, 2)}</b><em>${stoDashNum(slice.share, 1)}%</em></li>`).join('');
   return `<div class="sto-donut-wrap"><div class="sto-donut" style="background:conic-gradient(${paint})"><div class="sto-donut-hole"></div></div><ul class="sto-legend">${legend || '<li>ไม่มีข้อมูล</li>'}</ul></div>`;
 }
 
