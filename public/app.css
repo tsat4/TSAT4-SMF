@@ -399,10 +399,10 @@ button.gantt-label.is-editable:hover{background:var(--drive-hover)}
   .sto-kpis,.sto-split,.sto-three{grid-template-columns:1fr}
 }
 
-/* Section tone: work orange, activity green, settings blue. Charts and buttons use a solid border and a 50% fill. */
-body[data-zone="work"]{--zone:#ff8a1f;--zone-fill:rgb(255 138 31 / 50%);--slice-1:rgb(255 138 31 / 50%);--slice-2:rgb(229 106 0 / 50%);--slice-3:rgb(255 176 102 / 50%);--slice-4:rgb(194 65 12 / 50%);--slice-5:rgb(253 186 116 / 50%);--slice-6:rgb(154 52 18 / 50%);--slice-7:rgb(255 214 170 / 50%);--slice-8:rgb(124 45 18 / 50%)}
-body[data-zone="act"]{--zone:#3ecf8e;--zone-fill:rgb(62 207 142 / 50%);--slice-1:rgb(62 207 142 / 50%);--slice-2:rgb(31 138 91 / 50%);--slice-3:rgb(134 239 172 / 50%);--slice-4:rgb(22 101 52 / 50%);--slice-5:rgb(187 247 208 / 50%);--slice-6:rgb(20 83 45 / 50%);--slice-7:rgb(74 222 128 / 50%);--slice-8:rgb(5 46 22 / 50%)}
-body[data-zone="setup"]{--zone:#3b82f6;--zone-fill:rgb(59 130 246 / 50%);--slice-1:rgb(59 130 246 / 50%);--slice-2:rgb(29 78 216 / 50%);--slice-3:rgb(147 197 253 / 50%);--slice-4:rgb(30 58 138 / 50%);--slice-5:rgb(191 219 254 / 50%);--slice-6:rgb(30 64 175 / 50%);--slice-7:rgb(96 165 250 / 50%);--slice-8:rgb(23 37 84 / 50%)}
+/* Section tone: work orange, activity green, settings blue. Border stays solid. Fill is 80% transparent. */
+body[data-zone="work"]{--zone:#ff8a1f;--zone-fill:rgb(255 138 31 / 20%);--mo-primary:#ff8a1f;--mo-primary-dark:#e56a00;--mo-info:#ff8a1f;--mo-info-soft:rgb(255 138 31 / 20%);--mo-focus:rgb(255 138 31 / 28%);--mo-on-primary:#1a1006;--slice-1:rgb(255 138 31 / 20%);--slice-2:rgb(229 106 0 / 20%);--slice-3:rgb(255 176 102 / 20%);--slice-4:rgb(194 65 12 / 20%);--slice-5:rgb(253 186 116 / 20%);--slice-6:rgb(154 52 18 / 20%);--slice-7:rgb(255 214 170 / 20%);--slice-8:rgb(124 45 18 / 20%)}
+body[data-zone="act"]{--zone:#3ecf8e;--zone-fill:rgb(62 207 142 / 20%);--mo-primary:#3ecf8e;--mo-primary-dark:#2eb67d;--mo-info:#3ecf8e;--mo-info-soft:rgb(62 207 142 / 20%);--mo-focus:rgb(62 207 142 / 28%);--mo-on-primary:#052e16;--slice-1:rgb(62 207 142 / 20%);--slice-2:rgb(31 138 91 / 20%);--slice-3:rgb(134 239 172 / 20%);--slice-4:rgb(22 101 52 / 20%);--slice-5:rgb(187 247 208 / 20%);--slice-6:rgb(20 83 45 / 20%);--slice-7:rgb(74 222 128 / 20%);--slice-8:rgb(5 46 22 / 20%)}
+body[data-zone="setup"]{--zone:#3b82f6;--zone-fill:rgb(59 130 246 / 20%);--mo-primary:#3b82f6;--mo-primary-dark:#1d4ed8;--mo-info:#3b82f6;--mo-info-soft:rgb(59 130 246 / 20%);--mo-focus:rgb(59 130 246 / 28%);--mo-on-primary:#0b1f44;--slice-1:rgb(59 130 246 / 20%);--slice-2:rgb(29 78 216 / 20%);--slice-3:rgb(147 197 253 / 20%);--slice-4:rgb(30 58 138 / 20%);--slice-5:rgb(191 219 254 / 20%);--slice-6:rgb(30 64 175 / 20%);--slice-7:rgb(96 165 250 / 20%);--slice-8:rgb(23 37 84 / 20%)}
 body[data-zone] .btn-primary,
 body[data-zone] .seg-btn.is-active,
 body[data-zone] .nav-btn.active,
@@ -437,6 +437,8 @@ html[data-theme="dark"] body[data-zone] .nav-acc:has(.nav-btn.active) > .nav-spl
 body[data-zone] button.module-card{border:1px solid var(--zone);background:var(--zone-fill)}
 body[data-zone] button.module-card .material-symbols-rounded,
 body[data-zone] button.module-card:hover{color:var(--zone);border-color:var(--zone)}
+body[data-zone] .sto-kpi-icon{background:var(--zone-fill);color:var(--zone);border:1px solid var(--zone)}
+body[data-zone] .sto-dash-bar select{background:var(--zone-fill);border:1px solid var(--zone);color:var(--mo-text)}
 body[data-zone] .sto-line{color:var(--zone)}
 body[data-zone] .sto-line circle{fill:var(--zone-fill);stroke:var(--zone);stroke-width:1}
 body[data-zone] .sto-col i.is-out,
