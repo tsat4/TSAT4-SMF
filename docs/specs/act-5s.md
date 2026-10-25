@@ -89,7 +89,7 @@ v_<k>_audit_group   % ของแต่ละหมวดต่อใบตร�
 - สิทธิ์ transaction = อยู่ใน mt_<k>_team ปีนั้น หรือเป็นเจ้าของพื้นที่ใน mt_<k>_area_owner ปีนั้น · Setting = role admin ปีนั้น
 - `หัวหน้าทีม` ของระบบเดิม = `chairman` · `Auditor` ทีม X = `auditor` + team X · สีทีมคำนวณจากตัวอักษร (ไม่เก็บ)
 - ฐาน TX ย้ายมารวม MX แล้ว จึงใช้ join คำนวณ Dashboard ได้ (ทำเป็น view เช่น % ราย ส ต่อ audit)
-- รูปเดิมอยู่ Google Drive เก็บ URL เดิมไว้ก่อน รูปใหม่เก็บ Supabase Storage (bucket `act-img`)
+- รูปเดิมอยู่ Google Drive เก็บ URL เดิมไว้ก่อน รูปใหม่เก็บ Supabase Storage ของ Tx Data bucket `img_5s` (กิจกรรมอื่น `img_<กิจกรรม>`) ไฟล์ `issue/<ISSxxxx>_<BEFORE|AFTER>_<เวลา>.jpg`
 - ย้ายข้อมูลจาก Excel ได้ครบ: 34 พื้นที่, 17 ทีม, 25 ข้อ, 33 ผลตรวจ, 52 Issue, 14 แผน
 
 ## การตัดสินใจ (ผู้ใช้เลือกตามคำแนะนำ 2026-10-25)

@@ -6,7 +6,6 @@ import { accessOf, activityOf, dateOf, fetchAll, fetchIn, missingTables, namesOf
 // Checklist audits — transaction: record Self / Committee audits and follow Issues to closure.
 // Rules: docs/specs/act-5s.md ("transaction", "Issue"). Pure rule functions are exported for scripts/test-act-audit.js.
 const AUDIT_TYPES = ['SELF', 'COMMITTEE'];
-const PHOTO_BUCKET = 'act-img';
 const DEFAULTS = { pass_percent: 80, issue_score: 3, issue_due_days_before_next: 10, issue_photo_max: 1, self_audit_due_day: 10 };
 
 const todayIso = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
@@ -401,13 +400,14 @@ export function mountTransaction(app) {
     const settings = await settingsOf(activity);
     const have = must(await tx.from(t.photo).select('id').eq('issue_id', found.issue.id).eq('kind', kind));
     if (have.length >= settings.issue_photo_max) return fail(res, 400, `แนบรูป${kind === 'AFTER' ? 'หลังแก้' : 'ปัญหา'}ได้ ${settings.issue_photo_max} รูป`);
-    const key = `${activity.replace(/[^a-z0-9]/g, '')}/${found.issue.issue_no}_${kind}_${Date.now()}.jpg`;
-    const uploaded = await tx.storage.from(PHOTO_BUCKET).upload(key, new Uint8Array(bytes), { contentType: 'image/jpeg', upsert: false });
+    // Each activity has its own bucket img_<key>; files: issue/<ISSxxxx>_<BEFORE|AFTER>_<time>.jpg
+    const key = `issue/${found.issue.issue_no}_${kind}_${Date.now()}.jpg`;
+    const uploaded = await tx.storage.from(t.bucket).upload(key, new Uint8Array(bytes), { contentType: 'image/jpeg', upsert: false });
     if (uploaded.error) {
       const text = String(uploaded.error.message || '');
-      return fail(res, 400, /bucket/i.test(text) ? `ยังไม่ได้สร้างที่เก็บรูป ${PHOTO_BUCKET} ใน Tx Data (db/act/storage.sql)` : 'อัปโหลดรูปไม่ได้');
+      return fail(res, 400, /bucket/i.test(text) ? `ยังไม่ได้สร้างที่เก็บรูป ${t.bucket} ใน Tx Data (รัน ${t.sql} อีกครั้ง)` : 'อัปโหลดรูปไม่ได้');
     }
-    const url = tx.storage.from(PHOTO_BUCKET).getPublicUrl(key).data.publicUrl;
+    const url = tx.storage.from(t.bucket).getPublicUrl(key).data.publicUrl;
     must(await tx.from(t.photo).insert({ issue_id: found.issue.id, kind, url }));
     res.status(201).json({ url });
   });

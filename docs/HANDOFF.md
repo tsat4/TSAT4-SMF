@@ -3,7 +3,7 @@
 ## กำลังทำอยู่
 
 - งาน: 5S → transaction (ฟอร์มตรวจ Self / Committee + Issue) — Claude ทำเสร็จและ deploy แล้ว 2026-10-25
-- เหลือ (ผู้ใช้ / Cursor): **Tx Data** SQL Editor รัน `db/act/storage.sql` (สร้างที่เก็บรูป `act-img`) ไม่อย่างนั้นแนบรูป Issue จะขึ้นว่ายังไม่ได้สร้างที่เก็บรูป
+- เหลือ (ผู้ใช้ / Cursor): **Tx Data** SQL Editor รัน `db/act/5s.sql` อีกครั้ง (รันซ้ำได้ ตารางเดิมไม่กระทบ) เพื่อสร้างที่เก็บรูป `img_5s` ไม่อย่างนั้นแนบรูป Issue จะขึ้นว่ายังไม่ได้สร้างที่เก็บรูป · ถ้าเคยสร้าง bucket `act-img` ไว้แล้ว ลบทิ้งได้ (เลิกใช้)
 - ไฟล์ที่ยังแก้ไม่เสร็จ: ไม่มี
 <!-- ถ้าเริ่มงานใหญ่ ให้เขียนตามนี้:
 - งาน: ...
@@ -14,7 +14,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- **Tx Data**: `db/act/storage.sql` (bucket รูป act-img)
+- **Tx Data**: `db/act/5s.sql` อีกครั้ง (สร้าง bucket รูป img_5s)
 
 ## ข้อควรระวัง
 
@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-25 · Claude · ที่เก็บรูปแยกต่อกิจกรรมชื่อ `img_<กิจกรรม>` (ผู้ใช้สั่ง) สร้างในแม่แบบ scripts/act-sql.js · 5S ใช้ `img_5s` ไฟล์ `issue/<ISS>_<BEFORE|AFTER>_<เวลา>.jpg` · ลบ db/act/storage.sql (act-img เลิกใช้)
 - 2026-10-25 · Claude · 5S transaction แบ่ง 2 หน้า Audit / Issue · หน้า Audit เหมือนระบบเดิม (ไตรมาส/ประเภท/ประเภทพื้นที่/พื้นที่/ค้นหา, เปิด Audit/แก้ไข/ลบ, ดับเบิลคลิกดูรายละเอียด) · เพิ่มแก้ไขใบตรวจ PATCH /api/act/:activity/audits/:id (คนบันทึกหรือ admin; ข้อที่ Issue เดิมไม่มี Action ยังล็อก 0, Issue ของใบนี้ที่ยังไม่มีใครแก้จะถูกลบเมื่อคะแนนขึ้นเกินเกณฑ์, ข้อที่ต่ำลงใหม่เปิด Issue)
 - 2026-10-25 · Claude · 5S transaction: ฟอร์มตรวจ Self/Committee (ให้คะแนนรายข้อ, Issue เดิมไม่มี Action ล็อก 0, ข้อ ≤ 3 เปิด Issue + รูป 16:9), รายการใบตรวจ (admin ลบได้), Issue (ส่ง Action + รูปหลังแก้, admin แก้กำหนด) · กติกา verifyIssues/dueDateFor/scoreAudit ทดสอบใน test:act · ต้องรัน db/act/storage.sql ใน Tx Data
 - 2026-10-25 · Claude · แยกโฟลเดอร์ทำงาน: Claude ใช้ `C:\Work\projects\SMF-act` (worktree branch claude-act → push `HEAD:main`) · Cursor ใช้ `C:\Work\projects\SMF` (main) · ทำพร้อมกันได้ ดูหัวข้อ 0 ใน AGENTS.md · Claude ดูแลระบบกิจกรรม Cursor ดูแลระบบงาน + งาน SQL

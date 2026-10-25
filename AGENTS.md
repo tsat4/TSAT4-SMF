@@ -49,6 +49,7 @@
 - route ของโมดูลใหม่ต้องขึ้นต้นด้วย `/api/<id>/...` (route เดิมของ STO คงไว้ตามเดิมเพื่อไม่ให้ frontend พัง)
 - ไฟล์ใน `public/js/` ใช้ global scope ร่วมกัน ชื่อ top-level ห้ามซ้ำกันข้ามไฟล์ ให้ใส่ prefix ของโมดูล เช่น `pd1Render`, `PD1_STATUS`
 - ฐานข้อมูล 2 ก้อน: **Mx Data** (client `mx`) = ตารางกลาง `mt_main_*` + ระบบงาน `mt_<module>_*` / `tx_<module>_*` (เช่น sto) · **Tx Data** (client `tx`) = ระบบกิจกรรม ตารางแยกต่อกิจกรรม `mt_<กิจกรรม>_*` / `tx_<กิจกรรม>_*` (เช่น mt_5s_area, tx_5s_audit)
+- รูปของกิจกรรมเก็บใน Supabase Storage ของ Tx Data แยก bucket ต่อกิจกรรม ชื่อ `img_<กิจกรรม>` (เช่น `img_5s`) สร้างมาพร้อม `db/act/<กิจกรรม>.sql` · ชื่อในโค้ดใช้ `tablesOf(กิจกรรม).bucket`
 - ตารางกิจกรรมสร้างจากแม่แบบเท่านั้น: `node scripts/act-sql.js <กิจกรรม>` → `db/act/<กิจกรรม>.sql` ห้ามแก้ไฟล์ใน db/act/ ด้วยมือ (แก้ที่ scripts/act-sql.js แล้วสร้างใหม่) และชื่อตารางในโค้ดมาจาก `tablesOf()` ใน server/modules/act/common.js
 
 ### ฐานข้อมูล

@@ -49,6 +49,16 @@ create table if not exists public.mt_${k}_plan (
   constraint mt_${k}_plan_dates check (end_date >= start_date)
 );
 create index if not exists mt_${k}_plan_dates on public.mt_${k}_plan (start_date, end_date);
+
+-- ที่เก็บรูปของกิจกรรมนี้ (Supabase Storage) ชื่อ img_${k} · รูป JPEG ≤ 700 KB เปิดดูได้ด้วยลิงก์
+-- ข้ามไปเองถ้าฐานไม่มี storage (เช่นตอนทดสอบด้วย PGlite)
+do $$ begin
+  if to_regclass('storage.buckets') is not null then
+    insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    values ('img_${k}', 'img_${k}', true, 716800, array['image/jpeg'])
+    on conflict (id) do nothing;
+  end if;
+end $$;
 `;
   const auditPart = `
 -- ===== ${activity}: checklist audit =====

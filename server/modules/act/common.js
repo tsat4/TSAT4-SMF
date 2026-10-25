@@ -11,6 +11,7 @@ export function tablesOf(activity) {
   const k = activity.replace(/[^a-z0-9]/g, '');
   return {
     sql: `db/act/${activity}.sql`,
+    bucket: `img_${k}`, // Storage bucket for this activity's photos
     team: `mt_${k}_team`,
     setting: `mt_${k}_setting`,
     plan: `mt_${k}_plan`,

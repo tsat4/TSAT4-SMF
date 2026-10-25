@@ -5,7 +5,7 @@
 | ฐาน | client / env | เก็บอะไร |
 |---|---|---|
 | **Mx Data** (ezhyitqznflvjnwuuchn) | `mx` / `MX_SUPABASE_*` | ตารางกลาง `mt_main_*` (พนักงาน, costcenter, login) + ระบบงาน `mt_sto_*` / `tx_sto_*` (และ PD/MTN ในอนาคต) |
-| **Tx Data** (loeyrgavlpdnrbczjxpl) | `tx` / `TX_SUPABASE_*` | ระบบกิจกรรม ตารางแยกต่อกิจกรรม `mt_5s_*` / `tx_5s_*` / `v_5s_*` (สร้างจาก scripts/act-sql.js) |
+| **Tx Data** (loeyrgavlpdnrbczjxpl) | `tx` / `TX_SUPABASE_*` | ระบบกิจกรรม ตารางแยกต่อกิจกรรม `mt_5s_*` / `tx_5s_*` / `v_5s_*` และที่เก็บรูป `img_5s` (สร้างจาก scripts/act-sql.js) |
 
 ชื่อพนักงานในหน้ากิจกรรมดึงจาก Mx Data แยกอีกครั้ง (`namesOf`) เพราะคนละฐาน
 deploy บน Render (`render.yaml`): push ไปที่ `main` แล้ว deploy อัตโนมัติ URL คือ https://tsat4-smf.onrender.com
@@ -33,7 +33,7 @@ server/
       tables.js              ตาราง sto ที่แก้ได้ในหน้า System
     act/index.js             ระบบกิจกรรม: แผน Gantt /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (db/04_act_plan.sql)
     act/common.js            tablesOf(กิจกรรม) ชื่อตาราง, accessOf (สิทธิ์รายปีจาก mt_<act>_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
-    act/transaction.js       ระบบตรวจ checklist: บันทึกผลตรวจ Self/Committee + Issue (รูปใน Storage bucket act-img ของ Tx Data) กติกาเป็นฟังก์ชันแยก ทดสอบใน test:act
+    act/transaction.js       ระบบตรวจ checklist: บันทึกผลตรวจ Self/Committee + Issue (รูปใน Storage bucket img_<กิจกรรม> ของ Tx Data เช่น img_5s) กติกาเป็นฟังก์ชันแยก ทดสอบใน test:act
     act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/act/<กิจกรรม>.sql) summarize()/rank() ทดสอบด้วย npm run test:act
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
 public/
