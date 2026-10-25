@@ -19,8 +19,10 @@ export async function loadUser(employeeId) {
   const entries = Object.entries(MEMBER_TABLES);
   const members = await Promise.all(entries.map(([, table]) => mx.from(table).select('role,status,department').eq('employee_id', employeeId).maybeSingle()));
   data.members = {};
-  entries.forEach(([moduleId], i) => {
-    if (members[i].error) throw members[i].error;
+  entries.forEach(([moduleId, table], i) => {
+    // PGRST205 = table not created yet: a new module must not lock everyone out before its SQL is run.
+    if (members[i].error?.code === 'PGRST205') console.warn(`member table ${table} is missing`);
+    else if (members[i].error) throw members[i].error;
     data.members[moduleId] = members[i].data || null;
   });
   return data;
