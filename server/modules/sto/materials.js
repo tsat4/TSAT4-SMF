@@ -105,7 +105,7 @@ export function mountMaterials(app, mod) {
     const offset = Math.max(0, Number(req.query.offset) || 0);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     let query = mx.from('mt_sto_usage')
-      .select('material,material_description,bun,status,usage_group,img', { count: 'exact' })
+      .select('material,material_description,bun,price,status,usage_group,img', { count: 'exact' })
       .eq('status', 'Active')
       .order('material')
       .range(offset, offset + limit - 1);

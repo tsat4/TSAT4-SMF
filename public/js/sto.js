@@ -22,6 +22,11 @@ function usageThumb(src) {
   return src ? `<img class="usage-thumb" src="${esc(src)}" alt="">` : '';
 }
 
+function moneyText(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : '';
+}
+
 function badge(status) {
   const kind = status === 'ready' || status === 'received' ? 'badge-success' : status === 'cancelled' ? 'badge-danger' : status === 'cart' ? 'badge-warning' : 'badge-primary';
   return `<span class="badge ${kind}">${esc(STATUS[status] || status)}</span>`;
@@ -84,7 +89,7 @@ async function renderEdit(target) {
     $('edit-actions').innerHTML = '';
     const data = await api(`/api/materials?q=${encodeURIComponent($('edit-q').value.trim())}&offset=${state.offset}&limit=${PAGE}`);
     const rows = data.materials || [];
-    fillTable('edit-rows', ['รูป', ...LINE_HEAD, ''], rows.map((row) => `<tr><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td><td><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}">+</button></td></tr>`).join(''), 'ไม่พบรายการ');
+    fillTable('edit-rows', ['กลุ่ม', 'รูปภาพ', 'รหัสรายการ', 'ชื่อรายการ', 'ราคา', ''], rows.map((row) => `<tr><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}">+</button></td></tr>`).join(''), 'ไม่พบรายการ');
     setFoot(rows.length, data.total || 0);
     $('edit-rows').querySelectorAll('[data-add]').forEach((node) => {
       node.onclick = () => openCartPopup({ material: node.dataset.add, name: node.dataset.name || '', bun: node.dataset.bun || '' }).catch(onErr);
@@ -397,7 +402,7 @@ async function renderUsers(target) {
       const data = await api(`/api/usage-materials?q=${encodeURIComponent($('usage-q').value.trim())}&offset=${state.offset}`);
       state.rows = data.materials;
       countText('usage-count', state.rows.length, data.total);
-      fillTable('usage-rows', ['รูป', 'รหัส', 'ชื่อรายการ', 'group', 'หน่วย', 'ราคา', 'สกุลเงิน', 'สถานะ'], state.rows.map((row, index) => `<tr data-pick="${index}"><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.usage_group || '')}</td><td>${esc(row.bun)}</td><td>${Number(row.price)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีรายการ');
+      fillTable('usage-rows', ['กลุ่ม', 'รูปภาพ', 'รหัสรายการ', 'ชื่อรายการ', 'ราคา', 'หน่วย', 'สกุลเงิน', 'สถานะ'], state.rows.map((row, index) => `<tr data-pick="${index}"><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td>${esc(row.bun)}</td><td>${esc(row.crcy)}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีรายการ');
     } else {
       const term = $('usage-q').value.trim().toLowerCase();
       const filtered = (await api('/api/users')).users.filter((row) => !term || [row.employeeId, row.name, row.department, centerText(row), row.role].join(' ').toLowerCase().includes(term));
