@@ -125,8 +125,7 @@ function fillTable(id, headers, rows, emptyText, head) {
     if (!head || !key) return `<th>${esc(label)}</th>`;
     const filtered = String(head.filters?.[key] || '').trim();
     const asc = head.sort === key && head.dir !== 'desc';
-    const desc = head.sort === key && head.dir === 'desc';
-    return `<th class="has-menu"><div class="th-line"><span class="th-label">${esc(label)}</span><button class="th-tool${filtered ? ' is-active' : ''}" type="button" data-col-filter="${esc(key)}" aria-label="กรอง"><span class="material-symbols-rounded">filter_alt</span></button><button class="th-tool${asc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" data-dir="asc" aria-label="เรียง A ไป Z">A-Z</button><button class="th-tool${desc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" data-dir="desc" aria-label="เรียง Z ไป A">Z-A</button></div></th>`;
+    return `<th class="has-menu"><div class="th-line"><span class="th-label">${esc(label)}</span><button class="th-tool${filtered ? ' is-active' : ''}" type="button" data-col-filter="${esc(key)}" aria-label="กรอง"><span class="material-symbols-rounded">filter_alt</span></button><button class="th-tool${asc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" aria-label="${asc ? 'เรียง Z ไป A' : 'เรียง A ไป Z'}"><span class="material-symbols-rounded">sort_by_alpha</span></button></div></th>`;
   }).join('');
   const body = rows || `<tr><td class="empty" colspan="${Math.max(headers.length, 1)}">${emptyText}</td></tr>`;
   const node = $(id);
@@ -140,9 +139,8 @@ function fillTable(id, headers, rows, emptyText, head) {
     btn.onclick = (event) => {
       event.stopPropagation();
       const key = btn.dataset.colSort;
-      const dir = btn.dataset.dir === 'desc' ? 'desc' : 'asc';
-      const same = head.sort === key && head.dir === dir;
-      head.onChange({ sort: same ? '' : key, dir: same ? 'asc' : dir, filters: head.filters || {} });
+      const asc = head.sort === key && head.dir !== 'desc';
+      head.onChange({ sort: key, dir: asc ? 'desc' : 'asc', filters: head.filters || {} });
     };
   });
   node.querySelectorAll('[data-col-filter]').forEach((btn) => {
