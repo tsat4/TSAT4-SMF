@@ -44,25 +44,26 @@ function a5WeekEnd(year, month, week) {
   return new Date(year, month - 1, week === 4 ? last : week * 7);
 }
 
-// Move a tab's search, filters and buttons from its body up into the right side of the page bar (core.js pageBar,
-// slot a5-tools): search first, then filters and buttons. The left side keeps only tabs. Notes (p, .sum-meta)
-// stay in the body. Bind events before calling.
+// Move a tab's filters, search and buttons from its body up into the right side of the page bar (core.js pageBar,
+// slot a5-tools, after the year): filters in body order (large to small) → search → buttons at the far right.
+// The left side keeps only tabs. Notes (p, .sum-meta) stay in the body. Bind events before calling.
 function a5Lift(body) {
   const left = $('a5-left');
   const tools = $('a5-tools');
   if (!tools) return;
   tools.innerHTML = '';
   if (left) left.innerHTML = '';
-  const searches = [];
+  const groups = { filter: [], search: [], action: [] };
   body.querySelectorAll(':scope > .a5-actions, :scope > .a5-filters').forEach((box) => {
     [...box.children].forEach((child) => {
       if (child.matches('p, .sum-meta')) return;
-      if (child.matches('.search-slot')) searches.push(child);
-      else tools.appendChild(child);
+      if (child.matches('.search-slot')) groups.search.push(child);
+      else if (child.matches('.action-bar, .btn') || box.classList.contains('a5-actions')) groups.action.push(child);
+      else groups.filter.push(child);
     });
     if (!box.children.length) box.remove();
   });
-  tools.prepend(...searches);
+  tools.append(...groups.filter, ...groups.search, ...groups.action);
 }
 
 // ---------- Dashboard ----------
