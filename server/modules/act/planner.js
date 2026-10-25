@@ -35,7 +35,8 @@ function datesIn(year, startRaw, endRaw) {
   const end = dateOf(endRaw || startRaw);
   if (!start || !end) return { error: 'ระบุวันเริ่มและวันจบ' };
   if (end < start) return { error: 'วันจบต้องไม่ก่อนวันเริ่ม' };
-  if (Number(start.slice(0, 4)) !== year || Number(end.slice(0, 4)) !== year) return { error: `วันที่ต้องอยู่ในปี ${year}` };
+  // A plan of year Y starts in Y and may run until December of Y + 1 (planning ahead).
+  if (start < `${year}-01-01` || end > `${year + 1}-12-31`) return { error: `วันที่ต้องอยู่ระหว่าง ม.ค. ${year} ถึง ธ.ค. ${year + 1}` };
   return { start, end };
 }
 

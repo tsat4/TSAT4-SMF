@@ -1,15 +1,17 @@
 // ระบบกิจกรรม > <activity> > Setting: Project Planner (server: server/modules/act/planner.js).
-// Main items with sub items on a Gantt: year view = 12 months × W1–W4, month view = days. The year's admins
+// Main items with sub items on a Gantt: year view = 12 months × W1–W4 (longer when items run into next year), month view = days. The year's admins
 // drag bars (whole bar = move, edge = resize), add rows with +, and create / edit / delete. Others read only.
 // Turn it on for another activity by adding its id here and to PLANNER_ON in planner.js.
 const APL_ON = ['100p'];
 const APL_COLORS = { p1: '#ec6f73', p2: '#3fbfbf', p3: '#e3a52f', p4: '#8b6fd8', p5: '#4b8bea' };
-// Narrowest column; columns grow to fill the screen when there is room. 384 = left columns (app.css .apl-row).
+// Narrowest column in px; wider screens stretch the columns so the last month ends at the right edge.
 const APL_COL = { year: 15, month: 26 };
-const APL_LEFT = 384;
+const APL_LEFT = 384; // left columns, app.css .apl-row (260 on phones)
+// A plan of year Y may run until December of Y + 1 (planner.js datesIn).
+const APL_MAX_MONTHS = 24;
 let aplView = 'year';
 let aplYear = new Date().getFullYear();
-let aplMonth = new Date().getMonth();
+let aplMonth = new Date().getMonth(); // month of the plan, 12–23 = next year
 let aplSelected = null;
 let aplQuery = '';
 const aplCollapsed = new Set();
@@ -18,67 +20,84 @@ function aplLastDay(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
 
-// Year view column = month * 4 + week (W1 1–7, W2 8–14, W3 15–21, W4 22–end of month), as in the 5S audit plan.
-function aplWeekCol(iso) {
+function aplMonthOf(iso) {
   const date = actDate(iso);
-  return date.getMonth() * 4 + Math.min(3, Math.floor((date.getDate() - 1) / 7));
+  return (date.getFullYear() - aplYear) * 12 + date.getMonth();
 }
 
-function aplColStart(year, col) {
-  return actIso(new Date(year, Math.floor(col / 4), (col % 4) * 7 + 1));
+function aplMonthName(month, long = false) {
+  const name = (long ? ACT_MONTHS : ACT_MONTHS_SHORT)[month % 12];
+  if (month < 12) return long ? `${name} ${aplYear}` : name;
+  return long ? `${name} ${aplYear + 1}` : `${name} ${String(aplYear + 1).slice(2)}`;
 }
 
-function aplColEnd(year, col) {
+// Year view column = plan month * 4 + week (W1 1–7, W2 8–14, W3 15–21, W4 22–end of month), as in the 5S audit plan.
+function aplWeekCol(iso) {
+  return aplMonthOf(iso) * 4 + Math.min(3, Math.floor((actDate(iso).getDate() - 1) / 7));
+}
+
+function aplColStart(col) {
+  return actIso(new Date(aplYear, Math.floor(col / 4), (col % 4) * 7 + 1));
+}
+
+function aplColEnd(col) {
   const month = Math.floor(col / 4);
   const week = col % 4;
-  return actIso(new Date(year, month, week < 3 ? week * 7 + 7 : aplLastDay(year, month)));
+  return actIso(new Date(aplYear, month, week < 3 ? week * 7 + 7 : aplLastDay(aplYear, month)));
 }
 
-function aplGeometry(width) {
-  const cols = aplView === 'year' ? 48 : aplLastDay(aplYear, aplMonth);
-  const room = Math.floor((width - (window.innerWidth <= 640 ? 260 : APL_LEFT) - 4) / cols);
-  return { cols, w: Math.max(APL_COL[aplView], room) };
+// Year view shows 12 months, or more when an item runs into next year.
+function aplGeometry(tasks) {
+  if (aplView === 'month') {
+    const cols = aplLastDay(aplYear, aplMonth);
+    return { cols, min: APL_COL.month, first: actIso(new Date(aplYear, aplMonth, 1)), last: actIso(new Date(aplYear, aplMonth, cols)) };
+  }
+  const lastMonth = Math.max(11, ...tasks.filter((t) => t.end_date).map((t) => Math.min(APL_MAX_MONTHS - 1, aplMonthOf(t.end_date))));
+  return { cols: (lastMonth + 1) * 4, months: lastMonth + 1, min: APL_COL.year };
 }
 
+// Column span [a, b] of an item, clipped to the view; null when it is outside.
 function aplPlace(task, g) {
   if (!task.start_date) return null;
   if (aplView === 'year') {
-    const a = aplWeekCol(task.start_date);
-    return { left: a * g.w, width: (aplWeekCol(task.end_date) - a + 1) * g.w };
+    const a = Math.max(0, aplWeekCol(task.start_date));
+    const b = Math.min(g.cols - 1, aplWeekCol(task.end_date));
+    return b < a ? null : { a, b };
   }
-  const first = actIso(new Date(aplYear, aplMonth, 1));
-  const last = actIso(new Date(aplYear, aplMonth, g.cols));
-  if (task.end_date < first || task.start_date > last) return null;
-  const a = task.start_date < first ? 0 : actDate(task.start_date).getDate() - 1;
-  const b = task.end_date > last ? g.cols - 1 : actDate(task.end_date).getDate() - 1;
-  return { left: a * g.w, width: (b - a + 1) * g.w };
+  if (task.end_date < g.first || task.start_date > g.last) return null;
+  return { a: task.start_date < g.first ? 0 : actDate(task.start_date).getDate() - 1, b: task.end_date > g.last ? g.cols - 1 : actDate(task.end_date).getDate() - 1 };
 }
 
-function aplTodayLeft(g) {
-  const today = new Date();
-  if (today.getFullYear() !== aplYear) return null;
-  if (aplView === 'month') return today.getMonth() === aplMonth ? (today.getDate() - 0.5) * g.w : null;
-  const col = aplWeekCol(actIso(today));
+// Today as a column position (fractional), or null.
+function aplTodayCol(g) {
+  const today = actIso(new Date());
+  if (aplView === 'month') return today >= g.first && today <= g.last ? actDate(today).getDate() - 0.5 : null;
+  const col = aplWeekCol(today);
+  if (col < 0 || col >= g.cols) return null;
+  const date = actDate(today);
   const from = (col % 4) * 7 + 1;
-  const to = col % 4 < 3 ? from + 6 : aplLastDay(aplYear, today.getMonth());
-  return (col + (today.getDate() - from + 0.5) / (to - from + 1)) * g.w;
+  const to = col % 4 < 3 ? from + 6 : aplLastDay(date.getFullYear(), date.getMonth());
+  return col + (date.getDate() - from + 0.5) / (to - from + 1);
 }
+
+const aplPct = (col, g) => `${(col / g.cols) * 100}%`;
 
 // New dates after dragging `delta` columns. Year view snaps to whole weeks, month view moves by days.
-function aplShift(task, mode, delta) {
+function aplShift(task, mode, delta, g) {
   if (aplView === 'year') {
+    const max = APL_MAX_MONTHS * 4 - 1;
     let a = aplWeekCol(task.start_date);
     let b = aplWeekCol(task.end_date);
     if (mode === 'move') {
       const len = b - a;
-      a = Math.max(0, Math.min(47 - len, a + delta));
+      a = Math.max(0, Math.min(max - len, a + delta));
       b = a + len;
     } else if (mode === 'l') a = Math.max(0, Math.min(b, a + delta));
-    else b = Math.min(47, Math.max(a, b + delta));
-    return { startDate: aplColStart(aplYear, a), endDate: aplColEnd(aplYear, b) };
+    else b = Math.min(Math.max(g.cols - 1, b), Math.max(a, b + delta));
+    return { startDate: aplColStart(a), endDate: aplColEnd(b) };
   }
   const first = actIso(new Date(aplYear, 0, 1));
-  const last = actIso(new Date(aplYear, 11, 31));
+  const last = actIso(new Date(aplYear + 1, 11, 31));
   const add = (iso) => actIso(actAddDays(actDate(iso), delta));
   let start = task.start_date;
   let end = task.end_date;
@@ -101,13 +120,12 @@ function aplShift(task, mode, delta) {
 }
 
 function aplHead(g) {
-  const tpl = `repeat(${g.cols}, ${g.w}px)`;
   if (aplView === 'year') {
-    return `<div class="apl-months" style="grid-template-columns:repeat(12, ${4 * g.w}px)">${ACT_MONTHS_SHORT.map((m) => `<div>${m}</div>`).join('')}</div>
-      <div class="apl-ticks" style="grid-template-columns:${tpl}">${Array.from({ length: 48 }, (_, c) => `<div title="${ACT_MONTHS_SHORT[Math.floor(c / 4)]} W${c % 4 + 1}">${c % 4 + 1}</div>`).join('')}</div>`;
+    return `<div class="apl-months" style="grid-template-columns:repeat(${g.months}, 1fr)">${Array.from({ length: g.months }, (_, m) => `<div class="${m === 12 ? 'is-year' : ''}">${aplMonthName(m)}</div>`).join('')}</div>
+      <div class="apl-ticks" style="grid-template-columns:repeat(${g.cols}, 1fr)">${Array.from({ length: g.cols }, (_, c) => `<div class="${c % 4 === 0 ? 'is-month' : ''}${c === 48 ? ' is-year' : ''}" title="${aplMonthName(Math.floor(c / 4))} W${c % 4 + 1}">${c % 4 + 1}</div>`).join('')}</div>`;
   }
-  return `<div class="apl-months" style="grid-template-columns:${g.cols * g.w}px"><div>${ACT_MONTHS[aplMonth]} ${aplYear}</div></div>
-    <div class="apl-ticks" style="grid-template-columns:${tpl}">${Array.from({ length: g.cols }, (_, c) => {
+  return `<div class="apl-months"><div>${aplMonthName(aplMonth, true)}</div></div>
+    <div class="apl-ticks" style="grid-template-columns:repeat(${g.cols}, 1fr)">${Array.from({ length: g.cols }, (_, c) => {
       const day = new Date(aplYear, aplMonth, c + 1).getDay();
       return `<div class="${day === 0 || day === 6 ? 'is-weekend' : ''}">${c + 1}</div>`;
     }).join('')}</div>`;
@@ -115,22 +133,21 @@ function aplHead(g) {
 
 function aplLines(g) {
   const cells = Array.from({ length: g.cols }, (_, c) => {
-    if (aplView === 'year') return `<div class="${c % 4 === 0 ? 'is-month' : ''}"></div>`;
+    if (aplView === 'year') return `<div class="${c % 4 === 0 ? 'is-month' : ''}${c === 48 ? ' is-year' : ''}"></div>`;
     const day = new Date(aplYear, aplMonth, c + 1).getDay();
     return `<div class="${day === 0 || day === 6 ? 'is-weekend' : ''}"></div>`;
   }).join('');
-  const today = aplTodayLeft(g);
-  return `<div class="apl-lines" style="grid-template-columns:repeat(${g.cols}, ${g.w}px)">${cells}</div>${today == null ? '' : `<div class="apl-today" style="left:${today}px"></div>`}`;
+  const today = aplTodayCol(g);
+  return `<div class="apl-lines" style="grid-template-columns:repeat(${g.cols}, 1fr)">${cells}</div>${today == null ? '' : `<div class="apl-today" style="left:${aplPct(today, g)}"></div>`}`;
 }
 
 function aplRow(task, code, color, g, lines, canEdit, phase) {
   const pos = aplPlace(task, g);
-  const width = pos ? Math.max(pos.width, g.w) : 0;
   const span = task.start_date ? `${actShort(task.start_date)} – ${actShort(task.end_date)}` : '';
-  const bar = pos ? `<div class="apl-bar${canEdit ? ' is-editable' : ''}" data-bar="${task.id}" style="left:${pos.left}px;width:${width}px;--bar:${color}" title="${esc(task.title)} · ${span} · ${task.progress}%">
+  const bar = pos ? `<div class="apl-bar${canEdit ? ' is-editable' : ''}" data-bar="${task.id}" data-a="${pos.a}" data-b="${pos.b}" style="left:${aplPct(pos.a, g)};width:${aplPct(pos.b - pos.a + 1, g)};--bar:${color}" title="${esc(task.title)} · ${span} · ${task.progress}%">
       <div class="apl-fill" style="width:${task.progress}%"></div><span>${task.progress}%</span>
       ${canEdit && !task.derived ? '<div class="apl-handle is-l" data-h="l"></div><div class="apl-handle is-r" data-h="r"></div>' : ''}</div>
-    <div class="apl-dates" style="left:${pos.left + width + 6}px">${span}</div>` : '';
+    <div class="apl-dates" style="${pos.b + 1 > g.cols * 0.8 ? `right:calc(${aplPct(g.cols - pos.a, g)} + 6px)` : `left:calc(${aplPct(pos.b + 1, g)} + 6px)`}">${span}</div>` : '';
   const title = phase
     ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(task.title)}</span>${canEdit ? `<button class="apl-add" type="button" data-add="${task.id}" title="เพิ่มข้อรอง" aria-label="เพิ่มข้อรองใต้ ${esc(task.title)}">+</button>` : ''}</div>`
     : `<div class="apl-title is-sub"><span>${esc(task.title)}</span></div>`;
@@ -144,7 +161,7 @@ async function aplRender(target, activity) {
   const tasks = data.tasks || [];
   const canEdit = Boolean(data.canEdit);
   if (!tasks.some((t) => t.id === aplSelected)) aplSelected = null;
-  const g = aplGeometry(target.clientWidth - 2 * 8 - 2 * 10);
+  const g = aplGeometry(tasks);
   const kidsOf = (id) => tasks.filter((t) => t.parent_id === id).sort((a, b) => a.sort_no - b.sort_no || a.id - b.id);
   const phases = tasks.filter((t) => t.parent_id == null).sort((a, b) => a.sort_no - b.sort_no || a.id - b.id);
   const q = aplQuery.trim().toLowerCase();
@@ -163,7 +180,7 @@ async function aplRender(target, activity) {
   const years = [aplYear - 1, aplYear, aplYear + 1].filter((y) => y >= 2000 && y <= 2100);
   const seg = `<div class="seg" role="group" aria-label="มุมมอง">${[['year', 'รายปี'], ['month', 'รายเดือน']].map(([mode, name]) => `<button class="seg-btn${mode === aplView ? ' is-active' : ''}" type="button" data-aplview="${mode}" aria-pressed="${mode === aplView}">${name}</button>`).join('')}</div>`;
   const search = field('ค้นหา', `<input id="apl-q" placeholder="ชื่อรายการหรือผู้รับผิดชอบ" value="${esc(aplQuery)}">`);
-  const tools = `${aplView === 'month' ? `<div class="plan-nav">${button('apl-prev', '‹', 'secondary', 'aria-label="เดือนก่อน"')}${button('apl-next', '›', 'secondary', 'aria-label="เดือนถัดไป"')}</div><strong class="plan-label">${ACT_MONTHS[aplMonth]} ${aplYear}</strong>` : ''}
+  const tools = `${aplView === 'month' ? `<div class="plan-nav">${button('apl-prev', '‹', 'secondary', 'aria-label="เดือนก่อน"')}${button('apl-next', '›', 'secondary', 'aria-label="เดือนถัดไป"')}</div><strong class="plan-label">${aplMonthName(aplMonth, true)}</strong>` : ''}
     ${canEdit ? `${button('apl-new', 'สร้าง', 'primary')}${button('apl-edit', 'แก้ไข', 'secondary', aplSelected ? '' : 'disabled')}${button('apl-del', 'ลบ', 'danger', aplSelected ? '' : 'disabled')}` : ''}
     <div class="a5-year">${field('ปี', `<select id="apl-year">${years.map((y) => `<option value="${y}"${y === aplYear ? ' selected' : ''}>${y}</option>`).join('')}</select>`)}</div>`;
   const admins = data.admins?.length ? `admin ปี ${aplYear}: ${data.admins.map(esc).join(', ')}` : `ยังไม่กำหนด admin ปี ${aplYear}`;
@@ -172,25 +189,34 @@ async function aplRender(target, activity) {
   target.innerHTML = `<div class="view-body"><section class="card plan-card">
     ${pageBar(`${seg}${search}`, tools, 'apl')}
     <p class="page-note">${admins} · ${tasks.length} รายการ${canEdit ? ' · ลากแท่งเพื่อย้าย ลากขอบเพื่อยืด/หด (รายปีทีละสัปดาห์ รายเดือนทีละวัน) · ดับเบิลคลิกแถวเพื่อแก้ไข' : ''}</p>
-    <div class="apl-scroll"><div class="apl-grid" style="--apl-tl:${g.cols * g.w}px">
+    <div class="apl-scroll"><div class="apl-grid" style="--apl-tl:${g.cols * g.min}px">
       <div class="apl-row apl-head"><div class="apl-left"><div>ลำดับ</div><div>รายการ</div><div>ผู้รับผิดชอบ</div><div class="apl-pct">%</div></div><div class="apl-track">${aplHead(g)}</div></div>
       ${rows}
     </div></div>
     ${tasks.length ? '' : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}
   </section></div>`;
   const box = target.querySelector('.apl-scroll');
+  // The scrollbars start below the header row and right of the left columns (app.css .apl-scroll).
+  box.style.setProperty('--apl-head', `${box.querySelector('.apl-head').offsetHeight}px`);
+  box.style.setProperty('--apl-left', `${box.querySelector('.apl-left').offsetWidth}px`);
   if (scroll) [box.scrollLeft, box.scrollTop] = scroll;
-  else if (box.scrollWidth > box.clientWidth) box.scrollLeft = Math.max(0, (aplTodayLeft(g) ?? 0) - (box.clientWidth - APL_LEFT) / 2);
+  else if (box.scrollWidth > box.clientWidth) {
+    const track = box.scrollWidth - box.querySelector('.apl-left').offsetWidth;
+    box.scrollLeft = Math.max(0, ((aplTodayCol(g) ?? 0) / g.cols) * track - (box.clientWidth - APL_LEFT) / 2);
+  }
 
   const rerender = () => aplRender(target, activity).catch(onErr);
   const byId = (id) => tasks.find((t) => t.id === Number(id));
   target.querySelectorAll('[data-aplview]').forEach((node) => { node.onclick = () => { aplView = node.dataset.aplview; rerender(); }; });
-  $('apl-year').onchange = () => { aplYear = Number($('apl-year').value); aplSelected = null; rerender(); };
+  $('apl-year').onchange = () => { aplYear = Number($('apl-year').value); aplMonth %= 12; aplSelected = null; rerender(); };
   let typing;
   $('apl-q').oninput = () => { clearTimeout(typing); typing = setTimeout(() => { aplQuery = $('apl-q').value; rerender().then(() => { const input = $('apl-q'); input?.focus(); input?.setSelectionRange(input.value.length, input.value.length); }); }, 250); };
   if ($('apl-prev')) {
-    $('apl-prev').onclick = () => { if (aplMonth === 0) { aplMonth = 11; aplYear -= 1; } else aplMonth -= 1; rerender(); };
-    $('apl-next').onclick = () => { if (aplMonth === 11) { aplMonth = 0; aplYear += 1; } else aplMonth += 1; rerender(); };
+    // Month view moves within the plan: January of its year to December of the next.
+    $('apl-prev').disabled = aplMonth <= 0;
+    $('apl-next').disabled = aplMonth >= APL_MAX_MONTHS - 1;
+    $('apl-prev').onclick = () => { aplMonth = Math.max(0, aplMonth - 1); rerender(); };
+    $('apl-next').onclick = () => { aplMonth = Math.min(APL_MAX_MONTHS - 1, aplMonth + 1); rerender(); };
   }
   target.querySelectorAll('[data-tog]').forEach((node) => {
     node.onclick = (e) => { e.stopPropagation(); const id = Number(node.dataset.tog); if (aplCollapsed.has(id)) aplCollapsed.delete(id); else aplCollapsed.add(id); rerender(); };
@@ -230,17 +256,20 @@ function aplDrag(e, node, g, activity, tasks, kidsOf, rerender) {
   const task = tasks.find((t) => t.id === Number(node.dataset.bar));
   const mode = e.target.dataset.h || 'move';
   const x0 = e.clientX;
-  const left0 = parseFloat(node.style.left);
-  const width0 = parseFloat(node.style.width);
+  const colPx = node.parentElement.getBoundingClientRect().width / g.cols;
+  const a0 = Number(node.dataset.a);
+  const b0 = Number(node.dataset.b);
   let delta = 0;
   try { node.setPointerCapture(e.pointerId); } catch { // keep dragging without capture
   }
   node.classList.add('is-dragging');
   const move = (ev) => {
-    delta = Math.round((ev.clientX - x0) / g.w);
-    if (mode === 'move') node.style.left = `${left0 + delta * g.w}px`;
-    else if (mode === 'l') { node.style.left = `${left0 + Math.min(delta, width0 / g.w - 1) * g.w}px`; node.style.width = `${Math.max(g.w, width0 - delta * g.w)}px`; }
-    else node.style.width = `${Math.max(g.w, width0 + delta * g.w)}px`;
+    delta = Math.round((ev.clientX - x0) / colPx);
+    let a = a0;
+    let b = b0;
+    if (mode === 'move') { a += delta; b += delta; } else if (mode === 'l') a = Math.min(b0, a0 + delta); else b = Math.max(a0, b0 + delta);
+    node.style.left = aplPct(a, g);
+    node.style.width = aplPct(b - a + 1, g);
   };
   const up = async () => {
     node.removeEventListener('pointermove', move);
@@ -250,7 +279,7 @@ function aplDrag(e, node, g, activity, tasks, kidsOf, rerender) {
     aplSelected = task.id;
     if (!delta) return rerender();
     const targets = task.derived ? kidsOf(task.id) : [task];
-    const items = targets.map((t) => ({ id: t.id, ...aplShift(t, mode, delta) }))
+    const items = targets.map((t) => ({ id: t.id, ...aplShift(t, mode, delta, g) }))
       .filter((item, i) => item.startDate !== targets[i].start_date || item.endDate !== targets[i].end_date);
     try {
       if (items.length) await api(`/api/act/${encodeURIComponent(activity)}/tasks/dates`, { method: 'PATCH', body: { year: aplYear, items } });
@@ -269,6 +298,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
   const pid = task ? task.parent_id : parentId;
   const derived = Boolean(task?.derived);
   const base = aplView === 'month' ? new Date(aplYear, aplMonth, 1) : new Date(aplYear, aplYear === new Date().getFullYear() ? new Date().getMonth() : 0, 1);
+  const range = `min="${aplYear}-01-01" max="${aplYear + 1}-12-31"`;
   const start = task ? task.start_date || '' : actIso(base);
   const end = task ? task.end_date || '' : actIso(actAddDays(base, 13));
   let ownerId = task?.owner_id || '';
@@ -278,12 +308,12 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
     field('ชื่อรายการ', `<input id="apl-title" maxlength="200" value="${esc(task?.title || '')}">`),
     field('ผู้รับผิดชอบ', `<div class="apl-owner"><input id="apl-owner" readonly value="${esc(ownerId ? `${ownerId} · ${task.owner_name}` : '')}" placeholder="ค้นจากรายชื่อด้านล่าง">${button('apl-owner-clear', 'ล้าง')}</div>`),
     searchBlock(searchSlot('ค้นพนักงาน', 'apl-emp-q', 'apl-emp-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน' }), 'apl-emp-list'),
-    field('วันเริ่ม', `<input id="apl-start" type="date" min="${aplYear}-01-01" max="${aplYear}-12-31" value="${esc(start)}"${derived ? ' disabled' : ''}>`),
-    field('วันจบ', `<input id="apl-end" type="date" min="${aplYear}-01-01" max="${aplYear}-12-31" value="${esc(end)}"${derived ? ' disabled' : ''}>`),
+    field('วันเริ่ม', `<input id="apl-start" type="date" ${range} value="${esc(start)}"${derived ? ' disabled' : ''}>`),
+    field('วันจบ', `<input id="apl-end" type="date" ${range} value="${esc(end)}"${derived ? ' disabled' : ''}>`),
     field(`ความคืบหน้า <span id="apl-pct-v">${task?.progress ?? 0}%</span>`, `<input id="apl-pct" type="range" min="0" max="100" step="5" value="${task?.progress ?? 0}"${derived ? ' disabled' : ''}>`),
     `<div id="apl-color-wrap">${field('สีข้อหลัก', `<div class="apl-swatches">${Object.entries(APL_COLORS).map(([key, hex]) => `<label class="apl-swatch" style="--bar:${hex}"><input type="radio" name="apl-color" value="${key}"${key === color ? ' checked' : ''}><span></span></label>`).join('')}</div>`)}</div>`,
     field('รายละเอียด', `<textarea id="apl-note" rows="2" maxlength="2000">${esc(task?.note || '')}</textarea>`),
-    derived ? '<p class="sum-meta">ข้อหลักที่มีข้อรอง: ช่วงวันและ % คิดจากข้อรองให้อัตโนมัติ</p>' : '<p class="sum-meta">ข้อหลักเว้นวันว่างได้ ข้อรองต้องมีวันเริ่มและวันจบ</p>'
+    derived ? '<p class="sum-meta">ข้อหลักที่มีข้อรอง: ช่วงวันและ % คิดจากข้อรองให้อัตโนมัติ</p>' : `<p class="sum-meta">วางแผนได้ถึง ธ.ค. ${aplYear + 1} · ข้อหลักเว้นวันว่างได้ ข้อรองต้องมีวันเริ่มและวันจบ</p>`
   ].join('');
   const title = task ? 'แก้ไขรายการ' : pid ? 'เพิ่มข้อรอง' : 'สร้างข้อหลัก';
   openPopup(title, fields, async () => {
