@@ -1,15 +1,5 @@
 // Store > Usage dashboards. renderHome in sto.js opens the overview page.
-const STO_DASH_COLORS = ['#ff8a1f', '#e56a00', '#ffb066', '#c2410c', '#fdba74', '#9a3412', '#ffd6aa', '#7c2d12'];
-
-function stoDashColors() {
-  const style = getComputedStyle(document.body);
-  const colors = [];
-  for (let i = 1; i <= 8; i += 1) {
-    const value = style.getPropertyValue(`--slice-${i}`).trim();
-    if (value) colors.push(value);
-  }
-  return colors.length ? colors : STO_DASH_COLORS.map((color) => color);
-}
+const STO_DASH_COLORS = ['#3b82f6', '#ff8a1f', '#3ecf8e', '#a78bfa', '#f87171', '#f59e0b', '#14b8a6', '#71717a'];
 let stoDashYear = new Date().getFullYear();
 
 function stoDashNum(value, digits = 0) {
@@ -40,7 +30,7 @@ function stoDashLine(months) {
 }
 
 function stoDashDonut(slices) {
-  const colors = stoDashColors();
+  const colors = STO_DASH_COLORS;
   let cursor = 0;
   const stops = slices.map((slice, index) => {
     const start = cursor;
@@ -118,11 +108,10 @@ function stoDashMonth(data) {
 async function stoDashRender(target, page) {
   const data = await api(`/api/usage-dashboard?year=${stoDashYear}`);
   const years = [stoDashYear - 1, stoDashYear, stoDashYear + 1];
+  const year = field('ปี', `<select id="sto-dash-year">${years.map((item) => `<option value="${item}"${item === data.year ? ' selected' : ''}>${item}</option>`).join('')}</select>`);
   target.innerHTML = `<div class="view-body sto-dash">
-    <div class="sto-dash-bar">
-      ${field('ปี', `<select id="sto-dash-year">${years.map((year) => `<option value="${year}"${year === data.year ? ' selected' : ''}>${year}</option>`).join('')}</select>`)}
-      <span class="sum-meta">รายการใช้งานทั้งระบบ · จ่ายออกของ ${esc(data.scope)}</span>
-    </div>
+    ${pageBar('', year, 'sto-dash')}
+    <p class="page-note">รายการใช้งานทั้งระบบ · จ่ายออกของ ${esc(data.scope)}</p>
     ${page === 'flow' ? stoDashFlow(data) : page === 'month' ? stoDashMonth(data) : stoDashOverview(data)}
   </div>`;
   $('sto-dash-year').onchange = () => {
