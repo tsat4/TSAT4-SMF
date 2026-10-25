@@ -68,17 +68,14 @@ function atxPhotoInput(id, onPick) {
 async function atxPage(target, activity) {
   const me = await a5Api(activity, `me?year=${a5Year}`);
   target.innerHTML = `<div class="view-body"><section class="card">
-    <div class="plan-head">
-      <div><div class="card-title">transaction · ${esc(actLabel(activity))}</div><p class="sum-meta">${me.access.member ? `ทีมปี ${a5Year}` : `เข้าได้เฉพาะทีมของกิจกรรมปี ${a5Year} (admin เพิ่มรายชื่อที่ Setting > ทีม)`}</p></div>
-      <div class="plan-tools">${a5Seg('data-atx', ATX_TABS, atxTab)}<div class="a5-year">${a5YearSelect(me.years)}</div></div>
-    </div>
+    ${pageBar(a5Seg('data-atx', ATX_TABS, atxTab), `<div class="a5-year">${a5YearSelect(me.years)}</div>`, 'a5')}
     <div id="atx-body"></div>
   </section></div>`;
   const rerender = () => atxPage(target, activity).catch(onErr);
   target.querySelectorAll('[data-atx]').forEach((node) => { node.onclick = () => { atxTab = node.dataset.atx; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   const body = $('atx-body');
-  if (!me.access.member) { body.innerHTML = '<p class="empty">ยังไม่มีชื่อในทีมของปีนี้</p>'; return; }
+  if (!me.access.member) { body.innerHTML = `<p class="empty">เข้าได้เฉพาะทีมของกิจกรรมปี ${a5Year} (admin เพิ่มรายชื่อที่ Setting > ทีม)</p>`; return; }
   if (atxTab === 'issues') return atxIssues(body, activity);
   return atxAudits(body, activity, me);
 }
@@ -142,6 +139,7 @@ async function atxAudits(body, activity, me) {
   $('atx-f-area').onchange = () => { atxFilter.area = $('atx-f-area').value; draw(); };
   $('atx-f-search').onclick = () => { atxFilter.q = $('atx-f-q').value; draw(); };
   onEnter('atx-f-q', () => { atxFilter.q = $('atx-f-q').value; draw(); });
+  a5Lift(body);
   if ($('atx-new')) $('atx-new').onclick = () => atxForm(body, activity, me).catch(onErr);
   $('atx-edit').onclick = () => picked?.canEdit && atxForm(body, activity, me, picked.id).catch(onErr);
   if ($('atx-del')) $('atx-del').onclick = () => picked && confirmPopup('ลบใบตรวจ', `ลบ ${esc(picked.audit_no)} และ Issue ที่เปิดจากใบนี้ (Issue เดิมที่ใบนี้ยืนยันไปแล้วจะไม่ย้อนกลับ)`, async () => {
@@ -313,6 +311,7 @@ async function atxIssues(body, activity) {
     <td>${esc(i.description)}</td><td>${esc(i.responsibleName || i.responsible_id || '-')}</td><td>${i.due_date ? atxDate(i.due_date) : '<span class="sum-meta">รอกำหนด</span>'}</td>
     <td>${atxBadge(i.shownStatus)}</td><td>${i.photos.length}</td></tr>`).join(''), 'ไม่มี Issue');
   body.querySelectorAll('[data-iall]').forEach((node) => { node.onclick = () => { atxIssueAll = node.dataset.iall === 'all'; atxIssues(body, activity).catch(onErr); }; });
+  a5Lift(body);
   bindRowSelect($('atx-rows'), (id) => atxIssueDetail(activity, data.issues.find((i) => String(i.id) === id), () => atxIssues(body, activity).catch(onErr)));
 }
 

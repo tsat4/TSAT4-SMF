@@ -44,15 +44,29 @@ function a5WeekEnd(year, month, week) {
   return new Date(year, month - 1, week === 4 ? last : week * 7);
 }
 
+// Move a tab's filters and buttons from its body up into the page bar (core.js pageBar, slots a5-left / a5-tools):
+// search goes left, everything else right. Notes (p, .sum-meta) stay in the body. Bind events before calling.
+function a5Lift(body) {
+  const left = $('a5-left');
+  const tools = $('a5-tools');
+  if (!tools) return;
+  tools.innerHTML = '';
+  if (left) left.innerHTML = '';
+  body.querySelectorAll(':scope > .a5-actions, :scope > .a5-filters').forEach((box) => {
+    [...box.children].forEach((child) => {
+      if (child.matches('p, .sum-meta')) return;
+      (child.matches('.search-slot') && left ? left : tools).appendChild(child);
+    });
+    if (!box.children.length) box.remove();
+  });
+}
+
 // ---------- Dashboard ----------
 
 async function a5Dashboard(target, activity) {
   const me = await a5Api(activity, `me?year=${a5Year}`);
   target.innerHTML = `<div class="view-body"><section class="card">
-    <div class="plan-head">
-      <div><div class="card-title">Dashboard · ${esc(actLabel(activity))}</div><p class="sum-meta">ทุกคนดูได้ · ปี ${a5Year}</p></div>
-      <div class="plan-tools">${a5Seg('data-a5dash', A5_DASH_TABS, a5DashTab)}<div class="a5-year">${a5YearSelect(me.years)}</div></div>
-    </div>
+    ${pageBar(a5Seg('data-a5dash', A5_DASH_TABS, a5DashTab), `<div class="a5-year">${a5YearSelect(me.years)}</div>`, 'a5')}
     <div id="a5-body"><div class="empty">กำลังโหลด...</div></div>
   </section></div>`;
   const rerender = () => a5Dashboard(target, activity).catch(onErr);
@@ -85,6 +99,7 @@ async function a5DrawSummary(body, activity) {
       <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th>${esc(actLabel(activity))} %</th><th>ครั้ง</th></tr></thead><tbody>${months.slice(0, 6).map(row).join('')}</tbody></table></div>
       <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th>${esc(actLabel(activity))} %</th><th>ครั้ง</th></tr></thead><tbody>${months.slice(6).map(row).join('')}</tbody></table></div>
     </div>`;
+  a5Lift(body);
   const redraw = () => a5DrawSummary(body, activity).catch(onErr);
   $('a5-type').onchange = () => { a5Summary.type = $('a5-type').value; redraw(); };
   $('a5-atype').onchange = () => { a5Summary.areaType = $('a5-atype').value; a5Summary.area = ''; redraw(); };
@@ -105,6 +120,7 @@ async function a5DrawRanking(body, activity) {
   body.innerHTML = `
     <div class="toolbar a5-filters">${field('เดือน', `<select id="a5-rank-month">${options(Array.from({ length: 12 }, (_, i) => i + 1), data.month, (m) => (m === 1 ? 'ม.ค.' : `สะสม ม.ค.–${ACT_MONTHS_SHORT[m - 1]}`))}</select>`)}</div>
     <div class="a5-two">${A5_AREA_TYPES.map(table).join('')}</div>`;
+  a5Lift(body);
   $('a5-rank-month').onchange = () => { a5RankMonth = Number($('a5-rank-month').value); a5DrawRanking(body, activity).catch(onErr); };
 }
 
@@ -154,6 +170,7 @@ async function a5DrawSchedule(body, activity) {
     ${a5Legend()}
     ${a5Grid(a5Year, data.areas, data.plans, data.audits, (plan, audit) => a5Dot(a5Year, plan, audit, today))}`;
   body.querySelectorAll('[data-a5atype]').forEach((node) => { node.onclick = () => { a5AreaType = node.dataset.a5atype; a5DrawSchedule(body, activity).catch(onErr); }; });
+  a5Lift(body);
 }
 
 async function a5DrawTeam(body, activity) {
@@ -173,6 +190,7 @@ async function a5DrawTeam(body, activity) {
       const list = active.filter((m) => m.role === 'auditor' && m.team === t);
       return `<div class="a5-team" style="--team:${a5TeamColor(t)}"><div class="a5-team-head"><span class="a5-badge">${esc(t)}</span>ทีม ${esc(t)}<span>${list.length} คน</span></div>${list.map(person).join('')}</div>`;
     }).join('') || '<p class="empty">ยังไม่มีทีมตรวจประเมินปีนี้</p>'}</div>`;
+  a5Lift(body);
 }
 
 // ---------- Setting ----------
@@ -181,10 +199,8 @@ async function a5Setting(target, activity) {
   const me = await a5Api(activity, `me?year=${a5Year}`);
   const admin = me.access.admin;
   target.innerHTML = `<div class="view-body"><section class="card">
-    <div class="plan-head">
-      <div><div class="card-title">Setting · ${esc(actLabel(activity))}</div><p class="sum-meta">${admin ? `admin ปี ${a5Year} แก้ไขได้` : `ดูอย่างเดียว · แก้ได้เฉพาะ admin ปี ${a5Year}`}</p></div>
-      <div class="plan-tools">${a5Seg('data-a5set', A5_SET_TABS, a5SetTab)}${a5SetTab === 'gantt' ? '' : `<div class="a5-year">${a5YearSelect(me.years)}</div>`}</div>
-    </div>
+    ${pageBar(a5Seg('data-a5set', A5_SET_TABS, a5SetTab), a5SetTab === 'gantt' ? '' : `<div class="a5-year">${a5YearSelect(me.years)}</div>`, 'a5')}
+    ${admin ? '' : `<p class="page-note">ดูอย่างเดียว · แก้ได้เฉพาะ admin ปี ${a5Year}</p>`}
     <div id="a5-body"><div class="empty">กำลังโหลด...</div></div>
   </section></div>`;
   const rerender = () => a5Setting(target, activity).catch(onErr);
@@ -217,6 +233,7 @@ async function a5SetAreas(body, activity, admin, rerender) {
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${data.areas.length} พื้นที่ · เจ้าของพื้นที่แยกตามปี (ปี ${a5Year})</p>`;
   fillTable('a5-rows', ['รหัส', 'ประเภท', 'ชื่อพื้นที่', 'Section', `เจ้าของปี ${a5Year}`, 'สถานะ'], data.areas.map((a) => `<tr data-pick="${a.id}"><td>${esc(a.code)}</td><td>${esc(a.area_type)}</td><td>${esc(a.name)}</td><td>${esc(a.section || '')}</td><td>${a.owner ? `${esc(a.owner.employeeId)} · ${esc(a.owner.name)}` : '<span class="sum-meta">ยังไม่กำหนด</span>'}</td><td>${esc(a.status)}</td></tr>`).join(''), 'ยังไม่มีพื้นที่');
+  a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => {
     picked = data.areas.find((a) => String(a.id) === id);
@@ -266,6 +283,7 @@ async function a5SetTeam(body, activity, admin, rerender) {
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${rows.length} รายชื่อ · Admin เข้า Setting ได้ · หัวหน้าทีม / ผู้ตรวจ / เจ้าของพื้นที่ เข้า transaction ได้</p>`;
   fillTable('a5-rows', ['บทบาท', 'ทีม', 'รหัส', 'ชื่อ', 'หน่วยงาน', 'สถานะ'], rows.map((m) => `<tr data-pick="${m.id}"><td>${esc(A5_ROLE_LABEL[m.role] || m.role)}</td><td>${m.team ? `<span class="a5-dot is-done" style="--team:${a5TeamColor(m.team)}"></span> ${esc(m.team)}` : ''}</td><td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td>${esc(m.department)}</td><td>${esc(m.status)}</td></tr>`).join(''), `ยังไม่มีทีมปี ${a5Year}`);
+  a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => { picked = rows.find((m) => String(m.id) === id); $('a5-del').disabled = !picked; });
   $('a5-add').onclick = () => {
@@ -305,6 +323,7 @@ async function a5SetChecklist(body, activity, admin, rerender) {
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${data.items.length} ข้อ · คะแนนเต็มรวม ${total} · หัวข้อแยกตามปี แก้ปีนี้ไม่กระทบผลตรวจปีก่อน</p>`;
   fillTable('a5-rows', ['ข้อที่', 'หมวด', 'หัวข้อตรวจ', 'คะแนนเต็ม', 'สถานะ'], data.items.map((i) => `<tr data-pick="${i.id}"><td>${i.item_no}</td><td>${esc(a5GroupName(activity, i.s_group))}</td><td>${esc(i.title)}</td><td>${i.score_max}</td><td>${esc(i.status)}</td></tr>`).join(''), `ยังไม่มีหัวข้อปี ${a5Year}`);
+  a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => { picked = data.items.find((i) => String(i.id) === id); $('a5-edit').disabled = !picked; $('a5-del').disabled = !picked; });
   const groupCount = Math.max(5, (A5_GROUPS[activity] || []).length);
@@ -345,6 +364,7 @@ async function a5SetPlan(body, activity, admin) {
     ${a5Grid(a5Year, list, plan.plans, [], (p) => a5Dot(a5Year, p, null, today))}`;
   const redraw = () => a5SetPlan(body, activity, admin).catch(onErr);
   body.querySelectorAll('[data-a5atype]').forEach((node) => { node.onclick = () => { a5AreaType = node.dataset.a5atype; redraw(); }; });
+  a5Lift(body);
   if (!admin) return;
   body.querySelectorAll('[data-cell]').forEach((node) => {
     node.classList.add('is-editable');
