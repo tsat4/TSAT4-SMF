@@ -6,7 +6,7 @@ const STATUS = {
 const USAGE_ROLE = { viewer: 'Viewer', user: 'User', admin: 'Admin' };
 const USAGE = 'ระบบงาน > Store > Usage';
 const LINE_HEAD = ['หมายเลขเลขรายการ', 'ชื่อรายการ', 'หน่วย'];
-const TX_PAGE = { issue: 'เบิกจ่าย', receive: 'รับเข้า', stock: 'Stock' };
+const TX_PAGE = { catalog: 'รายการ', issue: 'เบิกจ่าย', receive: 'รับเข้า', stock: 'Stock' };
 let editMode = 'list';
 let txPage = 'issue';
 Object.assign(TITLES, {
@@ -57,10 +57,15 @@ function stockBadge(min, current, max) {
 async function renderEdit(target) {
   const state = { offset: 0 };
   const admin = rankOf('sto') >= 3;
-  target.innerHTML = tablePage('edit', `
-    ${field('เลือกหน้าย่อย', `<select id="edit-page">${options(Object.keys(TX_PAGE), txPage, (value) => TX_PAGE[value])}</select>`, 'grow')}
-    ${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'เลขที่ costcenter หรือสถานะ', grow: true })}
-    <div class="action-bar" id="edit-actions"></div>`);
+  const seg = `<div class="seg" role="group" aria-label="หน้า transaction">${Object.entries(TX_PAGE).map(([id, label]) => `<button class="seg-btn${id === txPage ? ' is-active' : ''}" type="button" data-tx="${id}">${label}</button>`).join('')}</div>`;
+  target.innerHTML = `<div class="view-body">
+    ${pageBar(`${seg}${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'ค้นหา' })}`, '<div class="action-bar" id="edit-actions"></div>', 'edit')}
+    <div class="table-wrap sheet" id="edit-rows"></div>
+    <div class="table-foot">
+      <div class="sum-meta" id="edit-count"></div>
+      <div class="action-bar">${button('edit-prev', 'ก่อนหน้า')}${button('edit-next', 'ถัดไป')}</div>
+    </div>
+  </div>`;
   const setFoot = (shown, total) => {
     countText('edit-count', shown, total);
     $('edit-prev').disabled = state.offset <= 0;
@@ -68,10 +73,22 @@ async function renderEdit(target) {
   };
   const pageOf = (rows) => rows.slice(state.offset, state.offset + PAGE);
   const load = async () => {
-    if (txPage === 'stock') await loadStock();
+    if (txPage === 'catalog') await loadCatalog();
+    else if (txPage === 'stock') await loadStock();
     else if (txPage === 'receive') await loadReceive();
     else if (editMode === 'summary') await loadSummary();
     else await loadList();
+  };
+  const loadCatalog = async () => {
+    $('edit-q').placeholder = 'หมายเลข ชื่อ หรือ group';
+    $('edit-actions').innerHTML = '';
+    const data = await api(`/api/materials?q=${encodeURIComponent($('edit-q').value.trim())}&offset=${state.offset}&limit=${PAGE}`);
+    const rows = data.materials || [];
+    fillTable('edit-rows', ['รูป', ...LINE_HEAD, ''], rows.map((row) => `<tr><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td><td><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}">+</button></td></tr>`).join(''), 'ไม่พบรายการ');
+    setFoot(rows.length, data.total || 0);
+    $('edit-rows').querySelectorAll('[data-add]').forEach((node) => {
+      node.onclick = () => openCartPopup({ material: node.dataset.add, name: node.dataset.name || '', bun: node.dataset.bun || '' }).catch(onErr);
+    });
   };
   const loadReceive = async () => {
     $('edit-q').placeholder = 'เลขที่หรือรายการ';
@@ -210,13 +227,15 @@ async function renderEdit(target) {
       });
     }
   };
-  $('edit-page').onchange = () => {
-    txPage = $('edit-page').value;
-    editMode = 'list';
-    state.offset = 0;
-    $('edit-q').value = '';
-    load().catch(onErr);
-  };
+  target.querySelectorAll('[data-tx]').forEach((node) => {
+    node.onclick = () => {
+      txPage = node.dataset.tx;
+      editMode = 'list';
+      state.offset = 0;
+      $('edit-q').value = '';
+      renderEdit(target).catch(onErr);
+    };
+  });
   $('edit-search').onclick = () => { state.offset = 0; load().catch(onErr); };
   onEnter('edit-q', () => { state.offset = 0; load().catch(onErr); });
   $('edit-prev').onclick = () => { state.offset = Math.max(0, state.offset - PAGE); load().catch(onErr); };
@@ -224,9 +243,44 @@ async function renderEdit(target) {
   await load();
 }
 
-async function openAddPopup() {
-  const [pay, mine] = await Promise.all([api('/api/pay-centers'), api('/api/requisitions?scope=mine')]);
+async function putInCart(material, qty, costcenter) {
+  const mine = await api('/api/requisitions?scope=mine');
+  const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
+  let id = cartHeader?.id;
+  if (!id) id = (await api('/api/requisitions', { method: 'POST', body: { costcenter } })).id;
+  await api(`/api/requisitions/${id}/lines`, { method: 'POST', body: { material, qty, costcenter } });
+}
+
+async function openCartPopup(item) {
+  const pay = await api('/api/pay-centers');
   const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
+  const mine = await api('/api/requisitions?scope=mine');
+  const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
+  const chosen = cartHeader && cartHeader.costcenter !== '-' ? cartHeader.costcenter : (centers[0]?.costcenter || '');
+  const centerField = centers.length
+    ? `<select id="line-cc">${centers.map((row) => `<option value="${esc(row.costcenter)}"${row.costcenter === chosen ? ' selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName)}</option>`).join('')}</select>`
+    : `<input readonly value="${pay.department ? 'หน่วยงานนี้ยังไม่มี costcenter' : 'พนักงานนี้ยังไม่มีหน่วยงาน'}">`;
+  openPopup('ใส่ตะกร้า', [
+    field('หมายเลขเลขรายการ', `<input value="${esc(item.material)}" readonly>`),
+    field('ชื่อรายการ', `<input value="${esc(item.name)}" readonly>`),
+    field('หน่วย', `<input value="${esc(item.bun)}" readonly>`),
+    field('จำนวน', '<input id="line-qty" type="number" min="0.001" step="0.001" value="1">'),
+    field('costcenter', centerField)
+  ].join(''), async () => {
+    const qty = Number($('line-qty').value);
+    const costcenter = $('line-cc')?.value || '';
+    if (!(qty > 0)) throw new Error('ระบุจำนวน');
+    if (!costcenter) throw new Error('เลือก costcenter');
+    await putInCart(item.material, qty, costcenter);
+    toast('ใส่ตะกร้าแล้ว');
+    closePopup();
+  }, 'ใส่ตะกร้า');
+}
+
+async function openAddPopup() {
+  const pay = await api('/api/pay-centers');
+  const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
+  const mine = await api('/api/requisitions?scope=mine');
   const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
   const chosen = cartHeader && cartHeader.costcenter !== '-' ? cartHeader.costcenter : (centers[0]?.costcenter || '');
   let picked = null;
@@ -246,9 +300,7 @@ async function openAddPopup() {
     const costcenter = $('line-cc')?.value || '';
     if (!(qty > 0)) throw new Error('ระบุจำนวน');
     if (!costcenter) throw new Error('เลือก costcenter');
-    let id = cartHeader?.id;
-    if (!id) id = (await api('/api/requisitions', { method: 'POST', body: { costcenter } })).id;
-    await api(`/api/requisitions/${id}/lines`, { method: 'POST', body: { material: picked.material, qty, costcenter } });
+    await putInCart(picked.material, qty, costcenter);
     toast('ใส่ตะกร้าแล้ว');
     closePopup();
     showEdit('summary');

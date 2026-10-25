@@ -102,14 +102,16 @@ export function mountMaterials(app, mod) {
 
   app.get('/api/materials', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
     const term = cleanTerm(req.query.q);
+    const offset = Math.max(0, Number(req.query.offset) || 0);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     let query = mx.from('mt_sto_usage')
-      .select('material,material_description,bun,status,usage_group,img')
+      .select('material,material_description,bun,status,usage_group,img', { count: 'exact' })
       .eq('status', 'Active')
       .order('material')
-      .limit(20);
+      .range(offset, offset + limit - 1);
     if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`);
-    const { data, error } = await query;
+    const { data, error, count } = await query;
     if (error) return fail(res, 400, 'ค้นหารายการไม่ได้');
-    res.json({ materials: data || [] });
+    res.json({ materials: data || [], total: count || 0 });
   }));
 }
