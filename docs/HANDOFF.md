@@ -5,9 +5,9 @@
 - งาน: แยกฐาน **Mx Data = master + ระบบงาน** · **Tx Data = ระบบกิจกรรม** ชื่อตาราง `mt_5s_*` / `tx_5s_*` (ผู้ใช้สั่ง 2026-10-25)
 - ใคร: Claude ทำโค้ดเสร็จและ deploy แล้ว (โค้ดรองรับกรณีตารางยังไม่มี หน้า 5S จะขึ้นข้อความแจ้งแทนการพัง)
 - ขั้นตอนที่เหลือ (ผู้ใช้ / Cursor ทำตามลำดับ):
-  1. [ ] **Tx Data** SQL Editor: รัน `db/act/5s.sql`
-  2. [ ] **Tx Data**: รัน `inbox/import_5s/01_areas.sql` … `10_issue_photos.sql` ตามลำดับ (หรือ `inbox/import_5s.sql` ทั้งไฟล์) ท้ายไฟล์เต็มมี query นับ: 34 / 19 / 25 / 14 / 33 / 52
-  3. [ ] **Render** → Environment: `TX_SUPABASE_URL` = `https://loeyrgavlpdnrbczjxpl.supabase.co` และ `TX_SUPABASE_SECRET_KEY` = secret key ของ Tx Data (Supabase → Tx Data → Settings → API Keys) แล้ว Save
+  1. [x] **Tx Data**: รัน `db/act/5s.sql` แล้ว (Cursor 2026-10-25)
+  2. [x] **Tx Data**: ใส่ข้อมูล 5S แล้ว นับได้ พื้นที่ 34 / เจ้าของ 34 / ทีม 19 / หัวข้อ 25 / แผน 14 / ใบตรวจ 33 / คะแนน 825 / คนในใบ 108 / Issue 52 / รูป 54 หมวด ส1–ส5 = 85.2/82.5/87.0/88.7/89.8
+  3. [ ] **Render** → Environment: `TX_SUPABASE_URL` = `https://loeyrgavlpdnrbczjxpl.supabase.co` และ `TX_SUPABASE_SECRET_KEY` = secret key ของ Tx Data (Supabase → Tx Data → Settings → API Keys) แล้ว Save — ตอนนี้ค่า TX ยังชี้ไป Mx Data จากรอบรวมฐานก่อนหน้า ถ้าไม่สลับกลับ หน้า 5S จะขึ้นว่ายังไม่มีตาราง
   4. [ ] ตรวจบนเว็บ: Store เบิก/รับยังทำงาน (ใช้ Mx Data) · 5S Dashboard ขึ้นตัวเลข 85.2/82.5/87.0/88.7/89.8
   5. [ ] **Mx Data**: รัน `db/07_drop_act_from_mx.sql` (ล้าง mt_act_* ชุดเก่า) — ทำหลังข้อ 4 ผ่านเท่านั้น
 - หมายเหตุ: ตาราง tx_sto_* ชุดเก่าที่ยังค้างใน Tx Data ไม่มีโค้ดใช้แล้ว (Store ใช้ Mx Data) เก็บไว้เป็นสำรองก่อน ลบทีหลังได้
@@ -29,6 +29,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-25 · Cursor · โค้ดแยกฐาน `59c8856` อยู่บนเว็บแล้ว และสร้างตาราง `mt_5s_*` / `tx_5s_*` ใน Tx Data พร้อมข้อมูลเดิม ตัวเลขหมวดตรง 85.2/82.5/87.0/88.7/89.8 ยังไม่สลับ env TX กลับ และยังไม่ลบตารางกิจกรรมเก่าใน Mx Data
 - 2026-10-25 · Claude · แยกฐาน: Store ใช้ client mx ทั้งหมด (tx_sto_* อยู่ Mx Data) · กิจกรรมใช้ client tx = Tx Data ตารางต่อกิจกรรม mt_5s_* / tx_5s_* จากแม่แบบ scripts/act-sql.js (db/act/5s.sql) · importer/test ใช้ชื่อใหม่ (ผล Dashboard ยังตรงระบบเดิม) · แก้หน้า Gantt ให้แสดงชื่อ admin ของปี · db/04, db/05 เลิกใช้ ล้างด้วย db/07
 - 2026-10-25 · Claude · 5S Dashboard (Summary / Ranking / Schedule / Team Auditor) + Setting (แผนงาน Gantt / พื้นที่ / ทีม / หัวข้อตรวจ / แผนตรวจ) สิทธิ์กิจกรรมย้ายไปใช้ mt_act_team รายปี (act ไม่มี memberTable แล้ว) ตัวเลข Dashboard ตรงกับระบบเดิม (`npm run test:act`) แยกไฟล์ import เป็น `inbox/import_5s/01–10` ยังไม่ได้ทำ transaction (ฟอร์มตรวจ + Issue)
 - 2026-10-25 · Cursor · รัน `db/05_act_audit.sql` ใน MX แล้ว และใส่ข้อมูลตั้งต้น 5S: พื้นที่ 34 ทีม 19 หัวข้อ 25 แผน 14 ใบตรวจ 33 ยังไม่ใส่คะแนนรายข้อ Issue และรูป หน้าจอตรวจยังไม่ได้ทำ
