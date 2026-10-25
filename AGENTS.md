@@ -1,7 +1,20 @@
 # กฎสำหรับ AI ทุกตัวในโปรเจกต์นี้ (Claude Code, Cursor และตัวอื่น)
 
-โปรเจกต์นี้มี AI หลายตัวผลัดกันทำงานในโฟลเดอร์เดียวกัน (`C:\Work\projects\SMF`) เมื่อตัวหนึ่งติด limit อีกตัวจะทำงานต่อ
+โปรเจกต์นี้มี AI 2 ตัวทำงานพร้อมกันได้ **คนละโฟลเดอร์** แต่เป็น repo, เว็บ (Render) และฐานข้อมูล (Supabase) ชุดเดียวกัน
 **ระบบที่ deploy อยู่ต้องไม่พัง** ทุกตัวจึงต้องทำตามกฎนี้ทุกครั้ง ไม่มีข้อยกเว้น
+
+## 0. ใครทำงานที่ไหน
+
+| | Cursor | Claude Code |
+|---|---|---|
+| โฟลเดอร์ | `C:\Work\projects\SMF` (branch `main`) | `C:\Work\projects\SMF-act` (git worktree, branch `claude-act` ติดตาม `origin/main`) |
+| ส่วนที่ดูแลหลัก | ระบบงาน (Store, PD, MTN) + งานรัน SQL ใน Supabase | ระบบกิจกรรม (`server/modules/act/`, `public/js/act*.js`, `db/act/`, `scripts/act-sql.js`, `scripts/*5s*`) |
+| ดึงโค้ดล่าสุด | `git pull --rebase` | `git pull --rebase` |
+| deploy | `git push origin main` | `git push origin HEAD:main` |
+
+- ห้ามทำงานในโฟลเดอร์ของอีกตัว ห้าม commit ไฟล์ที่อีกตัวกำลังแก้
+- ไฟล์กลาง (`public/index.html`, `public/app.css`, `server/core/`, `server/modules/index.js`, `scripts/routes.snapshot.txt`, `docs/*`) แตะได้ทั้งคู่: แก้เท่าที่จำเป็น commit ให้เร็ว ถ้า `git pull --rebase` เจอ conflict ให้รวมทั้งสองฝั่ง ห้ามเลือกฝั่งตัวเองทิ้งของอีกตัว
+- `inbox/` (Excel และ SQL ย้ายข้อมูล ไม่อยู่ใน git) มีจริงที่ `SMF\inbox` ส่วน `SMF-act\inbox` เป็นลิงก์ (junction) ไปที่เดียวกัน
 
 ## 1. ก่อนเริ่มงาน (ทำทุกครั้ง ทุก session)
 
@@ -51,7 +64,7 @@
    - ถ้าตั้งใจเพิ่ม/เปลี่ยน route หรือสิทธิ์ ให้รัน `npm run check -- --update` แล้วตรวจ diff ของ `scripts/routes.snapshot.txt` ว่าเปลี่ยนเฉพาะที่ตั้งใจ
 2. อัปเดต `docs/HANDOFF.md`: เพิ่มบรรทัดใน "บันทึก" (อันใหม่อยู่บนสุด) และล้างหรือแก้หัวข้อ "กำลังทำอยู่"
 3. commit message เป็นประโยคภาษาอังกฤษประโยคเดียว จบด้วยจุด บอกผลลัพธ์ที่ได้ เช่น `Add the PD1 dashboard with daily output.`
-4. `git push origin main` แล้ว **Render จะ deploy อัตโนมัติ**
+4. `git pull --rebase` อีกครั้ง (อีกตัวอาจ push ไปแล้ว) ให้ `npm run check` ผ่านอีกรอบ แล้ว push ตามตารางหัวข้อ 0 (`git push origin main` หรือ `git push origin HEAD:main`) **Render จะ deploy อัตโนมัติ**
 5. ประมาณ 2–5 นาทีต่อมา ตรวจ `https://tsat4-smf.onrender.com/api/health` ต้องได้ `{"ok":true,"database":true}`
 
 **ห้าม push ถ้า check ไม่ผ่าน** ถ้า limit ใกล้หมดและงานยังไม่เสร็จ ให้ปล่อยไฟล์ไว้แบบยังไม่ commit (AI ตัวถัดไปจะเห็นในโฟลเดอร์เดียวกัน) แล้วเขียนหัวข้อ "กำลังทำอยู่" ใน HANDOFF ให้ละเอียดว่าทำถึงไหน เหลืออะไร และไฟล์ไหนยังไม่เสร็จ

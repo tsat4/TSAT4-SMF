@@ -29,6 +29,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-25 · Claude · แยกโฟลเดอร์ทำงาน: Claude ใช้ `C:\Work\projects\SMF-act` (worktree branch claude-act → push `HEAD:main`) · Cursor ใช้ `C:\Work\projects\SMF` (main) · ทำพร้อมกันได้ ดูหัวข้อ 0 ใน AGENTS.md · Claude ดูแลระบบกิจกรรม Cursor ดูแลระบบงาน + งาน SQL
 - 2026-10-25 · Cursor · ลบของเก่าตามที่ผู้ใช้สั่ง: Mx Data ไม่มี mt_act_* / tx_act_* แล้ว (พนักงาน 309 และใบเบิก 1 ใบยังอยู่) · Tx Data ไม่มี tx_sto_* แล้ว (พื้นที่ 34 ใบตรวจ 33 Issue 52 ยังอยู่)
 - 2026-10-25 · Cursor · โค้ดแยกฐาน `59c8856` อยู่บนเว็บแล้ว และสร้างตาราง `mt_5s_*` / `tx_5s_*` ใน Tx Data พร้อมข้อมูลเดิม ตัวเลขหมวดตรง 85.2/82.5/87.0/88.7/89.8 ยังไม่สลับ env TX กลับ และยังไม่ลบตารางกิจกรรมเก่าใน Mx Data
 - 2026-10-25 · Claude · แยกฐาน: Store ใช้ client mx ทั้งหมด (tx_sto_* อยู่ Mx Data) · กิจกรรมใช้ client tx = Tx Data ตารางต่อกิจกรรม mt_5s_* / tx_5s_* จากแม่แบบ scripts/act-sql.js (db/act/5s.sql) · importer/test ใช้ชื่อใหม่ (ผล Dashboard ยังตรงระบบเดิม) · แก้หน้า Gantt ให้แสดงชื่อ admin ของปี · db/04, db/05 เลิกใช้ ล้างด้วย db/07
