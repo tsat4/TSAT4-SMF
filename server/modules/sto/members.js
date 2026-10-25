@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { mx, tx } from '../../core/db.js';
+import { mx } from '../../core/db.js';
 import { fail, wrap, cleanTerm } from '../../core/http.js';
 import { CREATOR_ID, ROLE_RANK, atLeast } from '../../core/access.js';
 import { nameOf, requireUser } from '../../core/users.js';
@@ -109,7 +109,7 @@ export function mountMembers(app, mod) {
     if (!/^[A-Za-z0-9]+$/.test(employeeId)) return fail(res, 400, 'รหัสพนักงานไม่ถูกต้อง');
     if (employeeId === CREATOR_ID) return fail(res, 400, 'นำผู้สร้างระบบออกจาก Usage ไม่ได้');
     if (employeeId === req.user.employeeId) return fail(res, 400, 'นำบัญชีที่กำลังใช้งานอยู่ออกไม่ได้');
-    const used = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+    const used = await mx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
       .or(`requested_by.eq.${employeeId},accepted_by.eq.${employeeId},received_by.eq.${employeeId}`);
     if (used.count) {
       const { error } = await mx.from('mt_sto_user').update({ status: 'Inactive' }).eq('employee_id', employeeId);

@@ -1,3 +1,4 @@
+-- เลิกใช้ (2026-10-25): ตารางกิจกรรมย้ายไป Tx Data ชื่อ mt_<กิจกรรม>_* / tx_<กิจกรรม>_* ดู db/act/ และ scripts/act-sql.js · ล้างของเก่าด้วย db/07_drop_act_from_mx.sql
 -- ระบบกิจกรรมแบบ "ตรวจด้วย checklist" (5S, SAFETY Patrol ฯลฯ) รันใน MX ครั้งเดียว (รันซ้ำได้)
 -- spec: docs/specs/act-5s.md · ทดสอบ: npm run test:act
 -- ทุกตารางแยกข้อมูลด้วย activity (id ตามเมนู เช่น '5s', 'safety')

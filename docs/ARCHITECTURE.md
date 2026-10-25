@@ -1,6 +1,13 @@
 # โครงสร้าง TSAT4 SMF
 
 เว็บแอปเดียว: Node 22 + Express ต่อกับ Supabase 2 ก้อน frontend เป็น vanilla JS ไม่มีขั้นตอน build
+
+| ฐาน | client / env | เก็บอะไร |
+|---|---|---|
+| **Mx Data** (ezhyitqznflvjnwuuchn) | `mx` / `MX_SUPABASE_*` | ตารางกลาง `mt_main_*` (พนักงาน, costcenter, login) + ระบบงาน `mt_sto_*` / `tx_sto_*` (และ PD/MTN ในอนาคต) |
+| **Tx Data** (loeyrgavlpdnrbczjxpl) | `tx` / `TX_SUPABASE_*` | ระบบกิจกรรม ตารางแยกต่อกิจกรรม `mt_5s_*` / `tx_5s_*` / `v_5s_*` (สร้างจาก scripts/act-sql.js) |
+
+ชื่อพนักงานในหน้ากิจกรรมดึงจาก Mx Data แยกอีกครั้ง (`namesOf`) เพราะคนละฐาน
 deploy บน Render (`render.yaml`): push ไปที่ `main` แล้ว deploy อัตโนมัติ URL คือ https://tsat4-smf.onrender.com
 
 ```
@@ -8,7 +15,7 @@ server.js                    จุดเริ่ม: createApp().listen() + bo
 server/
   app.js                     ประกอบแอป: auth → ทุกโมดูลใน MODULES → static → fallback index.html
   core/                      ของกลางที่ทุกโมดูลใช้
-    db.js                    mx (master, mt_*) / tx (transaction, tx_*)
+    db.js                    mx = Mx Data (master + ระบบงาน) / tx = Tx Data (กิจกรรม)
     http.js                  fail, wrap, qtyOf, amountOf, cleanTerm, adminWriteError
     session.js               cookie smf_session (HMAC, อายุ 7 วัน)
     access.js                CREATOR_ID, ROLE_RANK, defineModule, atLeast(mod, n), creatorOnly
@@ -25,8 +32,8 @@ server/
       requisitions.js        /api/summary, pay-centers, stock, requisitions (ขั้นตอนการเบิก)
       tables.js              ตาราง sto ที่แก้ได้ในหน้า System
     act/index.js             ระบบกิจกรรม: แผน Gantt /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (db/04_act_plan.sql)
-    act/common.js            accessOf (สิทธิ์รายปีจาก mt_act_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
-    act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/05_act_audit.sql) summarize()/rank() ทดสอบด้วย npm run test:act
+    act/common.js            tablesOf(กิจกรรม) ชื่อตาราง, accessOf (สิทธิ์รายปีจาก mt_<act>_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
+    act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/act/<กิจกรรม>.sql) summarize()/rank() ทดสอบด้วย npm run test:act
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
 public/
   index.html                 โครงหน้า + sidebar + ลำดับ <script>
@@ -97,14 +104,13 @@ scripts/
 | mt_sto_buyer | mx | costcenter ที่ซื้อได้ |
 | tx_sto_requisition / _line | tx | ใบเบิกและรายการในใบเบิก |
 | tx_sto_issue | tx | ประวัติการจ่าย |
-| mt_act_user | mx | สมาชิกระบบกิจกรรมและ role |
-| mt_act_owner | mx | หน่วยงานผู้ดูแลกิจกรรมแต่ละปี (year, activity, department) |
-| mt_act_plan | mx | รายการในแผน (activity, title, start_date, end_date, responsible, status planned/done/cancelled) |
+| mt_5s_team / _area / _area_owner / _checklist / _audit_plan / _setting / _plan | **tx** | กิจกรรม 5S: ทีมรายปี, พื้นที่, เจ้าของพื้นที่รายปี, หัวข้อตรวจรายปี, แผนตรวจ, ค่าตั้งต้น, แผน Gantt |
+| tx_5s_audit / _audit_score / _audit_person / _issue / _issue_photo, v_5s_audit_group | **tx** | ผลตรวจ คะแนน คนในใบตรวจ Issue รูป และ % ราย ส |
 
 ## Schedule Plan (ระบบกิจกรรม)
 
 - ทุกคนที่ login ดูแผนได้
-- สิทธิ์ของทุกกิจกรรมมาจาก `mt_act_team` รายปี (ไม่ใช้ `mt_act_user` / `mt_act_owner` แล้ว ตารางยังอยู่แต่ว่าง): role `admin` = แก้ Setting และแผน, `chairman` / `auditor` / เจ้าของพื้นที่ (`mt_act_area_owner`) = transaction, ทุกคน = Dashboard · creator ทำได้ทุกอย่าง
+- สิทธิ์ของแต่ละกิจกรรมมาจาก `mt_<กิจกรรม>_team` รายปี: role `admin` = แก้ Setting และแผน, `chairman` / `auditor` / เจ้าของพื้นที่ (`mt_<กิจกรรม>_area_owner`) = transaction, ทุกคน = Dashboard · creator ทำได้ทุกอย่าง
 - route เขียนข้อมูลของ act ตรวจ admin ของปีนั้นใน handler (`requireAdmin` / `guardYear`) snapshot จึงแสดงแค่ `auth`
 - แผนแบบ Gantt อยู่ที่ <กิจกรรม> > Setting รายการที่ชื่อเหมือนกันอยู่แถวเดียวกัน แถวที่ระบบสร้างเอง (เช่น Self Audit วันที่ 1–10 ทุกเดือน) กำหนดใน `ACT_GANTT_AUTO`
 - เปิดใช้กับกิจกรรมอื่น: เพิ่ม id ใน `ACT_GANTT_ON` ใน public/js/act-gantt.js (server รองรับทุกกิจกรรมใน `ACTIVITIES` แล้ว)

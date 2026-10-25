@@ -85,10 +85,11 @@ async function actGanttRender(target, activity) {
   const range = actGanttRange();
   const data = await api(`/api/act/${encodeURIComponent(activity)}/plan?from=${actIso(range.from)}&to=${actIso(range.to)}`);
   const events = data.events || [];
-  const yearOf = (year) => (data.years || []).find((row) => row.year === year) || { department: '', canEdit: false };
+  const yearOf = (year) => (data.years || []).find((row) => row.year === year) || { admins: [], canEdit: false };
   const current = yearOf(actGanttAnchor.getFullYear());
   const canEditDay = (iso) => yearOf(Number(String(iso).slice(0, 4))).canEdit;
-  const owner = current.department ? `ผู้ดูแลปี ${actGanttAnchor.getFullYear()}: ${esc(current.department)}` : `ยังไม่กำหนดผู้ดูแลปี ${actGanttAnchor.getFullYear()}`;
+  const admins = current.admins || [];
+  const owner = admins.length ? `admin ปี ${actGanttAnchor.getFullYear()}: ${admins.map(esc).join(', ')}` : `ยังไม่กำหนด admin ปี ${actGanttAnchor.getFullYear()}`;
   const total = actGanttDays(range.from, range.to);
   const columns = actGanttColumns(range);
   const template = columns.map(([, days]) => `${days}fr`).join(' ');

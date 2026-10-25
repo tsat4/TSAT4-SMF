@@ -1,10 +1,31 @@
-import { mx } from '../../core/db.js';
+import { mx, tx } from '../../core/db.js';
 import { fail } from '../../core/http.js';
 import { nameOf } from '../../core/users.js';
 
-// Shared by the act routes: activity list, input checks, yearly team access, and bulk reads.
+// Shared by the act routes. Activity data lives in Tx Data (client `tx`), one table set per activity:
+// mt_<key>_* / tx_<key>_* made by scripts/act-sql.js. Employees and logins stay in Mx Data (client `mx`).
 export const ACTIVITIES = ['100p', '5s', 'cfo', 'e-day', 'kaizen', 'lean', 'qcc', 'safety', 'smf'];
 export const PAGE = 1000;
+
+export function tablesOf(activity) {
+  const k = activity.replace(/[^a-z0-9]/g, '');
+  return {
+    sql: `db/act/${activity}.sql`,
+    team: `mt_${k}_team`,
+    setting: `mt_${k}_setting`,
+    plan: `mt_${k}_plan`,
+    area: `mt_${k}_area`,
+    owner: `mt_${k}_area_owner`,
+    checklist: `mt_${k}_checklist`,
+    auditPlan: `mt_${k}_audit_plan`,
+    audit: `tx_${k}_audit`,
+    score: `tx_${k}_audit_score`,
+    person: `tx_${k}_audit_person`,
+    issue: `tx_${k}_issue`,
+    photo: `tx_${k}_issue_photo`,
+    group: `v_${k}_audit_group`
+  };
+}
 
 export function dateOf(value) {
   const text = String(value || '');
@@ -24,10 +45,10 @@ export function activityOf(req, res) {
   return null;
 }
 
-// PGRST205 = the table is not created yet: say which SQL file to run instead of a 500.
-export function missingTables(res, error, file = 'db/05_act_audit.sql') {
+// PGRST205 = the table is not created yet: say which SQL file to run in Tx Data instead of a 500.
+export function missingTables(res, error, activity) {
   if (error?.code !== 'PGRST205') return false;
-  fail(res, 503, `ยังไม่ได้สร้างตารางของกิจกรรม (${file})`);
+  fail(res, 503, `ยังไม่ได้สร้างตารางของกิจกรรมนี้ใน Tx Data (${activity ? tablesOf(activity).sql : 'db/act/<กิจกรรม>.sql'})`);
   return true;
 }
 
@@ -58,14 +79,15 @@ export async function namesOf(ids) {
 // admin -> Setting · chairman / auditor / area owner -> transaction · everyone -> Dashboard
 export async function accessOf(req, activity, year) {
   const me = req.user.employeeId;
-  const none = { admin: false, chairman: false, auditor: false, teams: [], ownerAreaIds: [], member: false };
+  const t = tablesOf(activity);
+  const none = { admin: Boolean(req.user.creator), chairman: false, auditor: false, teams: [], ownerAreaIds: [], member: Boolean(req.user.creator) };
   const [team, owners] = await Promise.all([
-    mx.from('mt_act_team').select('role,team').eq('year', year).eq('activity', activity).eq('employee_id', me).eq('status', 'Active'),
-    mx.from('mt_act_area_owner').select('area_id,mt_act_area!inner(activity)').eq('year', year).eq('employee_id', me).eq('mt_act_area.activity', activity)
+    tx.from(t.team).select('role,team').eq('year', year).eq('employee_id', me).eq('status', 'Active'),
+    tx.from(t.owner).select('area_id').eq('year', year).eq('employee_id', me)
   ]);
-  if (team.error?.code === 'PGRST205' || owners.error?.code === 'PGRST205') return { ...none, admin: Boolean(req.user.creator) };
+  if (team.error?.code === 'PGRST205') return none;
   if (team.error) throw team.error;
-  if (owners.error) throw owners.error;
+  if (owners.error && owners.error.code !== 'PGRST205') throw owners.error;
   const roles = team.data || [];
   const access = {
     admin: Boolean(req.user.creator) || roles.some((r) => r.role === 'admin'),

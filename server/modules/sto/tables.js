@@ -13,14 +13,14 @@ export const STO_TABLES = {
   mt_sto_stock: { db: 'mx', pk: ['costcenter', 'material'], columns: [
     ['costcenter', 'text', true], ['material', 'text', true], ['min_qty', 'qty', true], ['current_qty', 'qty', true], ['max_qty', 'qty', true]
   ] },
-  tx_sto_requisition: { db: 'tx', pk: ['id'], columns: [
+  tx_sto_requisition: { db: 'mx', pk: ['id'], columns: [
     ['id', 'read'], ['requested_by', 'text', true], ['costcenter', 'text', true],
     ['status', 'req', true], ['note', 'text'], ['accepted_by', 'text'], ['received_by', 'text']
   ] },
-  tx_sto_requisition_line: { db: 'tx', pk: ['id'], columns: [
+  tx_sto_requisition_line: { db: 'mx', pk: ['id'], columns: [
     ['id', 'read'], ['requisition_id', 'int', true], ['costcenter', 'text', true], ['material', 'text', true], ['qty', 'qty', true]
   ] },
-  tx_sto_issue: { db: 'tx', pk: ['id'], columns: [
+  tx_sto_issue: { db: 'mx', pk: ['id'], columns: [
     ['id', 'read'], ['requisition_id', 'int', true], ['requisition_line_id', 'int', true],
     ['costcenter', 'text', true], ['material', 'text', true], ['qty', 'qty', true], ['issued_at', 'read']
   ] }

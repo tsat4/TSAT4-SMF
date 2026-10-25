@@ -35,7 +35,8 @@
 - ทุก route ที่ไม่ใช่ public ต้องมี `wrap(requireUser)` ตามด้วย `atLeast(mod, n)` หรือ `creatorOnly`
 - route ของโมดูลใหม่ต้องขึ้นต้นด้วย `/api/<id>/...` (route เดิมของ STO คงไว้ตามเดิมเพื่อไม่ให้ frontend พัง)
 - ไฟล์ใน `public/js/` ใช้ global scope ร่วมกัน ชื่อ top-level ห้ามซ้ำกันข้ามไฟล์ ให้ใส่ prefix ของโมดูล เช่น `pd1Render`, `PD1_STATUS`
-- ตาราง: `mt_<module>_*` (master อยู่ใน mx), `tx_<module>_*` (transaction อยู่ใน tx), ตารางกลาง `mt_main_*`
+- ฐานข้อมูล 2 ก้อน: **Mx Data** (client `mx`) = ตารางกลาง `mt_main_*` + ระบบงาน `mt_<module>_*` / `tx_<module>_*` (เช่น sto) · **Tx Data** (client `tx`) = ระบบกิจกรรม ตารางแยกต่อกิจกรรม `mt_<กิจกรรม>_*` / `tx_<กิจกรรม>_*` (เช่น mt_5s_area, tx_5s_audit)
+- ตารางกิจกรรมสร้างจากแม่แบบเท่านั้น: `node scripts/act-sql.js <กิจกรรม>` → `db/act/<กิจกรรม>.sql` ห้ามแก้ไฟล์ใน db/act/ ด้วยมือ (แก้ที่ scripts/act-sql.js แล้วสร้างใหม่) และชื่อตารางในโค้ดมาจาก `tablesOf()` ใน server/modules/act/common.js
 
 ### ฐานข้อมูล
 

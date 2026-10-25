@@ -2,15 +2,15 @@
 
 ## กำลังทำอยู่
 
-- งาน: รวมฐาน TX เข้า MX + ตัดสต็อกแบบ atomic **ทำตาม `db/README.md` ทีละขั้น (ขั้น 0–9)**
-- ใคร / เริ่มเมื่อ: Cursor, 2026-10-24 21:55 · ผู้ใช้สั่งให้ทำตาม db/README.md แล้วหยุดถามก่อนขั้นที่ 7
-- ขั้นตอน:
-  - [x] 0–2 เทสต์ผ่าน, inspect TX แล้ว, บันทึก `db/02b_mx_after_copy.sql`
-  - [x] 3 ผู้ใช้เลือกคง `rls_auto_enable` ของ MX และให้ฟังก์ชันใบเบิกใช้ข้อความจาก TX แล้วปรับให้ md5 ตรงกับ TX
-  - [x] 4–5 ไม่มี `.env` ในเครื่อง จึงเทียบในฐานโดยตรง: ใบเบิก 1 / รายการ 0 / จ่าย 0 และ checksum ใบเบิกตรงกัน
-  - [x] 6 รันทริกเกอร์จาก 02b และ `03_receive_rpc.sql` ใน MX แล้ว
-  - [ ] ขั้นที่ 7 ผู้ใช้ยืนยันว่ายังไม่มีคนใช้ (2026-10-25) ข้อมูล TX กับ MX ตรงกันแล้ว ติดที่ล็อกอิน Render เพื่อสลับ TX_SUPABASE_URL และ TX_SUPABASE_SECRET_KEY
-- ไฟล์ที่ยังแก้ไม่เสร็จ: `db/02a_mx_before_copy.sql` ยังไม่ได้บันทึกลงดิสก์ (รันในฐานแล้ว โดยข้าม `rls_auto_enable`)
+- งาน: แยกฐาน **Mx Data = master + ระบบงาน** · **Tx Data = ระบบกิจกรรม** ชื่อตาราง `mt_5s_*` / `tx_5s_*` (ผู้ใช้สั่ง 2026-10-25)
+- ใคร: Claude ทำโค้ดเสร็จและ deploy แล้ว (โค้ดรองรับกรณีตารางยังไม่มี หน้า 5S จะขึ้นข้อความแจ้งแทนการพัง)
+- ขั้นตอนที่เหลือ (ผู้ใช้ / Cursor ทำตามลำดับ):
+  1. [ ] **Tx Data** SQL Editor: รัน `db/act/5s.sql`
+  2. [ ] **Tx Data**: รัน `inbox/import_5s/01_areas.sql` … `10_issue_photos.sql` ตามลำดับ (หรือ `inbox/import_5s.sql` ทั้งไฟล์) ท้ายไฟล์เต็มมี query นับ: 34 / 19 / 25 / 14 / 33 / 52
+  3. [ ] **Render** → Environment: `TX_SUPABASE_URL` = `https://loeyrgavlpdnrbczjxpl.supabase.co` และ `TX_SUPABASE_SECRET_KEY` = secret key ของ Tx Data (Supabase → Tx Data → Settings → API Keys) แล้ว Save
+  4. [ ] ตรวจบนเว็บ: Store เบิก/รับยังทำงาน (ใช้ Mx Data) · 5S Dashboard ขึ้นตัวเลข 85.2/82.5/87.0/88.7/89.8
+  5. [ ] **Mx Data**: รัน `db/07_drop_act_from_mx.sql` (ล้าง mt_act_* ชุดเก่า) — ทำหลังข้อ 4 ผ่านเท่านั้น
+- หมายเหตุ: ตาราง tx_sto_* ชุดเก่าที่ยังค้างใน Tx Data ไม่มีโค้ดใช้แล้ว (Store ใช้ Mx Data) เก็บไว้เป็นสำรองก่อน ลบทีหลังได้
 <!-- ถ้าเริ่มงานใหญ่ ให้เขียนตามนี้:
 - งาน: ...
 - ใคร / เริ่มเมื่อ: Cursor | Claude, YYYY-MM-DD HH:MM
@@ -20,7 +20,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- ยังไม่ได้ย้ายคะแนนรายข้อ คนในใบตรวจ Issue และรูป: รัน `inbox/import_5s/07_scores.sql`, `08_people_in_each_audit.sql`, `09_issues.sql`, `10_issue_photos.sql` ใน MX ตามลำดับ (ไฟล์ 01–06 ใส่แล้ว รันซ้ำได้ไม่ซ้ำข้อมูล) จนกว่าจะรัน Summary/Ranking ของ 5S จะว่าง
+- ดูขั้นตอน 1–5 ในหัวข้อ "กำลังทำอยู่" (Tx Data: db/act/5s.sql + import · Mx Data: db/07 หลังตรวจแล้ว)
 
 ## ข้อควรระวัง
 
@@ -29,6 +29,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-25 · Claude · แยกฐาน: Store ใช้ client mx ทั้งหมด (tx_sto_* อยู่ Mx Data) · กิจกรรมใช้ client tx = Tx Data ตารางต่อกิจกรรม mt_5s_* / tx_5s_* จากแม่แบบ scripts/act-sql.js (db/act/5s.sql) · importer/test ใช้ชื่อใหม่ (ผล Dashboard ยังตรงระบบเดิม) · แก้หน้า Gantt ให้แสดงชื่อ admin ของปี · db/04, db/05 เลิกใช้ ล้างด้วย db/07
 - 2026-10-25 · Claude · 5S Dashboard (Summary / Ranking / Schedule / Team Auditor) + Setting (แผนงาน Gantt / พื้นที่ / ทีม / หัวข้อตรวจ / แผนตรวจ) สิทธิ์กิจกรรมย้ายไปใช้ mt_act_team รายปี (act ไม่มี memberTable แล้ว) ตัวเลข Dashboard ตรงกับระบบเดิม (`npm run test:act`) แยกไฟล์ import เป็น `inbox/import_5s/01–10` ยังไม่ได้ทำ transaction (ฟอร์มตรวจ + Issue)
 - 2026-10-25 · Cursor · รัน `db/05_act_audit.sql` ใน MX แล้ว และใส่ข้อมูลตั้งต้น 5S: พื้นที่ 34 ทีม 19 หัวข้อ 25 แผน 14 ใบตรวจ 33 ยังไม่ใส่คะแนนรายข้อ Issue และรูป หน้าจอตรวจยังไม่ได้ทำ
 - 2026-10-25 · Claude · ออกแบบตารางระบบตรวจ 5S จาก Excel + โค้ด TSAT4-5S เดิม (`db/05_act_audit.sql`) + สคริปต์ย้ายข้อมูล `scripts/import_5s_excel.py` + `npm run test:act` (ตัวเลขตรงกับ Dashboard เดิม) ยังไม่ได้ทำหน้าจอและยังไม่ได้รัน SQL ในฐาน

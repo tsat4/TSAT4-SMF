@@ -1,4 +1,4 @@
-import { mx, tx } from '../../core/db.js';
+import { mx } from '../../core/db.js';
 import { fail, wrap, qtyOf, cleanTerm } from '../../core/http.js';
 import { atLeast, rankIn } from '../../core/access.js';
 import { requireUser } from '../../core/users.js';
@@ -46,20 +46,20 @@ async function decorate(headers, linesById = new Map()) {
 }
 
 async function ownCart(req, id) {
-  const { data } = await tx.from('tx_sto_requisition').select('id,requested_by,costcenter,status').eq('id', id).maybeSingle();
+  const { data } = await mx.from('tx_sto_requisition').select('id,requested_by,costcenter,status').eq('id', id).maybeSingle();
   if (!data || data.requested_by !== req.user.employeeId || data.status !== 'cart') return null;
   return data;
 }
 
 async function move(id, from, patch) {
-  const { data, error } = await tx.from('tx_sto_requisition').update(patch).eq('id', id).eq('status', from).select('id');
+  const { data, error } = await mx.from('tx_sto_requisition').update(patch).eq('id', id).eq('status', from).select('id');
   if (error || !data?.length) throw new Error('เปลี่ยนสถานะไม่ได้');
 }
 
-// Once tx lives in the same database as mx, tx_sto_receive (db/03_receive_rpc.sql) cuts all stock
-// and marks the requisition received in one transaction. Until it exists, fall back to the old way.
+// tx_sto_receive (db/03_receive_rpc.sql, Mx Data) cuts all stock and marks the requisition received
+// in one transaction. If the function is missing, fall back to the old line-by-line way.
 async function receive(header) {
-  const { error } = await tx.rpc('tx_sto_receive', { p_id: header.id, p_employee: header.requested_by });
+  const { error } = await mx.rpc('tx_sto_receive', { p_id: header.id, p_employee: header.requested_by });
   if (!error) return;
   if (error.code !== 'PGRST202') {
     const text = error.message || '';
@@ -72,7 +72,7 @@ async function receive(header) {
 
 // Not atomic: stock is cut line by line and given back if a later line fails.
 async function receiveLineByLine(header) {
-  const { data: lines, error } = await tx.from('tx_sto_requisition_line')
+  const { data: lines, error } = await mx.from('tx_sto_requisition_line')
     .select('costcenter,material,qty').eq('requisition_id', header.id);
   if (error || !lines?.length) throw new Error('ใบเบิกไม่มีรายการ');
   const done = [];
@@ -98,15 +98,15 @@ export function mountRequisitions(app, mod) {
   const isAdmin = (req) => rankIn(req.user, mod.id) >= 3;
 
   app.get('/api/summary', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
-    const open = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+    const open = await mx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
       .eq('requested_by', req.user.employeeId)
       .in('status', ['cart', 'submitted', 'accepted', 'preparing', 'ready']);
-    const ready = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+    const ready = await mx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
       .eq('requested_by', req.user.employeeId)
       .eq('status', 'ready');
     let queue = 0;
     if (isAdmin(req)) {
-      const rows = await tx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
+      const rows = await mx.from('tx_sto_requisition').select('id', { count: 'exact', head: true })
         .in('status', ['submitted', 'accepted', 'preparing']);
       queue = rows.count || 0;
     }
@@ -155,7 +155,7 @@ export function mountRequisitions(app, mod) {
   app.get('/api/requisitions', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
     const scope = req.query.scope === 'queue' ? 'queue' : 'mine';
     if (scope === 'queue' && !isAdmin(req)) return fail(res, 403, 'จัดเตรียมและจ่ายสำหรับ Admin');
-    let query = tx.from('tx_sto_requisition').select('*').order('created_at', { ascending: false }).limit(50);
+    let query = mx.from('tx_sto_requisition').select('*').order('created_at', { ascending: false }).limit(50);
     if (scope === 'mine') query = query.eq('requested_by', req.user.employeeId);
     else query = query.in('status', ['submitted', 'accepted', 'preparing', 'ready']);
     const { data, error } = await query;
@@ -166,10 +166,10 @@ export function mountRequisitions(app, mod) {
 
   app.get('/api/requisitions/:id', wrap(requireUser), wrap(async (req, res) => {
     const id = Number(req.params.id);
-    const { data: header, error } = await tx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
+    const { data: header, error } = await mx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
     if (error || !header) return fail(res, 404, 'ไม่พบใบเบิก');
     if (header.requested_by !== req.user.employeeId && !isAdmin(req)) return fail(res, 403, 'เปิดใบเบิกนี้ไม่ได้');
-    const { data: lines, error: lineError } = await tx.from('tx_sto_requisition_line').select('*').eq('requisition_id', id).order('id');
+    const { data: lines, error: lineError } = await mx.from('tx_sto_requisition_line').select('*').eq('requisition_id', id).order('id');
     if (lineError) return fail(res, 400, 'อ่านรายการไม่ได้');
     const [row] = await decorate([header], new Map([[id, lines || []]]));
     res.json({ requisition: row });
@@ -180,7 +180,7 @@ export function mountRequisitions(app, mod) {
     if (costcenter) {
       if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
     } else costcenter = DRAFT_COSTCENTER;
-    const { data, error } = await tx.from('tx_sto_requisition')
+    const { data, error } = await mx.from('tx_sto_requisition')
       .insert({ requested_by: req.user.employeeId, costcenter })
       .select('id')
       .single();
@@ -198,18 +198,18 @@ export function mountRequisitions(app, mod) {
     const costcenter = String(req.body.costcenter || header.costcenter).trim();
     if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
     if (costcenter !== header.costcenter) {
-      const applied = await tx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
+      const applied = await mx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
       if (applied.error) return fail(res, 400, 'บันทึก costcenter ไม่ได้');
       header.costcenter = costcenter;
     }
     const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
     if (!item.data || item.data.status !== 'Active') return fail(res, 400, 'รายการนี้ใช้งานไม่ได้');
-    const existing = await tx.from('tx_sto_requisition_line').select('id,qty').eq('requisition_id', id).eq('material', material).maybeSingle();
+    const existing = await mx.from('tx_sto_requisition_line').select('id,qty').eq('requisition_id', id).eq('material', material).maybeSingle();
     if (existing.data) {
-      const { error } = await tx.from('tx_sto_requisition_line').update({ qty: qtyOf(Number(existing.data.qty) + qty) }).eq('id', existing.data.id);
+      const { error } = await mx.from('tx_sto_requisition_line').update({ qty: qtyOf(Number(existing.data.qty) + qty) }).eq('id', existing.data.id);
       if (error) return fail(res, 400, 'เพิ่มจำนวนไม่ได้');
     } else {
-      const { error } = await tx.from('tx_sto_requisition_line').insert({
+      const { error } = await mx.from('tx_sto_requisition_line').insert({
         requisition_id: id,
         costcenter: header.costcenter,
         material,
@@ -224,7 +224,7 @@ export function mountRequisitions(app, mod) {
     const qty = qtyOf(req.body.qty);
     const header = await ownCart(req, Number(req.params.id));
     if (!header || !qty) return fail(res, 400, 'แก้จำนวนในตะกร้าไม่ได้');
-    const { data, error } = await tx.from('tx_sto_requisition_line').update({ qty })
+    const { data, error } = await mx.from('tx_sto_requisition_line').update({ qty })
       .eq('id', Number(req.params.lineId)).eq('requisition_id', header.id).select('id');
     if (error || !data?.length) return fail(res, 400, 'แก้จำนวนไม่ได้');
     res.json({ ok: true });
@@ -233,7 +233,7 @@ export function mountRequisitions(app, mod) {
   app.delete('/api/requisitions/:id/lines/:lineId', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
     const header = await ownCart(req, Number(req.params.id));
     if (!header) return fail(res, 400, 'เอาออกจากตะกร้าไม่ได้');
-    const { error } = await tx.from('tx_sto_requisition_line').delete()
+    const { error } = await mx.from('tx_sto_requisition_line').delete()
       .eq('id', Number(req.params.lineId)).eq('requisition_id', header.id);
     if (error) return fail(res, 400, 'เอาออกจากตะกร้าไม่ได้');
     res.json({ ok: true });
@@ -243,7 +243,7 @@ export function mountRequisitions(app, mod) {
   app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res) => {
     const id = Number(req.params.id);
     const status = String(req.body.status || '');
-    const { data: header, error } = await tx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
+    const { data: header, error } = await mx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
     if (error || !header) return fail(res, 404, 'ไม่พบใบเบิก');
     const mine = header.requested_by === req.user.employeeId;
     const admin = isAdmin(req);
@@ -251,14 +251,14 @@ export function mountRequisitions(app, mod) {
       if (status === 'submitted' && mine && header.status === 'cart') {
         const costcenter = String(req.body.costcenter || header.costcenter || '').trim();
         if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
-        const { data: lines, error: lineError } = await tx.from('tx_sto_requisition_line').select('material').eq('requisition_id', id);
+        const { data: lines, error: lineError } = await mx.from('tx_sto_requisition_line').select('material').eq('requisition_id', id);
         if (lineError || !lines?.length) return fail(res, 400, 'ตะกร้าว่าง');
         for (const line of lines) {
           const stock = await mx.from('mt_sto_stock').select('material').eq('costcenter', costcenter).eq('material', line.material).maybeSingle();
           if (!stock.data) return fail(res, 400, `costcenter นี้ยังไม่มียอดของ ${line.material}`);
         }
         if (costcenter !== header.costcenter) {
-          const applied = await tx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
+          const applied = await mx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
           if (applied.error) return fail(res, 400, 'บันทึก costcenter ไม่ได้');
         }
         await move(id, 'cart', { status: 'submitted' });
