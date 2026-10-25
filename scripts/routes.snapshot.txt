@@ -1,9 +1,21 @@
-DELETE /api/act/:activity/plan/:id auth act:3
+DELETE /api/act/:activity/areas/:id auth
+DELETE /api/act/:activity/checklist/:id auth
+DELETE /api/act/:activity/plan/:id auth
+DELETE /api/act/:activity/team/:id auth
 DELETE /api/requisitions/:id/lines/:lineId auth sto:1
 DELETE /api/system/tables/:name auth creator
 DELETE /api/usage-materials/:material auth sto:3
 DELETE /api/users/:employeeId auth sto:3
+GET /api/act/:activity/areas auth
+GET /api/act/:activity/audit-plan auth
+GET /api/act/:activity/checklist auth
+GET /api/act/:activity/dashboard/ranking auth
+GET /api/act/:activity/dashboard/schedule auth
+GET /api/act/:activity/dashboard/summary auth
+GET /api/act/:activity/employees auth
+GET /api/act/:activity/me auth
 GET /api/act/:activity/plan auth
+GET /api/act/:activity/team auth
 GET /api/act/calendar auth
 GET /api/employees auth sto:3
 GET /api/health
@@ -18,12 +30,19 @@ GET /api/system/tables auth creator
 GET /api/system/tables/:name auth creator
 GET /api/usage-materials auth sto:3
 GET /api/users auth sto:3
-PATCH /api/act/:activity/plan/:id auth act:3
+PATCH /api/act/:activity/areas/:id auth
+PATCH /api/act/:activity/checklist/:id auth
+PATCH /api/act/:activity/plan/:id auth
 PATCH /api/requisitions/:id/lines/:lineId auth sto:1
 PATCH /api/system/tables/:name auth creator
 PATCH /api/usage-materials/:material auth sto:3
 PATCH /api/users/:employeeId auth sto:3
-POST /api/act/:activity/plan auth act:3
+POST /api/act/:activity/areas auth
+POST /api/act/:activity/checklist auth
+POST /api/act/:activity/checklist/copy auth
+POST /api/act/:activity/plan auth
+POST /api/act/:activity/team auth
+POST /api/act/:activity/team/copy auth
 POST /api/login
 POST /api/logout
 POST /api/password auth
@@ -33,3 +52,5 @@ POST /api/requisitions/:id/status auth
 POST /api/system/tables/:name auth creator
 POST /api/usage-materials auth sto:3
 POST /api/users auth sto:3
+PUT /api/act/:activity/areas/:id/owner auth
+PUT /api/act/:activity/audit-plan auth

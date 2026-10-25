@@ -24,7 +24,9 @@ server/
       materials.js           /api/usage-materials, /api/materials
       requisitions.js        /api/summary, pay-centers, stock, requisitions (ขั้นตอนการเบิก)
       tables.js              ตาราง sto ที่แก้ได้ในหน้า System
-    act/index.js             ระบบกิจกรรม: แผน /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (ตาราง db/04_act_plan.sql)
+    act/index.js             ระบบกิจกรรม: แผน Gantt /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (db/04_act_plan.sql)
+    act/common.js            accessOf (สิทธิ์รายปีจาก mt_act_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
+    act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/05_act_audit.sql) summarize()/rank() ทดสอบด้วย npm run test:act
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
 public/
   index.html                 โครงหน้า + sidebar + ลำดับ <script>
@@ -33,7 +35,8 @@ public/
   js/sto.js                  หน้า Usage: Dashboard / transaction / Setting
   js/units.js                รายชื่อหน่วยงาน PLANTS / ACTIVITIES และหน้าชั่วคราว
   js/act.js                  ระบบตั้งค่า > ปฏิทิน: แผนของทุกกิจกรรม (สัปดาห์ / เดือน / ปี) ดูอย่างเดียว + helper กลางของแผน
-  js/act-gantt.js            <กิจกรรม> > Setting: แผนประจำปีแบบ Gantt (สัปดาห์ / เดือน / ปี) เปิดใช้ตาม ACT_GANTT_ON
+  js/act-gantt.js            แผนประจำปีแบบ Gantt (สัปดาห์ / เดือน / ปี) เปิดใช้ตาม ACT_GANTT_ON
+  js/act-5s.js               <กิจกรรม> > Dashboard (Summary/Ranking/Schedule/Team) + Setting (แผนงาน/พื้นที่/ทีม/หัวข้อ/แผนตรวจ) เปิดใช้ตาม A5_ON
   js/system.js               หน้าแก้ตารางของ creator
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)
 db/                          SQL ที่ผู้ใช้รันเองใน Supabase + คู่มือ (README.md)
@@ -101,11 +104,12 @@ scripts/
 ## Schedule Plan (ระบบกิจกรรม)
 
 - ทุกคนที่ login ดูแผนได้
-- เพิ่ม/แก้/ลบได้เฉพาะ creator หรือ admin ใน `mt_act_user` ที่ department ตรงกับ `mt_act_owner` ของปีนั้น (ปีของวันเริ่ม) ผู้ดูแลจึงเปลี่ยนได้ทุกปีด้วยการเพิ่มแถวใน mt_act_owner
+- สิทธิ์ของทุกกิจกรรมมาจาก `mt_act_team` รายปี (ไม่ใช้ `mt_act_user` / `mt_act_owner` แล้ว ตารางยังอยู่แต่ว่าง): role `admin` = แก้ Setting และแผน, `chairman` / `auditor` / เจ้าของพื้นที่ (`mt_act_area_owner`) = transaction, ทุกคน = Dashboard · creator ทำได้ทุกอย่าง
+- route เขียนข้อมูลของ act ตรวจ admin ของปีนั้นใน handler (`requireAdmin` / `guardYear`) snapshot จึงแสดงแค่ `auth`
 - แผนแบบ Gantt อยู่ที่ <กิจกรรม> > Setting รายการที่ชื่อเหมือนกันอยู่แถวเดียวกัน แถวที่ระบบสร้างเอง (เช่น Self Audit วันที่ 1–10 ทุกเดือน) กำหนดใน `ACT_GANTT_AUTO`
 - เปิดใช้กับกิจกรรมอื่น: เพิ่ม id ใน `ACT_GANTT_ON` ใน public/js/act-gantt.js (server รองรับทุกกิจกรรมใน `ACTIVITIES` แล้ว)
 - ปฏิทินรวมอยู่ที่ ระบบตั้งค่า > ปฏิทิน แสดงทุกกิจกรรม แยกสีตามกิจกรรม ดูอย่างเดียว กดรายการแล้วไปที่แผนของกิจกรรมนั้นได้
-- ตั้งค่าผู้ดูแลและสมาชิกทำได้ที่หน้า System > Setting (ตาราง mt_act_owner, mt_act_user)
+- ตั้งค่าทีมและเจ้าของพื้นที่ที่ <กิจกรรม> > Setting (หรือ System > Setting สำหรับ creator)
 
 RPC: `mt_sto_stock_adjust(p_costcenter, p_material, p_delta)` (mx), `tx_sto_apply_costcenter(p_id, p_employee, p_costcenter)` (tx)
 

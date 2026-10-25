@@ -271,3 +271,51 @@ button.gantt-label.is-editable:hover{background:var(--drive-hover)}
 @media(max-width:650px){
   .gantt{--gantt-label:120px}
 }
+
+/* Checklist audit pages (public/js/act-5s.js) */
+.a5-year .field{width:110px}
+.a5-filters{margin-bottom:8px}
+.a5-actions{justify-content:flex-start;margin:0 0 8px}
+.a5-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:8px}
+.a5-kpis .kpi{background:var(--mo-info-soft);border:1px solid var(--mo-border);border-radius:var(--mo-radius);padding:8px}
+.a5-chart-card{margin-bottom:8px}
+.a5-chart{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:6px;height:220px;align-items:end;border-bottom:1px solid var(--mo-line);padding-top:16px}
+.a5-bar-col{position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.a5-bar{width:70%;min-height:1px;background:var(--mo-primary);opacity:.75;border-radius:3px 3px 0 0}
+.a5-bar-val{font-size:10.5px;color:var(--mo-text-muted);margin-bottom:2px}
+.a5-bar-label{position:absolute;bottom:-18px;font-size:10.5px;color:var(--mo-text-muted)}
+.a5-chart-card .a5-chart{margin-bottom:20px}
+.a5-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.a5-two > .card{min-width:0}
+.a5-rank td:nth-child(n+3),.a5-rank th:nth-child(n+3){text-align:right}
+.a5-rank tfoot td{font-weight:600;color:var(--mo-primary);border-top:2px solid var(--mo-line)}
+.a5-legend{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:11px;color:var(--mo-text-muted);margin:0 0 6px}
+.a5-legend > span{display:inline-flex;align-items:center;gap:5px}
+.a5-sched-wrap{overflow:auto;border:1px solid var(--mo-border);border-radius:var(--mo-radius);max-height:70vh}
+.a5-sched{border-collapse:separate;border-spacing:0;font-size:11px;min-width:100%}
+.a5-sched th,.a5-sched td{border-bottom:1px solid var(--mo-border);padding:3px 2px;text-align:center;white-space:nowrap;background:var(--mo-surface)}
+.a5-sched thead th{position:sticky;top:0;z-index:2;background:var(--mo-surface-2);color:var(--mo-text-muted);font-weight:500}
+.a5-sched thead tr:nth-child(2) th{top:22px}
+.a5-month{border-left:1px solid var(--mo-line)}
+.a5-cell:nth-child(4n+3){border-left:1px solid var(--mo-line)}
+.a5-sticky{position:sticky;left:0;z-index:1;text-align:left!important;padding:3px 8px!important;min-width:44px}
+.a5-sticky2{left:44px;min-width:130px;border-right:1px solid var(--mo-line)}
+.a5-sched thead .a5-sticky{z-index:3}
+.a5-cell.is-editable{cursor:pointer}
+.a5-cell.is-editable:hover{background:var(--drive-hover)}
+.a5-dot{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--mo-line);font-size:8px;font-weight:700;color:var(--team,#64748b);vertical-align:middle;box-sizing:border-box}
+.a5-dot.is-plan{border:2px solid var(--team,#64748b);background:transparent}
+.a5-dot.is-done{border:0;background:var(--team,#64748b);box-shadow:0 0 0 1px var(--mo-line)}
+.a5-dot.is-missed{border:0;background:var(--mo-danger)}
+.a5-dot.is-fixed{background:var(--mo-success)}
+.a5-team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-bottom:10px}
+.a5-team{border:1px solid var(--mo-border);border-left:4px solid var(--team);border-radius:var(--mo-radius);padding:8px;display:flex;flex-direction:column;gap:6px}
+.a5-team-head{display:flex;align-items:center;gap:8px;font-weight:600;font-size:12px}
+.a5-team-head > span:last-child{margin-left:auto;font-weight:400;font-size:11px;color:var(--mo-text-muted)}
+.a5-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--team);color:#fff;font-size:11px}
+.a5-person{border:1px solid var(--mo-border);border-radius:var(--mo-radius);padding:6px 8px;font-size:12px;display:flex;justify-content:space-between;gap:8px}
+.a5-person span{color:var(--mo-text-muted);font-size:11px}
+@media(max-width:900px){
+  .a5-two{grid-template-columns:1fr}
+}
+

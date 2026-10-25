@@ -161,7 +161,22 @@ def main():
                f"  (select count(*) from public.tx_act_audit where activity = {act}) as audits,\n"
                f"  (select count(*) from public.tx_act_issue i join public.tx_act_audit au on au.id = i.audit_id where au.activity = {act}) as issues;")
     Path(a.out).write_text('\n'.join(out) + '\n', encoding='utf-8')
+    # The same statements one section per file, for SQL editors that refuse a large paste.
+    parts_dir = Path(a.out).with_suffix('')
+    parts_dir.mkdir(exist_ok=True)
+    for old in parts_dir.glob('*.sql'):
+        old.unlink()
+    sections = []
+    for chunk in out[2:]:
+        if chunk.startswith('\n-- ') and not chunk.startswith('\n-- check:'):
+            sections.append([chunk.strip()])
+        elif sections and chunk.strip() != 'commit;' and not chunk.startswith('\n-- check:') and not chunk.startswith('select (select count'):
+            sections[-1].append(chunk)
+    for i, sec in enumerate(sections, 1):
+        name = ''.join(ch if ch.isalnum() else '_' for ch in sec[0].lstrip('- ').split(' (')[0]).strip('_').lower()
+        (parts_dir / f'{i:02d}_{name}.sql').write_text('\n'.join(sec) + '\n', encoding='utf-8')
     sys.stdout.reconfigure(encoding='utf-8')
+    print(f'wrote {len(sections)} parts in {parts_dir}')
     print(f'wrote {a.out}: areas {len(areas)}, team {len(team) + len(admins)}, checklist {len(checklist)}, plans {len(plans)}, audits {len(audits)}, issues {len(issues)}')
 
 

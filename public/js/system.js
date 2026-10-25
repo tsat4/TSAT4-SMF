@@ -4,7 +4,9 @@ const CHOICES = {
   group: ['Factory', 'Non', 'Center'],
   usage: ['viewer', 'user', 'admin'],
   level: ['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8'],
-  req: Object.keys(STATUS)
+  req: Object.keys(STATUS),
+  areatype: ['โรงงาน', 'สำนักงาน'],
+  actrole: ['admin', 'chairman', 'auditor']
 };
 
 TITLES.system = ['Setting', 'ตารางทั้งระบบ'];

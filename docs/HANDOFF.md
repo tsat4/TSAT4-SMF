@@ -20,8 +20,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- `db/05_act_audit.sql` ใน MX (ตารางระบบตรวจ 5S) แล้วตามด้วย `inbox/import_5s.sql` (สร้างด้วย `python -I scripts/import_5s_excel.py` ไฟล์ไม่อยู่ใน git) ดูหัวข้อ "ย้ายข้อมูล" ใน docs/specs/act-5s.md
-- ไม่มี `db/04_act_plan.sql` รันใน MX แล้ว (2026-10-25) ยังไม่ได้ใส่แถวผู้ดูแลปีใน `mt_act_owner` และยังไม่ได้เพิ่ม admin ใน `mt_act_user`
+- ยังไม่ได้ย้ายคะแนนรายข้อ คนในใบตรวจ Issue และรูป: รัน `inbox/import_5s/07_scores.sql`, `08_people_in_each_audit.sql`, `09_issues.sql`, `10_issue_photos.sql` ใน MX ตามลำดับ (ไฟล์ 01–06 ใส่แล้ว รันซ้ำได้ไม่ซ้ำข้อมูล) จนกว่าจะรัน Summary/Ranking ของ 5S จะว่าง
 
 ## ข้อควรระวัง
 
@@ -30,6 +29,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-25 · Claude · 5S Dashboard (Summary / Ranking / Schedule / Team Auditor) + Setting (แผนงาน Gantt / พื้นที่ / ทีม / หัวข้อตรวจ / แผนตรวจ) สิทธิ์กิจกรรมย้ายไปใช้ mt_act_team รายปี (act ไม่มี memberTable แล้ว) ตัวเลข Dashboard ตรงกับระบบเดิม (`npm run test:act`) แยกไฟล์ import เป็น `inbox/import_5s/01–10` ยังไม่ได้ทำ transaction (ฟอร์มตรวจ + Issue)
+- 2026-10-25 · Cursor · รัน `db/05_act_audit.sql` ใน MX แล้ว และใส่ข้อมูลตั้งต้น 5S: พื้นที่ 34 ทีม 19 หัวข้อ 25 แผน 14 ใบตรวจ 33 ยังไม่ใส่คะแนนรายข้อ Issue และรูป หน้าจอตรวจยังไม่ได้ทำ
 - 2026-10-25 · Claude · ออกแบบตารางระบบตรวจ 5S จาก Excel + โค้ด TSAT4-5S เดิม (`db/05_act_audit.sql`) + สคริปต์ย้ายข้อมูล `scripts/import_5s_excel.py` + `npm run test:act` (ตัวเลขตรงกับ Dashboard เดิม) ยังไม่ได้ทำหน้าจอและยังไม่ได้รัน SQL ในฐาน
 - 2026-10-25 · Claude · แผนประจำปีแบบ Gantt ที่ 5S > Setting (สัปดาห์ / เดือน / ปี, เส้นวันนี้, แถว Self Audit อัตโนมัติ) + ปฏิทินที่ ระบบตั้งค่า > ปฏิทิน แสดงทุกกิจกรรม (`/api/act/calendar`) (Cursor commit ac23b85 ระหว่างที่ Claude แก้ act.js อยู่ จึงติดส่วนปฏิทินรวมของ Claude ไปด้วย ส่วนที่เหลืออยู่ใน 88458cd) **ห้ามให้ Cursor กับ Claude ทำงานพร้อมกันในโฟลเดอร์เดียว**
 - 2026-10-25 · Cursor · ย้ายปฏิทินออกจาก 5S > Setting ไปไว้ที่กลุ่มเมนู ระบบตั้งค่า > ปฏิทิน ข้อมูลแผนยังเป็นของกิจกรรม 5S

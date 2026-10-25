@@ -73,6 +73,21 @@ if (!fs.existsSync(importFile)) {
   ok(JSON.stringify(sum) === JSON.stringify([85.2, 82.5, 87, 88.7, 89.8]), 'summary per S matches old dashboard');
   const sep = await one(db, `select round(avg(percent_score), 2)::float p, count(*)::int n from tx_act_audit where activity = '5s' and extract(month from audited_at at time zone 'Asia/Bangkok') = 9`);
   ok(sep.p === 86.67 && sep.n === 33, `September 5S % = 86.67 over 33 audits (got ${sep.p} / ${sep.n})`);
+
+  // The server's own dashboard functions on the same rows.
+  const { summarize, rank } = await import('../server/modules/act/audit.js');
+  const areas = (await db.query(`select id::int, code, area_type, name, section, status from mt_act_area where activity = '5s' order by code`)).rows;
+  const audits = (await db.query(`select id::int, audit_no, audit_type, area_id::int, team, audited_at::text, total_score::float, percent_score::float, result from tx_act_audit where activity = '5s' and year = 2026 and status = 'COMPLETED'`)).rows;
+  const groups = (await db.query(`select g.audit_id::int, g.s_group, g.percent::float from v_act_audit_group g join tx_act_audit a on a.id = g.audit_id where a.activity = '5s'`)).rows;
+  const s = summarize(audits, groups);
+  ok(s.groups.map((g) => g.percent).join('/') === '85.2/82.5/87/88.7/89.8' && s.months[8].percent === 86.67 && s.months[8].audits === 33, 'summarize() = old Summary page');
+  const r = rank(areas, audits, groups, 10);
+  const f = r.types['โรงงาน'];
+  const o = r.types['สำนักงาน'];
+  console.log('     ranking factory total', f.total.groups.join('/'), f.total.average, '· office total', o.total.groups.join('/'), o.total.average);
+  ok(f.rows.length === 18 && f.rows[0].name === 'ASSY PD4' && f.rows[0].average === 96.8, 'rank(): factory #1 ASSY PD4 96.8 of 18 areas');
+  ok(f.total.groups.join('/') === '88.2/85.1/88/91.8/90' && f.total.average === 88.6, 'rank(): factory total = old Ranking (88.2/85.1/88.0/91.8/90.0 · 88.6)');
+  ok(o.rows.length === 15 && o.rows[0].name === 'CIC' && o.total.groups.join('/') === '81.6/79.5/85.9/85.1/89.6' && o.total.average === 84.3, 'rank(): office = old Ranking (CIC first · 84.3)');
 }
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
