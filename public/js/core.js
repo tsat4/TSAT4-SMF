@@ -118,14 +118,12 @@ function listQuery(rows, head, valueOf) {
 }
 
 function fillTable(id, headers, rows, emptyText, head) {
-  document.querySelector('.col-menu')?.remove();
   const cells = headers.map((header) => {
     const label = typeof header === 'string' ? header : header.label;
     const key = typeof header === 'string' ? '' : header.key;
     if (!head || !key) return `<th>${esc(label)}</th>`;
-    const filtered = String(head.filters?.[key] || '').trim();
     const asc = head.sort === key && head.dir !== 'desc';
-    return `<th class="has-menu"><div class="th-line"><span class="th-label">${esc(label)}</span><button class="th-tool${filtered ? ' is-active' : ''}" type="button" data-col-filter="${esc(key)}" aria-label="กรอง"><span class="material-symbols-rounded">filter_alt</span></button><button class="th-tool${asc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" aria-label="${asc ? 'เรียง Z ไป A' : 'เรียง A ไป Z'}"><span class="material-symbols-rounded">sort_by_alpha</span></button></div></th>`;
+    return `<th class="has-menu"><div class="th-line"><span class="th-label">${esc(label)}</span><button class="th-tool${asc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" aria-label="${asc ? 'เรียง Z ไป A' : 'เรียง A ไป Z'}"><span class="material-symbols-rounded">sort_by_alpha</span></button></div></th>`;
   }).join('');
   const body = rows || `<tr><td class="empty" colspan="${Math.max(headers.length, 1)}">${emptyText}</td></tr>`;
   const node = $(id);
@@ -143,44 +141,6 @@ function fillTable(id, headers, rows, emptyText, head) {
       head.onChange({ sort: key, dir: asc ? 'desc' : 'asc', filters: head.filters || {} });
     };
   });
-  node.querySelectorAll('[data-col-filter]').forEach((btn) => {
-    btn.onclick = (event) => {
-      event.stopPropagation();
-      openColumnFilter(btn, head);
-    };
-  });
-}
-
-function openColumnFilter(button, head) {
-  document.querySelector('.col-menu')?.remove();
-  const key = button.dataset.colFilter;
-  const menu = document.createElement('div');
-  menu.className = 'col-menu';
-  menu.innerHTML = `<label class="field">กรอง<input id="col-filter-q" value="${esc(head.filters?.[key] || '')}"></label><div class="popup-actions">${button('col-filter-clear', 'ล้าง')}${button('col-filter-apply', 'กรอง', 'primary')}</div>`;
-  document.body.appendChild(menu);
-  const rect = button.getBoundingClientRect();
-  menu.style.top = `${rect.bottom + 4}px`;
-  menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 220))}px`;
-  const apply = (clear) => {
-    const filters = { ...(head.filters || {}) };
-    const term = clear ? '' : $('col-filter-q').value.trim();
-    if (term) filters[key] = term;
-    else delete filters[key];
-    menu.remove();
-    head.onChange({ sort: head.sort || '', dir: head.dir === 'desc' ? 'desc' : 'asc', filters });
-  };
-  $('col-filter-apply').onclick = () => apply(false);
-  $('col-filter-clear').onclick = () => apply(true);
-  onEnter('col-filter-q', () => apply(false));
-  setTimeout(() => {
-    const close = (event) => {
-      if (menu.contains(event.target)) return;
-      menu.remove();
-      document.removeEventListener('mousedown', close);
-    };
-    document.addEventListener('mousedown', close);
-  }, 0);
-  $('col-filter-q')?.focus();
 }
 
 function tableParams(query, head) {

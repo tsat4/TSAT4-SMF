@@ -138,9 +138,6 @@ html[data-theme="dark"] .hold-btn .hold-fill{background:rgba(232,160,32,.4)}
 .th-tool{border:0;background:transparent;color:var(--mo-text-muted);height:18px;padding:0 3px;font-size:10px;font-weight:600;display:inline-flex;align-items:center}
 .th-tool .material-symbols-rounded{font-size:14px}
 .th-tool.is-active{color:var(--zone-ink, var(--mo-text))}
-.col-menu{position:fixed;z-index:40;width:200px;background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:var(--mo-radius);padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.16)}
-.col-menu .field{width:100%;max-width:none}
-.col-menu .popup-actions{margin-top:8px}
 .table-wrap.sheet{flex:1}
 .table-wrap{overflow:auto;max-width:100%;width:100%;min-width:0;border:1px solid var(--mo-line);border-radius:var(--mo-radius);background:var(--mo-surface);min-height:0;-webkit-overflow-scrolling:touch}
 table{border-collapse:separate;border-spacing:0;width:100%;min-width:0}
