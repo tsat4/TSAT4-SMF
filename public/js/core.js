@@ -243,9 +243,10 @@ function modulePage(target, title, meta, cards) {
 }
 
 async function renderMain(target) {
-  modulePage(target, 'TSAT4 SMF', 'เลือกส่วนที่ต้องการเข้า ตอนนี้มี 2 ส่วน และเพิ่มส่วนใหม่ได้ภายหลัง', [
+  modulePage(target, 'TSAT4 SMF', 'เลือกส่วนที่ต้องการเข้า ตอนนี้มี 3 ส่วน และเพิ่มส่วนใหม่ได้ภายหลัง', [
     ['work', 'work', 'ระบบงาน', 'Work System'],
-    ['activity', 'event', 'ระบบกิจกรรม', 'Activity']
+    ['activity', 'event', 'ระบบกิจกรรม', 'Activity'],
+    ['setup', 'settings', 'ระบบตั้งค่า', 'ปฏิทิน']
   ]);
 }
 

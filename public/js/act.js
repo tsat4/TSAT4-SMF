@@ -1,6 +1,7 @@
-// ระบบกิจกรรม > <activity> > Setting: Schedule Plan with week / month / year views (server: server/modules/act).
-// Turn the plan on for another activity by adding its id to ACT_PLAN_ON.
-const ACT_PLAN_ON = ['5s'];
+// ระบบตั้งค่า > ปฏิทิน: every activity's plan with week / month / year views, read-only (server: server/modules/act).
+// Shared plan helpers (dates, form, popup) are also used by act-gantt.js.
+// One color per activity, in ACTIVITIES order (units.js).
+const ACT_COLORS = ['#ff6b6b', '#ff9f43', '#f7c948', '#2ed573', '#1dd1a1', '#54a0ff', '#5f6dff', '#a55eea', '#ee5a9b'];
 const ACT_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const ACT_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const ACT_DAYS = ['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'];
@@ -59,8 +60,18 @@ function actOn(events, iso) {
   return events.filter((event) => event.start_date <= iso && event.end_date >= iso);
 }
 
+function actLabel(activity) {
+  return (ACTIVITIES.find(([id]) => id === activity) || [activity, activity])[1];
+}
+
+function actColor(activity) {
+  const i = ACTIVITIES.findIndex(([id]) => id === activity);
+  return ACT_COLORS[(i < 0 ? 0 : i) % ACT_COLORS.length];
+}
+
 function actChip(event) {
-  return `<button class="plan-chip plan-${esc(event.status)}" type="button" data-ev="${esc(event.id)}" title="${esc(event.title)}">${esc(event.title)}</button>`;
+  const text = `${actLabel(event.activity)} · ${event.title}`;
+  return `<button class="plan-chip plan-${esc(event.status)}" type="button" data-ev="${esc(event.id)}" title="${esc(text)}" style="--chip:${actColor(event.activity)}">${esc(text)}</button>`;
 }
 
 function actWeekBody(events, from) {
@@ -98,15 +109,15 @@ function actYearBody(events) {
     const list = events.filter((event) => event.start_date <= last && event.end_date >= first);
     return `<div class="plan-ym">
       <button class="plan-ym-head" type="button" data-month="${m}">${name}<span class="badge${list.length ? ' badge-primary' : ''}">${list.length}</span></button>
-      ${list.map((event) => `<button class="plan-item plan-${esc(event.status)}" type="button" data-ev="${esc(event.id)}"><span>${actSpan(event)}</span>${esc(event.title)}</button>`).join('') || '<span class="plan-empty">ไม่มีรายการ</span>'}
+      ${list.map((event) => `<button class="plan-item plan-${esc(event.status)}" type="button" data-ev="${esc(event.id)}" style="--chip:${actColor(event.activity)}"><span>${actSpan(event)}</span>${esc(actLabel(event.activity))} · ${esc(event.title)}</button>`).join('') || '<span class="plan-empty">ไม่มีรายการ</span>'}
     </div>`;
   }).join('')}</div>`;
 }
 
-function actForm(event, day) {
-  const row = event || { start_date: day, end_date: day, status: 'planned' };
+function actForm(event, day, title = '', titles = []) {
+  const row = event || { title, start_date: day, end_date: day, status: 'planned' };
   return [
-    field('ชื่อกิจกรรม', `<input id="act-title" maxlength="200" value="${esc(row.title || '')}">`),
+    field('ชื่อกิจกรรม (ชื่อเดียวกันอยู่แถวเดียวกันในแผน)', `<input id="act-title" maxlength="200" list="act-titles" value="${esc(row.title || '')}"><datalist id="act-titles">${titles.map((name) => `<option value="${esc(name)}">`).join('')}</datalist>`),
     field('วันเริ่ม', `<input id="act-start" type="date" value="${esc(row.start_date || '')}">`),
     field('วันจบ', `<input id="act-end" type="date" value="${esc(row.end_date || '')}">`),
     field('ผู้รับผิดชอบ', `<input id="act-resp" maxlength="200" value="${esc(row.responsible || '')}">`),
@@ -115,8 +126,8 @@ function actForm(event, day) {
   ].join('');
 }
 
-function actOpenForm(activity, event, day) {
-  openPopup(event ? 'แก้ไขรายการในแผน' : 'เพิ่มรายการในแผน', actForm(event, day), async () => {
+function actOpenForm(activity, event, day, title = '', titles = []) {
+  openPopup(event ? 'แก้ไขรายการในแผน' : 'เพิ่มรายการในแผน', actForm(event, day, title, titles), async () => {
     const body = {
       title: $('act-title').value.trim(),
       startDate: $('act-start').value,
@@ -136,7 +147,7 @@ function actOpenForm(activity, event, day) {
   });
 }
 
-function actOpenEvent(activity, event, editable) {
+function actOpenEvent(activity, event, editable, titles = []) {
   const body = `<div class="plan-detail">
     <p><strong>${esc(event.title)}</strong></p>
     <p class="sum-meta">${actSpan(event)} ${actDate(event.start_date).getFullYear()} · ${esc(ACT_STATUS[event.status] || event.status)}</p>
@@ -144,7 +155,7 @@ function actOpenEvent(activity, event, editable) {
     ${event.detail ? `<p class="plan-note">${esc(event.detail)}</p>` : ''}
     ${editable ? button('act-del', 'ลบรายการ', 'danger') : ''}
   </div>`;
-  openPopup('รายการในแผน', body, () => (editable ? actOpenForm(activity, event) : closePopup()), editable ? 'แก้ไข' : 'ปิด');
+  openPopup('รายการในแผน', body, () => (editable ? actOpenForm(activity, event, '', '', titles) : closePopup()), editable ? 'แก้ไข' : 'ปิด');
   if (editable) {
     $('act-del').onclick = () => confirmPopup('ลบรายการ', `ตรวจ "${esc(event.title)}" อีกครั้งก่อนลบ`, async () => {
       await api(`/api/act/${encodeURIComponent(activity)}/plan/${event.id}`, { method: 'DELETE' });
@@ -154,45 +165,48 @@ function actOpenEvent(activity, event, editable) {
   }
 }
 
-async function actPlanRender(target, activity) {
-  const label = (ACTIVITIES.find(([id]) => id === activity) || [activity, activity])[1];
+// Read-only: plans are edited in each activity's Setting (act-gantt.js).
+function actOpenCalendarEvent(event) {
+  const planView = `${event.activity}-setting`;
+  const body = `<div class="plan-detail">
+    <p><strong>${esc(event.title)}</strong></p>
+    <p class="sum-meta">${esc(actLabel(event.activity))} · ${actSpan(event)} ${actDate(event.start_date).getFullYear()} · ${esc(ACT_STATUS[event.status] || event.status)}</p>
+    ${event.responsible ? `<p>ผู้รับผิดชอบ: ${esc(event.responsible)}</p>` : ''}
+    ${event.detail ? `<p class="plan-note">${esc(event.detail)}</p>` : ''}
+  </div>`;
+  const canOpen = Boolean(VIEWS[planView]);
+  openPopup('รายการในปฏิทิน', body, () => { closePopup(); if (canOpen) openView(planView); }, canOpen ? 'ไปที่แผน' : 'ปิด');
+}
+
+async function actPlanRender(target) {
   const range = actRange();
-  const data = await api(`/api/act/${encodeURIComponent(activity)}/plan?from=${actIso(range.from)}&to=${actIso(range.to)}`);
+  const data = await api(`/api/act/calendar?from=${actIso(range.from)}&to=${actIso(range.to)}`);
   const events = data.events || [];
-  const yearOf = (year) => (data.years || []).find((row) => row.year === year) || { department: '', canEdit: false };
-  const canEditDay = (iso) => yearOf(Number(String(iso).slice(0, 4))).canEdit;
-  const current = yearOf(actPlanAnchor.getFullYear());
-  const owner = current.department ? `ผู้ดูแลปี ${actPlanAnchor.getFullYear()}: ${esc(current.department)}` : `ยังไม่กำหนดผู้ดูแลปี ${actPlanAnchor.getFullYear()}`;
+  const shown = ACTIVITIES.filter(([id]) => events.some((event) => event.activity === id));
+  const legend = shown.map(([id, label]) => `<span class="plan-legend" style="--chip:${actColor(id)}">${esc(label)}</span>`).join('');
   const body = actPlanMode === 'week' ? actWeekBody(events, range.from) : actPlanMode === 'year' ? actYearBody(events) : actMonthBody(events, range.from);
   target.innerHTML = `<div class="view-body"><section class="card plan-card">
     <div class="plan-head">
-      <div><div class="card-title">Schedule Plan · ${esc(label)}</div><p class="sum-meta">${owner} · ${events.length} รายการ${current.canEdit ? ' · กดที่วันเพื่อเพิ่ม' : ''}</p></div>
+      <div><div class="card-title">ปฏิทินกิจกรรม · ทุกกิจกรรม</div><p class="sum-meta">${events.length} รายการ · แก้ไขแผนได้ที่ Setting ของแต่ละกิจกรรม</p>${legend ? `<div class="plan-legends">${legend}</div>` : ''}</div>
       <div class="plan-tools">
         <div class="seg" role="group" aria-label="มุมมอง">${Object.entries(ACT_MODES).map(([mode, name]) => `<button class="seg-btn${mode === actPlanMode ? ' is-active' : ''}" type="button" data-mode="${mode}" aria-pressed="${mode === actPlanMode}">${name}</button>`).join('')}</div>
         <div class="plan-nav">${button('act-prev', '‹', 'secondary', 'aria-label="ก่อนหน้า"')}${button('act-today', 'วันนี้')}${button('act-next', '›', 'secondary', 'aria-label="ถัดไป"')}</div>
         <strong class="plan-label">${range.label}</strong>
-        ${current.canEdit ? button('act-add', 'เพิ่ม', 'primary') : ''}
       </div>
     </div>
     <div class="plan-body">${body}</div>
   </section></div>`;
-  const rerender = () => actPlanRender(target, activity).catch(onErr);
+  const rerender = () => actPlanRender(target).catch(onErr);
   target.querySelectorAll('[data-mode]').forEach((node) => { node.onclick = () => { actPlanMode = node.dataset.mode; rerender(); }; });
   $('act-prev').onclick = () => { actMove(-1); rerender(); };
   $('act-next').onclick = () => { actMove(1); rerender(); };
   $('act-today').onclick = () => { actPlanAnchor = new Date(); rerender(); };
-  if ($('act-add')) $('act-add').onclick = () => actOpenForm(activity, null, actIso(actPlanMode === 'year' ? new Date(actPlanAnchor.getFullYear(), actPlanAnchor.getMonth(), 1) : actPlanAnchor));
   target.querySelectorAll('[data-ev]').forEach((node) => {
     node.onclick = (e) => {
       e.stopPropagation();
       const event = events.find((row) => String(row.id) === node.dataset.ev);
-      if (event) actOpenEvent(activity, event, canEditDay(event.start_date));
+      if (event) actOpenCalendarEvent(event);
     };
-  });
-  target.querySelectorAll('[data-day]').forEach((node) => {
-    if (!canEditDay(node.dataset.day)) return;
-    node.classList.add('is-editable');
-    node.onclick = () => actOpenForm(activity, null, node.dataset.day);
   });
   target.querySelectorAll('[data-week]').forEach((node) => {
     node.onclick = (e) => { e.stopPropagation(); actPlanMode = 'week'; actPlanAnchor = actDate(node.dataset.week); rerender(); };
@@ -202,4 +216,12 @@ async function actPlanRender(target, activity) {
   });
 }
 
-for (const id of ACT_PLAN_ON) VIEWS[`${id}-setting`] = (target) => actPlanRender(target, id);
+function actSetupRender(target) {
+  modulePage(target, 'ระบบตั้งค่า', 'ตั้งค่า', [
+    ['act-plan', 'calendar_month', 'ปฏิทิน', 'แผนของทุกกิจกรรม รายสัปดาห์ เดือน และปี']
+  ]);
+}
+
+TITLES.setup = ['ระบบตั้งค่า', 'ตั้งค่า'];
+TITLES['act-plan'] = ['ปฏิทิน', 'ระบบตั้งค่า'];
+Object.assign(VIEWS, { setup: actSetupRender, 'act-plan': actPlanRender });
