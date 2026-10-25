@@ -461,7 +461,6 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .page-bar .search-slot .btn{padding:0 8px}
 .page-bar .search-slot .field{max-width:none}
 .page-bar .action-bar{margin-left:0}
-.page-note{font-size:11.5px;color:var(--mo-text-muted);margin:0 0 6px}
 .page-bar .seg,.page-bar .a5-year,.page-bar .btn{flex:0 0 auto;white-space:nowrap}
 @media(min-width:1280px){
   .page-bar{flex-wrap:nowrap}

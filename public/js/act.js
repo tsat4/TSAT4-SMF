@@ -136,7 +136,7 @@ async function actPlanRender(target) {
   const body = actPlanMode === 'week' ? actWeekBody(events, range.from) : actPlanMode === 'year' ? actYearBody(events) : actMonthBody(events, range.from);
   target.innerHTML = `<div class="view-body"><section class="card plan-card">
     ${pageBar('', `<div class="seg" role="group" aria-label="มุมมอง">${Object.entries(ACT_MODES).map(([mode, name]) => `<button class="seg-btn${mode === actPlanMode ? ' is-active' : ''}" type="button" data-mode="${mode}" aria-pressed="${mode === actPlanMode}">${name}</button>`).join('')}</div><div class="plan-nav">${button('act-prev', '‹', 'secondary', 'aria-label="ก่อนหน้า"')}${button('act-today', 'วันนี้')}${button('act-next', '›', 'secondary', 'aria-label="ถัดไป"')}</div><strong class="plan-label">${range.label}</strong>`, 'cal')}
-    <p class="page-note">${events.length} รายการ · แก้ไขแผนได้ที่ Setting ของแต่ละกิจกรรม</p>${legend ? `<div class="plan-legends">${legend}</div>` : ''}
+    ${legend ? `<div class="plan-legends">${legend}</div>` : ''}
     <div class="plan-body">${body}</div>
   </section></div>`;
   const rerender = () => actPlanRender(target).catch(onErr);

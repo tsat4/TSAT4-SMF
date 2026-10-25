@@ -207,7 +207,6 @@ async function a5Setting(target, activity) {
   const admin = me.access.admin;
   target.innerHTML = `<div class="view-body"><section class="card">
     ${pageBar(a5Seg('data-a5set', A5_SET_TABS, a5SetTab), `<div class="a5-year">${a5YearSelect(me.years)}</div>`, 'a5')}
-    ${admin ? '' : `<p class="page-note">ดูอย่างเดียว · แก้ได้เฉพาะ admin ปี ${a5Year}</p>`}
     <div id="a5-body"><div class="empty">กำลังโหลด...</div></div>
   </section></div>`;
   const rerender = () => a5Setting(target, activity).catch(onErr);

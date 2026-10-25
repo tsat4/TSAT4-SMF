@@ -201,12 +201,9 @@ async function aplRender(target, activity, opts = {}) {
     ${aplView === 'month' ? `<div class="plan-nav">${button('apl-prev', '‹', 'secondary', 'aria-label="เดือนก่อน"')}${button('apl-next', '›', 'secondary', 'aria-label="เดือนถัดไป"')}</div><strong class="plan-label">${aplMonthName(aplMonth, true)}</strong>` : ''}
     ${search}
     ${canEdit ? `${button('apl-new', 'สร้าง', 'primary')}${button('apl-edit', 'แก้ไข', 'secondary', aplSelected ? '' : 'disabled')}${button('apl-del', 'ลบ', 'danger', aplSelected ? '' : 'disabled')}` : ''}`;
-  const admins = data.admins?.length ? `admin ปี ${aplYear}: ${data.admins.map(esc).join(', ')}` : `ยังไม่กำหนด admin ปี ${aplYear}`;
   const keepScroll = target.querySelector('.apl-scroll');
   const scroll = keepScroll ? [keepScroll.scrollLeft, keepScroll.scrollTop] : null;
-  const hint = canEdit ? ' · ลากแท่งเพื่อย้าย ลากขอบเพื่อยืด/หด (รายปีทีละสัปดาห์ รายเดือนทีละวัน) · ดับเบิลคลิกแถวเพื่อแก้ไข' : readOnly ? ' · ดูอย่างเดียว แก้ไขที่ Setting > แผนงาน' : '';
-  const content = `<p class="page-note">${admins} · ${tasks.length} รายการ${hint}</p>
-    <div class="apl-scroll"><div class="apl-grid" style="--apl-tl:${g.cols * g.min}px">
+  const content = `<div class="apl-scroll"><div class="apl-grid" style="--apl-tl:${g.cols * g.min}px">
       <div class="apl-row apl-head"><div class="apl-left"><div>ลำดับ</div><div>รายการ</div><div>ผู้รับผิดชอบ</div><div class="apl-pct">%</div></div><div class="apl-track">${aplHead(g)}</div></div>
       ${rows}
     </div></div>
