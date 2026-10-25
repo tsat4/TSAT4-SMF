@@ -41,6 +41,17 @@ await db.exec(`insert into mt_safety_team (year, employee_id, role) values (2026
 ok(await throws(db, `insert into mt_safety_team (year, employee_id, role) values (2026, '1', 'admin')`), 'same admin twice is refused (nulls not distinct)');
 ok(await throws(db, `insert into mt_safety_audit_plan (year, area_id, month, week) select 2026, id, 1, 5 from mt_safety_area`), 'week must be 1-4');
 ok(await throws(db, `insert into mt_safety_plan (title, start_date, end_date, created_by) values ('x', '2026-02-02', '2026-02-01', '1')`), 'plan end date not before start');
+// area owners live in the team table (role owner + area_id)
+await db.exec(`insert into mt_safety_area (code, area_type, name) values ('X2', 'สำนักงาน', 'Test 2')`);
+ok(await throws(db, `insert into mt_safety_team (year, employee_id, role) values (2026, '7', 'owner')`), 'owner needs an area');
+await db.exec(`insert into mt_safety_team (year, employee_id, role, area_id) select 2026, '7', 'owner', id from mt_safety_area`);
+ok((await one(db, `select count(*)::int n from mt_safety_team where role = 'owner' and employee_id = '7'`)).n === 2, 'one person may own several areas');
+ok(await throws(db, `insert into mt_safety_team (year, employee_id, role, area_id) select 2026, '8', 'owner', id from mt_safety_area where code = 'X1'`), 'one owner per area per year');
+await db.exec(`insert into mt_safety_team (year, employee_id, role, area_id) select 2027, '8', 'owner', id from mt_safety_area where code = 'X1'`);
+ok(true, 'the area may get a new owner next year');
+ok(await throws(db, `insert into mt_safety_team (year, employee_id, role, area_id) select 2026, '9', 'admin', id from mt_safety_area where code = 'X1'`), 'only owners carry an area');
+await db.exec(`delete from mt_safety_area where code = 'X2'`);
+ok((await one(db, `select count(*)::int n from mt_safety_team where role = 'owner' and employee_id = '7'`)).n === 1, 'deleting an area removes its owner rows');
 ok((await one(db, `select count(*)::int n from mt_5s_setting`)).n === 5, 'settings seeded');
 
 if (!fs.existsSync(importFile)) {
@@ -55,17 +66,17 @@ if (!fs.existsSync(importFile)) {
   ok(true, 'import part files run on top of it');
   const c = await one(db, `select
     (select count(*)::int from mt_5s_area) areas,
-    (select count(*)::int from mt_5s_area_owner) owners,
-    (select count(*)::int from mt_5s_team) team,
+    (select count(*)::int from mt_5s_team where role = 'owner') owners,
+    (select count(*)::int from mt_5s_team where role <> 'owner') team,
     (select count(*)::int from mt_5s_checklist) checklist,
     (select count(*)::int from mt_5s_audit_plan) plans,
     (select count(*)::int from tx_5s_audit) audits,
     (select count(*)::int from tx_5s_audit_score) scores,
-    (select count(*)::int from tx_5s_audit_person) people,
+    (select count(*)::int from tx_5s_audit where cardinality(auditors) > 0) people,
     (select count(*)::int from tx_5s_issue) issues,
-    (select count(*)::int from tx_5s_issue_photo) photos`);
+    (select coalesce(sum(cardinality(photo_before) + cardinality(photo_after)), 0)::int from tx_5s_issue) photos`);
   console.log('     counts', JSON.stringify(c));
-  ok(c.areas === 34 && c.owners === 34 && c.team === 19 && c.checklist === 25 && c.plans === 14 && c.audits === 33 && c.issues === 52, 'all rows imported');
+  ok(c.areas === 34 && c.owners === 34 && c.team === 19 && c.checklist === 25 && c.plans === 14 && c.audits === 33 && c.issues === 52 && c.people === 33 && c.photos === 54, 'all rows imported (owners in team, auditors on audits, photos on issues)');
   ok(c.scores === 33 * 25, `25 scores per audit (got ${c.scores})`);
   const bad = await one(db, `select count(*)::int n from tx_5s_audit a where abs((select sum(score) from tx_5s_audit_score s where s.audit_id = a.id) - a.total_score) > 0.001`);
   ok(bad.n === 0, 'stored total = sum of item scores');
@@ -89,7 +100,8 @@ if (!fs.existsSync(importFile)) {
 
 // Transaction rules (server/modules/act/transaction.js)
 {
-  const { scoreAudit, verifyIssues, dueDateFor, weekStartIso, shownStatus } = await import('../server/modules/act/transaction.js');
+  const { scoreAudit, verifyIssues, dueDateFor, weekStartIso, shownStatus, photosOf } = await import('../server/modules/act/transaction.js');
+  ok(JSON.stringify(photosOf({ photo_before: ['b1'], photo_after: ['a1', 'a2'] })) === JSON.stringify([{ kind: 'BEFORE', url: 'b1' }, { kind: 'AFTER', url: 'a1' }, { kind: 'AFTER', url: 'a2' }]) && photosOf({}).length === 0, 'photosOf() turns the Issue photo lists into [{ kind, url }] for the page');
   const items = [1, 2, 3, 4, 5].map((id) => ({ id, score_max: 5 }));
   const sc = scoreAudit(items, new Map([[1, 5], [2, 4], [3, 4], [4, 3], [5, 4]]), 80);
   ok(sc.total === 20 && sc.percent === 80 && sc.result === 'PASS', `scoreAudit 20/25 = 80% PASS (got ${JSON.stringify(sc)})`);

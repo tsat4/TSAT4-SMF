@@ -38,7 +38,7 @@ function auditsOf(activity, year, type) {
 const groupsOf = (activity, auditIds) => fetchIn(() => tx.from(tablesOf(activity).group).select('audit_id,s_group,percent'), 'audit_id', auditIds);
 
 async function ownersOf(activity, year, areaIds) {
-  const rows = await fetchIn(() => tx.from(tablesOf(activity).owner).select('area_id,employee_id').eq('year', year), 'area_id', areaIds);
+  const rows = await fetchIn(() => tx.from(tablesOf(activity).team).select('area_id,employee_id').eq('year', year).eq('role', 'owner'), 'area_id', areaIds);
   return new Map(rows.map((row) => [Number(row.area_id), String(row.employee_id)]));
 }
 
@@ -180,7 +180,7 @@ export function mountAudit(app) {
   route('get', '/api/act/:activity/team', async (req, res, activity) => {
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
-    const rows = await fetchAll(() => tx.from(tablesOf(activity).team).select('id,employee_id,role,team,status').eq('year', year).order('role').order('team').order('employee_id'));
+    const rows = await fetchAll(() => tx.from(tablesOf(activity).team).select('id,employee_id,role,team,status').eq('year', year).neq('role', 'owner').order('role').order('team').order('employee_id'));
     const names = await namesOf(rows.map((r) => r.employee_id));
     res.json({ year, members: rows.map((r) => ({ ...r, name: names.get(String(r.employee_id))?.name || '', department: names.get(String(r.employee_id))?.department || '' })) });
   });
@@ -278,9 +278,11 @@ export function mountAudit(app) {
     if (check(res, area.error)) return;
     if (!area.data) return fail(res, 404, 'ไม่พบพื้นที่');
     const employeeId = String(req.body?.employeeId || '').trim();
-    const { error } = employeeId
-      ? await tx.from(tablesOf(activity).owner).upsert({ year, area_id: areaId, employee_id: employeeId }, { onConflict: 'year,area_id' })
-      : await tx.from(tablesOf(activity).owner).delete().eq('year', year).eq('area_id', areaId);
+    // The owner is a team row (role owner, area_id); one per area per year, so replace it.
+    const team = tablesOf(activity).team;
+    const removed = await tx.from(team).delete().eq('year', year).eq('area_id', areaId).eq('role', 'owner');
+    if (check(res, removed.error)) return;
+    const { error } = employeeId ? await tx.from(team).insert({ year, employee_id: employeeId, role: 'owner', area_id: areaId, status: 'Active' }) : { error: null };
     if (check(res, error)) return;
     res.json({ ok: true });
   });
@@ -323,7 +325,7 @@ export function mountAudit(app) {
     if (check(res, error)) return;
     res.json({ ok: true, copied: rows.length });
   };
-  route('post', '/api/act/:activity/team/copy', copyYear('team', ['employee_id', 'role', 'team', 'status'], 'year,employee_id,role,team'));
+  route('post', '/api/act/:activity/team/copy', copyYear('team', ['employee_id', 'role', 'team', 'area_id', 'status'], 'year,employee_id,role,team,area_id'));
   route('post', '/api/act/:activity/checklist/copy', copyYear('checklist', ['item_no', 's_group', 'title', 'score_max', 'status'], 'year,item_no'));
 
   const itemInput = (body) => {

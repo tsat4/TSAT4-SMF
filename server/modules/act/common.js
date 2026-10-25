@@ -16,14 +16,11 @@ export function tablesOf(activity) {
     setting: `mt_${k}_setting`,
     plan: `mt_${k}_plan`,
     area: `mt_${k}_area`,
-    owner: `mt_${k}_area_owner`,
     checklist: `mt_${k}_checklist`,
     auditPlan: `mt_${k}_audit_plan`,
     audit: `tx_${k}_audit`,
     score: `tx_${k}_audit_score`,
-    person: `tx_${k}_audit_person`,
     issue: `tx_${k}_issue`,
-    photo: `tx_${k}_issue_photo`,
     group: `v_${k}_audit_group`
   };
 }
@@ -82,20 +79,17 @@ export async function accessOf(req, activity, year) {
   const me = req.user.employeeId;
   const t = tablesOf(activity);
   const none = { admin: Boolean(req.user.creator), chairman: false, auditor: false, teams: [], ownerAreaIds: [], member: Boolean(req.user.creator) };
-  const [team, owners] = await Promise.all([
-    tx.from(t.team).select('role,team').eq('year', year).eq('employee_id', me).eq('status', 'Active'),
-    tx.from(t.owner).select('area_id').eq('year', year).eq('employee_id', me)
-  ]);
+  // One table says who does what this year, area owners included (role owner + area_id).
+  const team = await tx.from(t.team).select('role,team,area_id').eq('year', year).eq('employee_id', me).eq('status', 'Active');
   if (team.error?.code === 'PGRST205') return none;
   if (team.error) throw team.error;
-  if (owners.error && owners.error.code !== 'PGRST205') throw owners.error;
   const roles = team.data || [];
   const access = {
     admin: Boolean(req.user.creator) || roles.some((r) => r.role === 'admin'),
     chairman: roles.some((r) => r.role === 'chairman'),
     auditor: roles.some((r) => r.role === 'auditor'),
     teams: [...new Set(roles.filter((r) => r.team).map((r) => r.team))],
-    ownerAreaIds: (owners.data || []).map((r) => Number(r.area_id))
+    ownerAreaIds: roles.filter((r) => r.role === 'owner').map((r) => Number(r.area_id))
   };
   access.member = access.admin || access.chairman || access.auditor || access.ownerAreaIds.length > 0;
   return access;

@@ -43,6 +43,12 @@ def emp(value):
     return str(int(value)) if isinstance(value, (int, float)) else str(value).strip()
 
 
+def arr(values):
+    """text[] literal for a list of ids or links."""
+    items = [str(v).strip().replace("'", "''") for v in values if v not in (None, '')]
+    return "'{}'::text[]" if not items else 'array[' + ', '.join(f"'{v}'" for v in items) + ']::text[]'
+
+
 def item_no(value):
     digits = ''.join(ch for ch in str(value) if ch.isdigit())
     return int(digits) if digits else None
@@ -77,10 +83,10 @@ def main():
         [[lit(r['area_id']), lit(r['area_type']), lit(r['objectname']), lit(r.get('section')), lit(r.get('status') or 'Active')] for r in areas]
     ) + '\non conflict (code) do update set area_type = excluded.area_type, name = excluded.name, section = excluded.section, status = excluded.status;')
 
-    out.append('\n-- area owners')
-    out.append(f'insert into public.mt_{k}_area_owner (year, area_id, employee_id)\nselect v.year, ar.id, v.employee_id from (values\n  ' + values(
+    out.append('\n-- area owners (team rows with role owner)')
+    out.append(f'insert into public.mt_{k}_team (year, employee_id, role, area_id, status)\nselect v.year, v.employee_id, \'owner\', ar.id, \'Active\' from (values\n  ' + values(
         [[lit(a.year, 'integer'), lit(r['area_id']), lit(emp(r['employee_id']))] for r in areas if emp(r.get('employee_id'))]
-    ) + f'\n) v(year, code, employee_id)\njoin public.mt_{k}_area ar on ar.code = v.code\non conflict (year, area_id) do update set employee_id = excluded.employee_id;')
+    ) + f'\n) v(year, code, employee_id)\njoin public.mt_{k}_area ar on ar.code = v.code\non conflict do nothing;')
 
     out.append('\n-- team (หัวหน้าทีม -> chairman, Auditor -> auditor + team, Admin จาก tr_role -> admin)')
     rows = []
@@ -103,10 +109,11 @@ def main():
     ) + f'\n) v(year, code, month, week, round, team)\njoin public.mt_{k}_area ar on ar.code = v.code\non conflict (year, area_id, month, week) do update set round = excluded.round, team = excluded.team;')
 
     out.append('\n-- audits')
-    out.append(f'insert into public.tx_{k}_audit (audit_no, year, audit_type, area_id, team, audited_at, total_score, percent_score, result, status)\nselect v.audit_no, v.year, v.audit_type, ar.id, v.team, v.audited_at, v.total, v.percent, v.result, v.status from (values\n  ' + values(
-        [[lit(r['audit_id']), lit(r['datetime'].year, 'integer'), lit(r['audit_type']), lit(r['area_id']), lit(r.get('audit_team')), lit(r['datetime'], 'timestamptz'),
-          lit(r['total_score'], 'numeric'), lit(r['percent_score'], 'numeric'), lit(r.get('result')), lit(r.get('status') or 'COMPLETED')] for r in audits]
-    ) + f'\n) v(audit_no, year, audit_type, code, team, audited_at, total, percent, result, status)\njoin public.mt_{k}_area ar on ar.code = v.code\non conflict (audit_no) do nothing;')
+    out.append(f'insert into public.tx_{k}_audit (audit_no, year, audit_type, area_id, team, auditors, receivers, audited_at, total_score, percent_score, result, status)\nselect v.audit_no, v.year, v.audit_type, ar.id, v.team, v.auditors, v.receivers, v.audited_at, v.total, v.percent, v.result, v.status from (values\n  ' + values(
+        [[lit(r['audit_id']), lit(r['datetime'].year, 'integer'), lit(r['audit_type']), lit(r['area_id']), lit(r.get('audit_team')),
+          arr(sorted({emp(x) for x in json.loads(r.get('participated_json') or '[]')})), arr(sorted({emp(x) for x in json.loads(r.get('receiver_json') or '[]')})),
+          lit(r['datetime'], 'timestamptz'), lit(r['total_score'], 'numeric'), lit(r['percent_score'], 'numeric'), lit(r.get('result')), lit(r.get('status') or 'COMPLETED')] for r in audits]
+    ) + f'\n) v(audit_no, year, audit_type, code, team, auditors, receivers, audited_at, total, percent, result, status)\njoin public.mt_{k}_area ar on ar.code = v.code\non conflict (audit_no) do nothing;')
 
     out.append('\n-- scores (no01..no25 -> one row per item)')
     rows = []
@@ -119,43 +126,24 @@ def main():
                '\n) v(audit_no, item_no, score)\n' f'join public.tx_{k}_audit au on au.audit_no = v.audit_no\n'
                f'join public.mt_{k}_checklist c on c.year = au.year and c.item_no = v.item_no\non conflict (audit_id, checklist_id) do nothing;')
 
-    out.append('\n-- people in each audit')
-    rows = []
-    for r in audits:
-        for kind, col in (('assigned', 'assigned_json'), ('participated', 'participated_json'), ('receiver', 'receiver_json')):
-            for person in json.loads(r.get(col) or '[]'):
-                rows.append([lit(r['audit_id']), lit(emp(person)), lit(kind)])
-    if rows:
-        out.append(f'insert into public.tx_{k}_audit_person (audit_id, employee_id, kind)\nselect au.id, v.employee_id, v.kind from (values\n  ' + values(rows) +
-                   '\n) v(audit_no, employee_id, kind)\n' f'join public.tx_{k}_audit au on au.audit_no = v.audit_no\non conflict (audit_id, employee_id, kind) do nothing;')
-
     out.append('\n-- issues')
-    out.append(f'insert into public.tx_{k}_issue (issue_no, audit_id, area_id, checklist_id, score, description, issue_date, responsible_id, due_date, action_description, action_date, status, verify_audit_no, final_score, closed_by, closed_at)\n'
-               'select v.issue_no, au.id, ar.id, c.id, v.score, v.description, v.issue_date, v.responsible_id, v.due_date, v.action_description, v.action_date, v.status, v.verify_audit_no, v.final_score, v.closed_by, v.closed_at from (values\n  ' + values(
+    urls = lambda raw: [ph.get('file_url') if isinstance(ph, dict) else ph for ph in json.loads(raw or '[]')]  # Google Drive links from the old system
+    out.append(f'insert into public.tx_{k}_issue (issue_no, audit_id, area_id, checklist_id, score, description, photo_before, photo_after, issue_date, responsible_id, due_date, action_description, action_date, status, verify_audit_no, final_score, closed_by, closed_at)\n'
+               'select v.issue_no, au.id, ar.id, c.id, v.score, v.description, v.photo_before, v.photo_after, v.issue_date, v.responsible_id, v.due_date, v.action_description, v.action_date, v.status, v.verify_audit_no, v.final_score, v.closed_by, v.closed_at from (values\n  ' + values(
         [[lit(r['issue_id']), lit(r['audit_id']), lit(r['area_id']), lit(item_no(r['list_no']), 'integer'), lit(r['score'], 'numeric'), lit(r.get('issue_description') or '-'),
+          arr(urls(r.get('issue_photo'))), arr(urls(r.get('action_photo'))),
           lit(r.get('issue_date'), 'date'), lit(emp(r.get('responsible_id'))), lit(r.get('due_date'), 'date'), lit(r.get('action_description')), lit(r.get('action_date'), 'date'),
           lit(r.get('status') or 'OPEN'), lit(r.get('verify_audit_id')), lit(r.get('final_score'), 'numeric'), lit(emp(r.get('close_by'))), lit(r.get('close_date'), 'date')] for r in issues]
-    ) + '\n) v(issue_no, audit_no, code, item_no, score, description, issue_date, responsible_id, due_date, action_description, action_date, status, verify_audit_no, final_score, closed_by, closed_at)\n'
+    ) + '\n) v(issue_no, audit_no, code, item_no, score, description, photo_before, photo_after, issue_date, responsible_id, due_date, action_description, action_date, status, verify_audit_no, final_score, closed_by, closed_at)\n'
         f'join public.tx_{k}_audit au on au.audit_no = v.audit_no\n'
         f'join public.mt_{k}_area ar on ar.code = v.code\n'
         f'join public.mt_{k}_checklist c on c.year = au.year and c.item_no = v.item_no\non conflict (issue_no) do nothing;')
 
-    out.append('\n-- issue photos (Google Drive URLs from the old system)')
-    rows = []
-    for r in issues:
-        for kind, col in (('BEFORE', 'issue_photo'), ('AFTER', 'action_photo')):
-            for photo in json.loads(r.get(col) or '[]'):
-                url = photo.get('file_url') if isinstance(photo, dict) else photo
-                if url:
-                    rows.append([lit(r['issue_id']), lit(kind), lit(url)])
-    if rows:
-        out.append(f'insert into public.tx_{k}_issue_photo (issue_id, kind, url)\nselect i.id, v.kind, v.url from (values\n  ' + values(rows) +
-                   '\n) v(issue_no, kind, url)\n' f'join public.tx_{k}_issue i on i.issue_no = v.issue_no\non conflict (issue_id, url) do nothing;')
-
     out.append('\ncommit;')
     out.append('\n-- check: expect ' + ', '.join(f'{k} {v}' for k, v in (('areas', len(areas)), ('team', len(team) + len(admins)), ('checklist', len(checklist)), ('plans', len(plans)), ('audits', len(audits)), ('issues', len(issues)))))
     out.append(f"select (select count(*) from public.mt_{k}_area) as areas,\n"
-               f"  (select count(*) from public.mt_{k}_team) as team,\n"
+               f"  (select count(*) from public.mt_{k}_team where role <> 'owner') as team,\n"
+               f"  (select count(*) from public.mt_{k}_team where role = 'owner') as owners,\n"
                f"  (select count(*) from public.mt_{k}_checklist) as checklist,\n"
                f"  (select count(*) from public.mt_{k}_audit_plan) as plans,\n"
                f"  (select count(*) from public.tx_{k}_audit) as audits,\n"

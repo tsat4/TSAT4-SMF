@@ -54,6 +54,15 @@ export function shownStatus(issue, today = todayIso()) {
   return issue.status;
 }
 
+// Issue photos are two lists on the Issue row; the page reads them as [{ kind, url }].
+export function photosOf(issue) {
+  return (issue.photo_before || []).map((url) => ({ kind: 'BEFORE', url })).concat((issue.photo_after || []).map((url) => ({ kind: 'AFTER', url })));
+}
+
+function idList(list) {
+  return [...new Set((Array.isArray(list) ? list : []).map((x) => String(x).trim()).filter(Boolean))];
+}
+
 async function settingsOf(activity) {
   const { data, error } = await tx.from(tablesOf(activity).setting).select('key,value');
   if (error) throw error;
@@ -89,16 +98,11 @@ export function mountTransaction(app) {
   // Open Issues of an area with how many after photos they have (for the committee form and verification).
   // exceptAuditId leaves out the Issues an audit opened itself (used when that audit is edited).
   const openIssuesOf = async (t, areaId, exceptAuditId = 0) => {
-    let query = tx.from(t.issue).select('id,issue_no,audit_id,checklist_id,score,description,issue_date,due_date,action_description,action_date,status,responsible_id,verify_audit_no')
+    let query = tx.from(t.issue).select('id,issue_no,audit_id,checklist_id,score,description,issue_date,due_date,action_description,action_date,status,responsible_id,verify_audit_no,photo_before,photo_after')
       .eq('area_id', areaId).neq('status', 'CLOSED').order('issue_no');
     if (exceptAuditId) query = query.neq('audit_id', exceptAuditId);
     const issues = must(await query);
-    const photos = await fetchIn(() => tx.from(t.photo).select('issue_id,kind,url'), 'issue_id', issues.map((i) => i.id));
-    return issues.map((i) => ({
-      ...i,
-      photos: photos.filter((p) => p.issue_id === i.id),
-      after_photos: photos.filter((p) => p.issue_id === i.id && p.kind === 'AFTER').length
-    }));
+    return issues.map((i) => ({ ...i, photos: photosOf(i), after_photos: (i.photo_after || []).length }));
   };
 
   route('get', '/api/act/:activity/audit-form', async (req, res, activity, t) => {
@@ -158,12 +162,11 @@ export function mountTransaction(app) {
     const missing = items.filter((i) => scores.get(i.id) == null).map((i) => i.item_no);
     if (missing.length) return fail(res, 400, `ให้คะแนนให้ครบ (ข้อที่ ${missing.join(', ')})`);
 
-    const own = must(await tx.from(t.issue).select('id,checklist_id,score,status,action_description').eq('audit_id', audit.id));
-    const ownPhotos = await fetchIn(() => tx.from(t.photo).select('issue_id,kind'), 'issue_id', own.map((i) => i.id));
+    const own = must(await tx.from(t.issue).select('id,checklist_id,score,status,action_description,photo_after').eq('audit_id', audit.id));
     const carried = audit.audit_type === 'COMMITTEE' ? new Set((await openIssuesOf(t, audit.area_id, audit.id)).map((i) => i.checklist_id)) : new Set();
     const low = (id) => scores.get(id) <= settings.issue_score;
     // Drop own Issues whose item is no longer low, only while nobody has worked on them yet.
-    const drop = own.filter((i) => !low(i.checklist_id) && i.status === 'OPEN' && !String(i.action_description || '').trim() && !ownPhotos.some((p) => p.issue_id === i.id && p.kind === 'AFTER'));
+    const drop = own.filter((i) => !low(i.checklist_id) && i.status === 'OPEN' && !String(i.action_description || '').trim() && !(i.photo_after || []).length);
     const stillOwn = new Set(own.filter((i) => !drop.includes(i)).map((i) => i.checklist_id));
     const needIssue = audit.audit_type === 'COMMITTEE' ? items.filter((i) => low(i.id) && !stillOwn.has(i.id) && !carried.has(i.id) && !locked.has(i.id)) : [];
     const described = new Map((Array.isArray(body.issues) ? body.issues : []).map((x) => [Number(x.checklistId), String(x.description || '').trim().slice(0, 2000)]));
@@ -175,17 +178,13 @@ export function mountTransaction(app) {
     must(await tx.from(t.score).delete().eq('audit_id', audit.id));
     must(await tx.from(t.score).insert(items.map((i) => ({ audit_id: audit.id, checklist_id: i.id, score: scores.get(i.id) }))));
     if (Array.isArray(body.participated) || Array.isArray(body.receivers)) {
-      const ids = (list) => [...new Set((Array.isArray(list) ? list : []).map((x) => String(x).trim()).filter(Boolean))];
-      const participated = ids(body.participated).length ? ids(body.participated) : [audit.created_by].filter(Boolean);
-      must(await tx.from(t.person).delete().eq('audit_id', audit.id));
-      const people = participated.flatMap((id) => [{ audit_id: audit.id, employee_id: id, kind: 'participated' }, { audit_id: audit.id, employee_id: id, kind: 'assigned' }])
-        .concat(ids(body.receivers).map((id) => ({ audit_id: audit.id, employee_id: id, kind: 'receiver' })));
-      if (people.length) must(await tx.from(t.person).insert(people));
+      const auditors = idList(body.participated).length ? idList(body.participated) : [audit.created_by].filter(Boolean);
+      must(await tx.from(t.audit).update({ auditors, receivers: idList(body.receivers) }).eq('id', audit.id));
     }
     if (drop.length) must(await tx.from(t.issue).delete().in('id', drop.map((i) => i.id)));
     let created = [];
     if (needIssue.length) {
-      const owner = must(await tx.from(t.owner).select('employee_id').eq('year', audit.year).eq('area_id', audit.area_id).maybeSingle());
+      const owner = must(await tx.from(t.team).select('employee_id').eq('year', audit.year).eq('area_id', audit.area_id).eq('role', 'owner').maybeSingle());
       const plans = must(await tx.from(t.auditPlan).select('year,month,week').eq('area_id', audit.area_id).gte('year', audit.year));
       const due = dueDateFor(plans, auditedAt, settings.issue_due_days_before_next);
       const last = must(await tx.from(t.issue).select('issue_no').order('issue_no', { ascending: false }).limit(1));
@@ -251,22 +250,17 @@ export function mountTransaction(app) {
     const audit = must(await tx.from(t.audit).insert({
       audit_no: auditNo, year, audit_type: type, area_id: areaId, team,
       audited_at: `${auditedAt}T05:00:00Z`, // 12:00 Thai time, so the Thai date never shifts
-      total_score: score.total, percent_score: score.percent, result: score.result, status: 'DRAFT', created_by: req.user.employeeId
+      total_score: score.total, percent_score: score.percent, result: score.result, status: 'DRAFT', created_by: req.user.employeeId,
+      auditors: idList(body.participated).length ? idList(body.participated) : [req.user.employeeId],
+      receivers: idList(body.receivers)
     }).select('id').single());
 
     try {
       must(await tx.from(t.score).insert(items.map((i) => ({ audit_id: audit.id, checklist_id: i.id, score: scores.get(i.id) }))));
-      const people = [];
-      const ids = (list) => [...new Set((Array.isArray(list) ? list : []).map((x) => String(x).trim()).filter(Boolean))];
-      const participated = ids(body.participated).length ? ids(body.participated) : [req.user.employeeId];
-      for (const id of participated) people.push({ audit_id: audit.id, employee_id: id, kind: 'participated' });
-      for (const id of participated) people.push({ audit_id: audit.id, employee_id: id, kind: 'assigned' });
-      for (const id of ids(body.receivers)) people.push({ audit_id: audit.id, employee_id: id, kind: 'receiver' });
-      if (people.length) must(await tx.from(t.person).insert(people));
 
       let created = [];
       if (needIssue.length) {
-        const owner = must(await tx.from(t.owner).select('employee_id').eq('year', year).eq('area_id', areaId).maybeSingle());
+        const owner = must(await tx.from(t.team).select('employee_id').eq('year', year).eq('area_id', areaId).eq('role', 'owner').maybeSingle());
         const plans = must(await tx.from(t.auditPlan).select('year,month,week').eq('area_id', areaId).gte('year', year));
         const due = dueDateFor(plans, auditedAt, settings.issue_due_days_before_next);
         const last = must(await tx.from(t.issue).select('issue_no').order('issue_no', { ascending: false }).limit(1));
@@ -318,9 +312,9 @@ export function mountTransaction(app) {
     const audit = must(await tx.from(t.audit).select('*').eq('id', Number(req.params.id)).maybeSingle());
     if (!audit) return fail(res, 404, 'ไม่พบใบตรวจ');
     if (!(await accessOf(req, activity, audit.year)).member) return fail(res, 403, 'ดูได้เฉพาะทีมของกิจกรรมนี้');
-    const [scores, people, issues, area] = await Promise.all([
+    const people = (audit.auditors || []).map((id) => ({ employee_id: id, kind: 'participated' })).concat((audit.receivers || []).map((id) => ({ employee_id: id, kind: 'receiver' })));
+    const [scores, issues, area] = await Promise.all([
       fetchAll(() => tx.from(t.score).select('checklist_id,score').eq('audit_id', audit.id)),
-      fetchAll(() => tx.from(t.person).select('employee_id,kind').eq('audit_id', audit.id)),
       fetchAll(() => tx.from(t.issue).select('id,issue_no,checklist_id,score,description,status,due_date').eq('audit_id', audit.id)),
       tx.from(t.area).select('code,name,area_type').eq('id', audit.area_id).maybeSingle()
     ]);
@@ -356,8 +350,7 @@ export function mountTransaction(app) {
     if (!access.member) return fail(res, 403, `ดูได้เฉพาะทีมของกิจกรรมนี้ปี ${year}`);
     const audits = await fetchAll(() => tx.from(t.audit).select('id,audit_no,year').eq('year', year));
     const issues = await fetchIn(() => tx.from(t.issue).select('*').order('issue_no'), 'audit_id', audits.map((a) => a.id));
-    const [photos, areas, items] = await Promise.all([
-      fetchIn(() => tx.from(t.photo).select('issue_id,kind,url,created_at'), 'issue_id', issues.map((i) => i.id)),
+    const [areas, items] = await Promise.all([
       fetchAll(() => tx.from(t.area).select('id,code,name')),
       fetchIn(() => tx.from(t.checklist).select('id,item_no,s_group,title'), 'id', issues.map((i) => i.checklist_id))
     ]);
@@ -372,7 +365,7 @@ export function mountTransaction(app) {
         area: areas.find((a) => a.id === i.area_id) || {},
         item: items.find((x) => x.id === i.checklist_id) || {},
         responsibleName: names.get(String(i.responsible_id))?.name || '',
-        photos: photos.filter((p) => p.issue_id === i.id),
+        photos: photosOf(i),
         ...issueRights(access, i, req.user.employeeId)
       })).sort((a, b) => b.issue_no.localeCompare(a.issue_no))
     });
@@ -398,7 +391,8 @@ export function mountTransaction(app) {
     const bytes = imageBytes(req.body?.image);
     if (!bytes) return fail(res, 400, 'รูปต้องเป็น JPEG ไม่เกิน 700 KB');
     const settings = await settingsOf(activity);
-    const have = must(await tx.from(t.photo).select('id').eq('issue_id', found.issue.id).eq('kind', kind));
+    const column = kind === 'AFTER' ? 'photo_after' : 'photo_before';
+    const have = found.issue[column] || [];
     if (have.length >= settings.issue_photo_max) return fail(res, 400, `แนบรูป${kind === 'AFTER' ? 'หลังแก้' : 'ปัญหา'}ได้ ${settings.issue_photo_max} รูป`);
     // Each activity has its own bucket img_<key>; files: issue/<ISSxxxx>_<BEFORE|AFTER>_<time>.jpg
     const key = `issue/${found.issue.issue_no}_${kind}_${Date.now()}.jpg`;
@@ -408,7 +402,7 @@ export function mountTransaction(app) {
       return fail(res, 400, /bucket/i.test(text) ? `ยังไม่ได้สร้างที่เก็บรูป ${t.bucket} ใน Tx Data (รัน ${t.sql} อีกครั้ง)` : 'อัปโหลดรูปไม่ได้');
     }
     const url = tx.storage.from(t.bucket).getPublicUrl(key).data.publicUrl;
-    must(await tx.from(t.photo).insert({ issue_id: found.issue.id, kind, url }));
+    must(await tx.from(t.issue).update({ [column]: [...have, url] }).eq('id', found.issue.id));
     res.status(201).json({ url });
   });
 
@@ -418,8 +412,7 @@ export function mountTransaction(app) {
     if (!found.rights.canAct) return fail(res, 403, 'ส่ง Action ได้เฉพาะผู้รับผิดชอบพื้นที่');
     const description = String(req.body?.description || '').trim().slice(0, 2000);
     if (!description) return fail(res, 400, 'ระบุสิ่งที่แก้ไข');
-    const after = must(await tx.from(t.photo).select('id').eq('issue_id', found.issue.id).eq('kind', 'AFTER'));
-    if (!after.length) return fail(res, 400, 'แนบรูปหลังแก้ก่อนส่ง Action');
+    if (!(found.issue.photo_after || []).length) return fail(res, 400, 'แนบรูปหลังแก้ก่อนส่ง Action');
     const today = todayIso();
     const status = !found.issue.due_date || today <= found.issue.due_date ? 'ON_PLAN' : 'WAIT_VERIFY';
     must(await tx.from(t.issue).update({ action_description: description, action_date: today, status }).eq('id', found.issue.id));

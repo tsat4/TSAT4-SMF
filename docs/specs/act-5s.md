@@ -69,24 +69,24 @@
 ใช้ได้ทุกกิจกรรมที่เป็น "การตรวจด้วย checklist" (5S, SAFETY Patrol ฯลฯ) คะแนนเก็บแบบแถว (ไม่ใช่ no01–no25) จึงรองรับ checklist กี่ข้อก็ได้
 
 ```
--- Tx Data · <k> = กิจกรรม (5s, safety, ...) · ไม่มีคอลัมน์ activity เพราะแยกตารางต่อกิจกรรมแล้ว
+-- Tx Data · <k> = กิจกรรม (5s, safety, ...) · v2 (2026-10-25): 9 ตาราง + 1 view
 mt_<k>_area        id | code (A01) unique | area_type (โรงงาน/สำนักงาน) | name | section | status
-mt_<k>_area_owner  year | area_id | employee_id                                              pk(year, area_id)
-mt_<k>_team        id | year | employee_id | role (admin/chairman/auditor) | team (A–I) | status
+mt_<k>_team        id | year | employee_id | role (admin/chairman/auditor/owner) | team (A–I, เฉพาะ auditor) | area_id (เฉพาะ owner) | status
+                   unique (year, area_id) where role = owner  → เจ้าของพื้นที่ปีละ 1 คนต่อพื้นที่
 mt_<k>_checklist   id | year | item_no | s_group | title | score_max | status              unique(year, item_no)
 mt_<k>_audit_plan  id | year | area_id | month | week 1–4 | round 1–6 | team              unique(year, area_id, month, week)
 mt_<k>_setting     key | value      (pass_percent 80, issue_score 3, ...)
 mt_<k>_plan        แผน Gantt / ปฏิทินรวม
-tx_<k>_audit        id | audit_no | year | audit_type SELF/COMMITTEE | area_id | plan_id | team | audited_at | total | percent | result | status | created_by
+tx_<k>_audit        id | audit_no | year | audit_type SELF/COMMITTEE | area_id | plan_id | team | auditors[] | receivers[] | audited_at | total | percent | result | status | created_by
 tx_<k>_audit_score  audit_id | checklist_id | score 0–5                                     pk(audit_id, checklist_id)
-tx_<k>_audit_person audit_id | employee_id | kind (assigned/participated/receiver)
-tx_<k>_issue        id | issue_no | audit_id | area_id | checklist_id | score | description | issue_date | responsible_id | due_date
-                    | action_description | action_date | status | verify_audit_no | final_score | closed_by | closed_at
-tx_<k>_issue_photo  id | issue_id | kind BEFORE/AFTER | url | created_at
+tx_<k>_issue        id | issue_no | audit_id | area_id | checklist_id | score | description | photo_before[] | photo_after[] | issue_date | responsible_id
+                    | due_date | action_description | action_date | status | verify_audit_no | final_score | closed_by | closed_at
 v_<k>_audit_group   % ของแต่ละหมวดต่อใบตรวจ
 ```
+- v2 ยุบ mt_<k>_area_owner → team (owner), tx_<k>_audit_person → audit.auditors/receivers, tx_<k>_issue_photo → issue.photo_before/photo_after
+  ฐานที่มีข้อมูลอยู่แล้วย้ายด้วย db/act/5s_v2_step1.sql (เพิ่ม + คัดลอก) และ db/act/5s_v2_step2.sql (ลบตารางเก่า)
 
-- สิทธิ์ transaction = อยู่ใน mt_<k>_team ปีนั้น หรือเป็นเจ้าของพื้นที่ใน mt_<k>_area_owner ปีนั้น · Setting = role admin ปีนั้น
+- สิทธิ์ transaction = อยู่ใน mt_<k>_team ปีนั้น (chairman / auditor / owner) · Setting = role admin ปีนั้น
 - `หัวหน้าทีม` ของระบบเดิม = `chairman` · `Auditor` ทีม X = `auditor` + team X · สีทีมคำนวณจากตัวอักษร (ไม่เก็บ)
 - ฐาน TX ย้ายมารวม MX แล้ว จึงใช้ join คำนวณ Dashboard ได้ (ทำเป็น view เช่น % ราย ส ต่อ audit)
 - รูปเดิมอยู่ Google Drive เก็บ URL เดิมไว้ก่อน รูปใหม่เก็บ Supabase Storage ของ Tx Data bucket `img_5s` (กิจกรรมอื่น `img_<กิจกรรม>`) ไฟล์ `issue/<ISSxxxx>_<BEFORE|AFTER>_<เวลา>.jpg`

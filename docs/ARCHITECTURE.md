@@ -106,13 +106,13 @@ scripts/
 | mt_sto_buyer | mx | costcenter ที่ซื้อได้ |
 | tx_sto_requisition / _line | tx | ใบเบิกและรายการในใบเบิก |
 | tx_sto_issue | tx | ประวัติการจ่าย |
-| mt_5s_team / _area / _area_owner / _checklist / _audit_plan / _setting / _plan | **tx** | กิจกรรม 5S: ทีมรายปี, พื้นที่, เจ้าของพื้นที่รายปี, หัวข้อตรวจรายปี, แผนตรวจ, ค่าตั้งต้น, แผน Gantt |
-| tx_5s_audit / _audit_score / _audit_person / _issue / _issue_photo, v_5s_audit_group | **tx** | ผลตรวจ คะแนน คนในใบตรวจ Issue รูป และ % ราย ส |
+| mt_5s_team / _area / _checklist / _audit_plan / _setting / _plan | **tx** | กิจกรรม 5S: ทีมรายปี (รวมเจ้าของพื้นที่ role owner + area_id), พื้นที่, หัวข้อตรวจรายปี, แผนตรวจ, ค่าตั้งต้น, แผน Gantt |
+| tx_5s_audit (+ auditors, receivers) / _audit_score / _issue (+ photo_before, photo_after), v_5s_audit_group | **tx** | ผลตรวจ คะแนนรายข้อ Issue และ % ราย ส (9 ตาราง ตั้งแต่ v2 2026-10-25) |
 
 ## Schedule Plan (ระบบกิจกรรม)
 
 - ทุกคนที่ login ดูแผนได้
-- สิทธิ์ของแต่ละกิจกรรมมาจาก `mt_<กิจกรรม>_team` รายปี: role `admin` = แก้ Setting และแผน, `chairman` / `auditor` / เจ้าของพื้นที่ (`mt_<กิจกรรม>_area_owner`) = transaction, ทุกคน = Dashboard · creator ทำได้ทุกอย่าง
+- สิทธิ์ของแต่ละกิจกรรมมาจาก `mt_<กิจกรรม>_team` รายปี: role `admin` = แก้ Setting และแผน, `chairman` / `auditor` / เจ้าของพื้นที่ (`mt_<กิจกรรม>_team` role owner) = transaction, ทุกคน = Dashboard · creator ทำได้ทุกอย่าง
 - route เขียนข้อมูลของ act ตรวจ admin ของปีนั้นใน handler (`requireAdmin` / `guardYear`) snapshot จึงแสดงแค่ `auth`
 - แผนแบบ Gantt อยู่ที่ <กิจกรรม> > Setting รายการที่ชื่อเหมือนกันอยู่แถวเดียวกัน แถวที่ระบบสร้างเอง (เช่น Self Audit วันที่ 1–10 ทุกเดือน) กำหนดใน `ACT_GANTT_AUTO`
 - เปิดใช้กับกิจกรรมอื่น: เพิ่ม id ใน `ACT_GANTT_ON` ใน public/js/act-gantt.js (server รองรับทุกกิจกรรมใน `ACTIVITIES` แล้ว)

@@ -19,8 +19,7 @@ function tablesForSystem() {
     const t = tablesOf(activity);
     Object.assign(out, {
       [t.area]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['code', 'text', true], ['area_type', 'areatype', true], ['name', 'text', true], ['section', 'text'], ['status', 'status', true]] },
-      [t.owner]: { db: 'tx', pk: ['year', 'area_id'], columns: [['year', 'int', true], ['area_id', 'int', true], ['employee_id', 'text', true]] },
-      [t.team]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['employee_id', 'text', true], ['role', 'actrole', true], ['team', 'text'], ['status', 'status', true]] },
+      [t.team]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['employee_id', 'text', true], ['role', 'actrole', true], ['team', 'text'], ['area_id', 'int'], ['status', 'status', true]] },
       [t.checklist]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['item_no', 'int', true], ['s_group', 'int', true], ['title', 'text', true], ['score_max', 'int', true], ['status', 'status', true]] },
       [t.auditPlan]: { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['area_id', 'int', true], ['month', 'int', true], ['week', 'int', true], ['round', 'int'], ['team', 'text']] },
       [t.setting]: { db: 'tx', pk: ['key'], columns: [['key', 'text', true], ['value', 'text', true]] },
