@@ -174,6 +174,8 @@ html[data-theme="dark"] .badge-warning{color:#fbbf24}
 .table-wrap::-webkit-scrollbar-track,.apl-scroll::-webkit-scrollbar-track,.gantt-scroll::-webkit-scrollbar-track{background:var(--mo-surface-2)}
 .table-wrap::-webkit-scrollbar-corner,.apl-scroll::-webkit-scrollbar-corner,.gantt-scroll::-webkit-scrollbar-corner{background:var(--mo-surface)}
 .table-wrap::-webkit-scrollbar-track:vertical{margin-top:var(--table-head,40px)}
+/* The gap above the vertical bar keeps the header colour and its bottom line (painted on the box, does not scroll). */
+.table-wrap{background:linear-gradient(var(--mo-surface-2) calc(var(--table-head,40px) - 1px),var(--mo-line) 0) right top/12px var(--table-head,40px) no-repeat border-box,var(--mo-surface)}
 .apl-scroll::-webkit-scrollbar-track:vertical{margin-top:var(--apl-head,46px)}
 .apl-scroll::-webkit-scrollbar-track:horizontal{margin-left:var(--apl-left,384px)}
 .gantt-scroll::-webkit-scrollbar-track:horizontal{margin-left:var(--gantt-label,200px)}
@@ -496,6 +498,8 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 }
 /* Project Planner (act-planner.js): sticky left columns, week or day columns on the right */
 .apl-scroll{overflow:auto;max-height:calc(100vh - 190px);border:1px solid var(--mo-border);border-radius:var(--mo-radius)}
+/* Gaps beside the scroll bars: header colour above the vertical bar, left-column colour before the horizontal bar. */
+.apl-scroll{background:linear-gradient(var(--mo-surface-2) calc(var(--apl-head,46px) - 1px),var(--mo-border) 0) right top/12px var(--apl-head,46px) no-repeat border-box,linear-gradient(to right,var(--mo-surface) calc(var(--apl-left,384px) - 1px),var(--mo-border) 0) left bottom/var(--apl-left,384px) 12px no-repeat border-box,var(--mo-surface)}
 .apl-grid{min-width:calc(384px + var(--apl-tl))}
 .apl-row{display:grid;grid-template-columns:384px minmax(var(--apl-tl),1fr);border-bottom:1px solid var(--mo-border)}
 .apl-row:last-child{border-bottom:0}
