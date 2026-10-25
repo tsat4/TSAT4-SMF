@@ -105,6 +105,7 @@ export default defineModule({
         if (filters.length) query = query.or(filters.join(','));
       }
       const { data, error, count } = await query;
+      if (error?.code === 'PGRST205') return fail(res, 400, `ยังไม่มีตาราง ${req.params.name} ในฐานข้อมูล ต้องรัน SQL สร้างตารางก่อน`);
       if (error) return fail(res, 400, 'อ่านตารางไม่ได้');
       res.json({ rows: data || [], total: count || 0 });
     }));

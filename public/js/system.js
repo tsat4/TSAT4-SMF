@@ -29,11 +29,19 @@ async function renderSystem(target) {
   const tableOf = () => catalog.tables.find((table) => table.name === $('sys-table').value);
   const loadRows = async () => {
     const table = tableOf();
-    const data = await api(`/api/system/tables/${encodeURIComponent(table.name)}?q=${encodeURIComponent($('sys-q').value.trim())}&offset=${state.offset}`);
-    state.rows = data.rows;
+    state.rows = [];
     state.selected = null;
     $('sys-edit').disabled = true;
     $('sys-del').disabled = true;
+    let data;
+    try {
+      data = await api(`/api/system/tables/${encodeURIComponent(table.name)}?q=${encodeURIComponent($('sys-q').value.trim())}&offset=${state.offset}`);
+    } catch (err) {
+      fillTable('sys-rows', [], '', esc(err.message));
+      countText('sys-count', 0, 0);
+      throw err;
+    }
+    state.rows = data.rows;
     countText('sys-count', state.rows.length, data.total);
     const visible = table.columns.filter((column) => column.type !== 'password');
     fillTable('sys-rows', visible.map((column) => column.name), state.rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}</tr>`).join(''), 'ไม่มีแถว');
