@@ -4,8 +4,9 @@ import { defineModule } from '../../core/access.js';
 import { requireUser } from '../../core/users.js';
 import { ACTIVITIES, accessOf, activityOf, dateOf, missingTables, namesOf, tablesOf } from './common.js';
 import { mountAudit } from './audit.js';
+import { mountTransaction } from './transaction.js';
 
-// ระบบกิจกรรม (Tx Data): Gantt plan + calendar here, checklist audits in audit.js.
+// ระบบกิจกรรม (Tx Data): Gantt plan + calendar here, checklist audit Dashboard/Setting in audit.js, audits and Issues in transaction.js.
 // Each activity has its own tables (db/act/<activity>.sql). Rights come from mt_<act>_team per year (common.js accessOf).
 const STATUSES = ['planned', 'done', 'cancelled'];
 const MAX_RANGE_DAYS = 400;
@@ -157,5 +158,6 @@ export default defineModule({
     }));
 
     mountAudit(app);
+    mountTransaction(app);
   }
 });

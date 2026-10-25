@@ -87,5 +87,37 @@ if (!fs.existsSync(importFile)) {
   ok(o.rows.length === 15 && o.rows[0].name === 'CIC' && o.total.groups.join('/') === '81.6/79.5/85.9/85.1/89.6' && o.total.average === 84.3, 'rank(): office = old Ranking (CIC first · 84.3)');
 }
 
+// Transaction rules (server/modules/act/transaction.js)
+{
+  const { scoreAudit, verifyIssues, dueDateFor, weekStartIso, shownStatus } = await import('../server/modules/act/transaction.js');
+  const items = [1, 2, 3, 4, 5].map((id) => ({ id, score_max: 5 }));
+  const sc = scoreAudit(items, new Map([[1, 5], [2, 4], [3, 4], [4, 3], [5, 4]]), 80);
+  ok(sc.total === 20 && sc.percent === 80 && sc.result === 'PASS', `scoreAudit 20/25 = 80% PASS (got ${JSON.stringify(sc)})`);
+  ok(scoreAudit(items, new Map([[1, 5], [2, 4], [3, 4], [4, 3], [5, 3]]), 80).result === 'NEED_IMPROVE', 'scoreAudit 19/25 = 76% NEED_IMPROVE');
+  const open = [
+    { id: 10, checklist_id: 1, action_description: '', after_photos: 0 },
+    { id: 11, checklist_id: 2, action_description: 'ติดป้ายแล้ว', after_photos: 1 },
+    { id: 12, checklist_id: 3, action_description: 'จัดใหม่', after_photos: 1 },
+    { id: 13, checklist_id: 4, action_description: 'มีข้อความแต่ไม่มีรูป', after_photos: 0 }
+  ];
+  const v = verifyIssues(open, new Map([[1, 5], [2, 4], [3, 3], [4, 5], [5, 5]]));
+  const by = Object.fromEntries(v.updates.map((u) => [u.id, u.status]));
+  ok(v.scores.get(1) === 0 && by[10] === 'OVERDUE', 'no action -> item 0 + OVERDUE');
+  ok(by[11] === 'CLOSED' && v.scores.get(2) === 4, 'action + score 4 -> CLOSED');
+  ok(by[12] === 'OPEN' && v.updates.find((u) => u.id === 12).carry, 'action + score 3 -> carries on');
+  ok(by[13] === 'OVERDUE' && v.scores.get(4) === 0, 'action text without after photo counts as no action');
+  ok(weekStartIso(2026, 10, 3) === '2026-10-15', 'week 3 starts on the 15th');
+  const plans = [{ year: 2026, month: 10, week: 1 }, { year: 2027, month: 1, week: 2 }, { year: 2026, month: 9, week: 1 }];
+  ok(dueDateFor(plans, '2026-09-04', 10) === '2026-09-21', `due = next plan (1 Oct) - 10 days (got ${dueDateFor(plans, '2026-09-04', 10)})`);
+  ok(dueDateFor(plans, '2026-10-05', 10) === '2026-12-29', 'due crosses into next year (8 Jan 2027 - 10)');
+  ok(dueDateFor(plans, '2027-02-01', 10) === null, 'no next plan -> due null (รอกำหนด)');
+  ok(shownStatus({ status: 'OPEN', due_date: '2026-09-11' }, '2026-10-25') === 'OVERDUE' && shownStatus({ status: 'ON_PLAN', due_date: '2026-09-11' }, '2026-10-25') === 'ON_PLAN', 'OPEN past due shows OVERDUE, actions keep their status');
+  if (fs.existsSync(importFile)) {
+    const real = (await db.query(`select id::int, checklist_id::int, action_description, 0 as after_photos from tx_5s_issue where area_id = (select id from mt_5s_area where code = 'B11')`)).rows;
+    const rv = verifyIssues(real, new Map());
+    ok(real.length > 0 && rv.updates.every((u) => u.status === 'OVERDUE'), `real data: B11 has ${real.length} open Issues without action -> all OVERDUE at the next committee audit`);
+  }
+}
+
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

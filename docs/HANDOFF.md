@@ -2,15 +2,9 @@
 
 ## กำลังทำอยู่
 
-- งาน: 5S → transaction (ฟอร์มตรวจ Self / Committee + Issue) ตาม docs/specs/act-5s.md
-- ใคร / เริ่มเมื่อ: Claude (โฟลเดอร์ SMF-act), 2026-10-25
-- ขั้นตอน:
-  - [ ] server: /api/act/:activity/audits (list, form, save, delete) + /issues (list, photo, action, edit)
-  - [ ] หน้า transaction: แท็บ ตรวจประเมิน / Issue
-  - [ ] SQL: bucket รูป `act-img` ใน Tx Data (db/act/storage.sql) — ให้ผู้ใช้/Cursor รัน
-  - [ ] ทดสอบ + deploy
-- ไฟล์ที่ยังแก้ไม่เสร็จ: (อัปเดตระหว่างทำ)
-- เสร็จแล้วก่อนหน้า: แยกฐาน Mx/Tx เสร็จ ผู้ใช้สลับ env TX_* ไป Tx Data แล้ว (2026-10-25)
+- งาน: 5S → transaction (ฟอร์มตรวจ Self / Committee + Issue) — Claude ทำเสร็จและ deploy แล้ว 2026-10-25
+- เหลือ (ผู้ใช้ / Cursor): **Tx Data** SQL Editor รัน `db/act/storage.sql` (สร้างที่เก็บรูป `act-img`) ไม่อย่างนั้นแนบรูป Issue จะขึ้นว่ายังไม่ได้สร้างที่เก็บรูป
+- ไฟล์ที่ยังแก้ไม่เสร็จ: ไม่มี
 <!-- ถ้าเริ่มงานใหญ่ ให้เขียนตามนี้:
 - งาน: ...
 - ใคร / เริ่มเมื่อ: Cursor | Claude, YYYY-MM-DD HH:MM
@@ -20,7 +14,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- ไม่มี SQL ค้าง เหลือแค่สลับ env TX บน Render กลับไป Tx Data แล้วตรวจหน้าเว็บ (ขั้น 3–4)
+- **Tx Data**: `db/act/storage.sql` (bucket รูป act-img)
 
 ## ข้อควรระวัง
 
@@ -29,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-25 · Claude · 5S transaction: ฟอร์มตรวจ Self/Committee (ให้คะแนนรายข้อ, Issue เดิมไม่มี Action ล็อก 0, ข้อ ≤ 3 เปิด Issue + รูป 16:9), รายการใบตรวจ (admin ลบได้), Issue (ส่ง Action + รูปหลังแก้, admin แก้กำหนด) · กติกา verifyIssues/dueDateFor/scoreAudit ทดสอบใน test:act · ต้องรัน db/act/storage.sql ใน Tx Data
 - 2026-10-25 · Claude · แยกโฟลเดอร์ทำงาน: Claude ใช้ `C:\Work\projects\SMF-act` (worktree branch claude-act → push `HEAD:main`) · Cursor ใช้ `C:\Work\projects\SMF` (main) · ทำพร้อมกันได้ ดูหัวข้อ 0 ใน AGENTS.md · Claude ดูแลระบบกิจกรรม Cursor ดูแลระบบงาน + งาน SQL
 - 2026-10-25 · Cursor · ลบของเก่าตามที่ผู้ใช้สั่ง: Mx Data ไม่มี mt_act_* / tx_act_* แล้ว (พนักงาน 309 และใบเบิก 1 ใบยังอยู่) · Tx Data ไม่มี tx_sto_* แล้ว (พื้นที่ 34 ใบตรวจ 33 Issue 52 ยังอยู่)
 - 2026-10-25 · Cursor · โค้ดแยกฐาน `59c8856` อยู่บนเว็บแล้ว และสร้างตาราง `mt_5s_*` / `tx_5s_*` ใน Tx Data พร้อมข้อมูลเดิม ตัวเลขหมวดตรง 85.2/82.5/87.0/88.7/89.8 ยังไม่สลับ env TX กลับ และยังไม่ลบตารางกิจกรรมเก่าใน Mx Data

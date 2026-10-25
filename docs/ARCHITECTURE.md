@@ -33,6 +33,7 @@ server/
       tables.js              ตาราง sto ที่แก้ได้ในหน้า System
     act/index.js             ระบบกิจกรรม: แผน Gantt /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (db/04_act_plan.sql)
     act/common.js            tablesOf(กิจกรรม) ชื่อตาราง, accessOf (สิทธิ์รายปีจาก mt_<act>_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
+    act/transaction.js       ระบบตรวจ checklist: บันทึกผลตรวจ Self/Committee + Issue (รูปใน Storage bucket act-img ของ Tx Data) กติกาเป็นฟังก์ชันแยก ทดสอบใน test:act
     act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/act/<กิจกรรม>.sql) summarize()/rank() ทดสอบด้วย npm run test:act
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
 public/
@@ -44,6 +45,7 @@ public/
   js/act.js                  ระบบตั้งค่า > ปฏิทิน: แผนของทุกกิจกรรม (สัปดาห์ / เดือน / ปี) ดูอย่างเดียว + helper กลางของแผน
   js/act-gantt.js            แผนประจำปีแบบ Gantt (สัปดาห์ / เดือน / ปี) เปิดใช้ตาม ACT_GANTT_ON
   js/act-5s.js               <กิจกรรม> > Dashboard (Summary/Ranking/Schedule/Team) + Setting (แผนงาน/พื้นที่/ทีม/หัวข้อ/แผนตรวจ) เปิดใช้ตาม A5_ON
+  js/act-tx.js               <กิจกรรม> > transaction: รายการใบตรวจ + ฟอร์มตรวจ + Issue (ใช้ helper ของ act-5s.js)
   js/system.js               หน้าแก้ตารางของ creator
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)
 db/                          SQL ที่ผู้ใช้รันเองใน Supabase + คู่มือ (README.md)

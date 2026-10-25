@@ -210,9 +210,11 @@ export function mountAudit(app) {
 
   // ---------- Setting: admin of the year ----------
 
+  // Employee picker for Setting (admins) and for the audit form's receivers (any team member of the year).
   route('get', '/api/act/:activity/employees', async (req, res, activity) => {
     const year = yearOf(req.query.year);
-    if (!year || !(await requireAdmin(req, res, activity, year))) return;
+    if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
+    if (!(await accessOf(req, activity, year)).member) return fail(res, 403, `ค้นพนักงานได้เฉพาะทีมของกิจกรรมนี้ปี ${year}`);
     const term = cleanTerm(req.query.q);
     let q = mx.from('mt_main_employee').select('employee_id,prefix,first_name,last_name,department,position').eq('status', 'Active').order('employee_id').limit(20);
     if (term) q = q.or(`employee_id.ilike.%${term}%,first_name.ilike.%${term}%,last_name.ilike.%${term}%,department.ilike.%${term}%`);
