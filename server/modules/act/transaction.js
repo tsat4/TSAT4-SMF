@@ -1,7 +1,6 @@
 import { tx } from '../../core/db.js';
-import { fail, wrap } from '../../core/http.js';
-import { requireUser } from '../../core/users.js';
-import { accessOf, activityOf, dateOf, fetchAll, fetchIn, missingTables, namesOf, tablesOf, yearOf } from './common.js';
+import { fail } from '../../core/http.js';
+import { accessOf, actRoute, dateOf, fetchAll, fetchIn, must, namesOf, roundTo, tablesOf, yearOf } from './common.js';
 
 // Checklist audits — transaction: record Self / Committee audits and follow Issues to closure.
 // Rules: docs/specs/act-5s.md ("transaction", "Issue"). Pure rule functions are exported for scripts/test-act-audit.js.
@@ -10,7 +9,6 @@ const DEFAULTS = { pass_percent: 80, issue_score: 3, issue_due_days_before_next:
 
 const todayIso = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
 const addDays = (iso, days) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
-const roundTo = (n, digits) => Number(`${Math.round(Number(`${Number(n).toFixed(8)}e${digits}`))}e-${digits}`);
 
 // First day of plan week (W1 = 1, W2 = 8, W3 = 15, W4 = 22).
 export function weekStartIso(year, month, week) {
@@ -80,20 +78,7 @@ function imageBytes(dataUrl) {
 }
 
 export function mountTransaction(app) {
-  const route = (method, path, handler) => app[method](path, wrap(requireUser), wrap(async (req, res) => {
-    const activity = activityOf(req, res);
-    if (!activity) return;
-    try {
-      await handler(req, res, activity, tablesOf(activity));
-    } catch (err) {
-      if (missingTables(res, err, activity)) return;
-      throw err;
-    }
-  }));
-  const must = (result) => {
-    if (result.error) throw result.error;
-    return result.data;
-  };
+  const route = actRoute(app);
 
   // Open Issues of an area with how many after photos they have (for the committee form and verification).
   // exceptAuditId leaves out the Issues an audit opened itself (used when that audit is edited).

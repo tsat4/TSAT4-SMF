@@ -1,6 +1,6 @@
 # Project Planner (100P และ 5S)
 
-ผู้ใช้สั่ง 2026-10-25 · โค้ด: `server/modules/act/planner.js`, `public/js/act-planner.js` · ตาราง: `scripts/act-sql.js --task`
+ผู้ใช้สั่ง 2026-10-25 · โค้ด: `server/modules/act/planner.js`, `public/js/act-planner.js` · ตาราง: `mt_<act>_task` ในแม่แบบ `scripts/act-sql.js` (ทุกกิจกรรมมี)
 
 ## ใช้ที่ไหน
 
@@ -52,5 +52,5 @@
 
 ## เปิดใช้กับกิจกรรมอื่น
 
-1. กิจกรรมใหม่: `node scripts/act-sql.js <act> --plan --task` (หรือไม่มี `--plan` ถ้ามีระบบตรวจด้วย) · กิจกรรมที่ใช้งานอยู่: `node scripts/act-sql.js <act> --add-task` → `db/act/<act>_task.sql` (สร้างตารางและคัดลอกแผน Gantt เดิมครั้งเดียว: 1 ชื่อ = 1 ข้อหลัก ชื่อที่มีหลายช่วง = ข้อหลัก + ข้อรอง ไม่เอาที่ยกเลิก) แล้วรันใน Tx Data
+1. กิจกรรมใหม่: `node scripts/act-sql.js <act> --no-audit` (หรือไม่ใส่ `--no-audit` ถ้ามีระบบตรวจด้วย) ตาราง Planner มาด้วยเสมอ · กิจกรรมที่ใช้งานอยู่ก่อนมี Planner: `node scripts/act-sql.js <act> --add-task` → `db/act/<act>_task.sql` (สร้างตารางและคัดลอกแผน Gantt เดิมครั้งเดียว: 1 ชื่อ = 1 ข้อหลัก ชื่อที่มีหลายช่วง = ข้อหลัก + ข้อรอง ไม่เอาที่ยกเลิก) แล้วรันใน Tx Data
 2. เพิ่ม id ใน `PLANNER_ON` (planner.js) และ `APL_ON` (act-planner.js) · ถ้ากิจกรรมนั้นใช้หน้า Setting ของ 5S อยู่แล้วต้องวางหน้า Planner เป็นแท็บแทน

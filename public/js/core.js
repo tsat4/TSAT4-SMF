@@ -142,6 +142,11 @@ function fillTable(id, headers, rows, emptyText, head) {
   });
 }
 
+// fillTable's `head`: keeps sort and filters in the given object and calls reload() after a change.
+function headFor(head, reload) {
+  return { ...head, onChange: (next) => { Object.assign(head, next); reload(); } };
+}
+
 function tableParams(query, head) {
   if (head?.sort) {
     query.set('sort', head.sort);

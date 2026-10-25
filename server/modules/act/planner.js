@@ -1,13 +1,12 @@
 import { tx } from '../../core/db.js';
-import { fail, wrap } from '../../core/http.js';
-import { requireUser } from '../../core/users.js';
-import { accessOf, activityOf, dateOf, fetchAll, namesOf, requireAdmin, tablesOf, yearOf } from './common.js';
+import { fail } from '../../core/http.js';
+import { accessOf, actRoute, dateOf, fetchAll, must, namesOf, requireAdmin, tablesOf, yearOf } from './common.js';
 
-// Project Planner (100P): one year's plan as main items (parent_id null) with sub items, shown as a Gantt with
+// Project Planner (100P, 5S): one year's plan as main items (parent_id null) with sub items, shown as a Gantt with
 // year (W1–W4) and month (day) views. Everyone reads; the year's admins create, edit, drag and delete.
-// Table: mt_<act>_task (scripts/act-sql.js --task). A main item with sub items takes its dates and % from them.
+// Table: mt_<act>_task (scripts/act-sql.js). A main item with sub items takes its dates and % from them.
 export const PLANNER_ON = ['100p', '5s'];
-// SQL that creates the Planner table: a new activity gets it with its tables, a running one from an add-on file.
+// A running activity got the Planner table from an add-on file; a new one gets it with its tables.
 const PLANNER_SQL = { '5s': 'db/act/5s_task.sql' };
 const COLORS = ['p1', 'p2', 'p3', 'p4', 'p5'];
 const COLUMNS = 'id,year,parent_id,sort_no,title,start_date,end_date,progress,owner_id,color,note';
@@ -42,101 +41,80 @@ function datesIn(year, startRaw, endRaw) {
   return { start, end };
 }
 
-export function mountPlanner(app) {
-  const route = (method, path, handler) => app[method](path, wrap(requireUser), wrap(async (req, res) => {
-    const activity = activityOf(req, res);
-    if (!activity) return;
-    if (!PLANNER_ON.includes(activity)) return fail(res, 404, 'กิจกรรมนี้ยังไม่มี Project Planner');
-    try {
-      await handler(req, res, activity, tablesOf(activity).task);
-    } catch (err) {
-      if (err?.code === 'PGRST205') return fail(res, 503, `ยังไม่ได้สร้างตาราง Planner ใน Tx Data (${PLANNER_SQL[activity] || tablesOf(activity).sql})`);
-      throw err;
-    }
-  }));
-
-  const rowsOf = (table, year) => fetchAll(() => tx.from(table).select(COLUMNS).eq('year', year).order('sort_no').order('id'));
-  const oneOf = async (table, id) => {
-    const { data, error } = await tx.from(table).select(COLUMNS).eq('id', id).maybeSingle();
-    if (error) throw error;
-    return data;
+function input(body, year, hasKids) {
+  const title = String(body.title || '').trim().slice(0, 200);
+  if (!title) return { error: 'ระบุชื่อรายการ' };
+  const parentId = body.parentId == null || body.parentId === '' ? null : Number(body.parentId);
+  if (parentId != null && !Number.isInteger(parentId)) return { error: 'เลือกข้อหลักไม่ถูกต้อง' };
+  const row = {
+    title,
+    parent_id: hasKids ? null : parentId,
+    owner_id: String(body.ownerId || '').trim().slice(0, 40) || null,
+    note: String(body.note || '').trim().slice(0, 2000) || null,
+    color: parentId == null && COLORS.includes(body.color) ? body.color : null
   };
+  if (hasKids) return { row };
+  const progress = Number(body.progress ?? 0);
+  if (!Number.isInteger(progress) || progress < 0 || progress > 100) return { error: '% ต้องเป็น 0–100' };
+  // A main item may be left without dates until it has sub items; a sub item always has dates.
+  if (parentId == null && !body.startDate && !body.endDate) return { row: { ...row, start_date: null, end_date: null, progress } };
+  const dates = datesIn(year, body.startDate, body.endDate);
+  return dates.error ? dates : { row: { ...row, start_date: dates.start, end_date: dates.end, progress } };
+}
 
+export function mountPlanner(app) {
+  const route = actRoute(app, { only: PLANNER_ON, sqlOf: (activity) => PLANNER_SQL[activity] });
+  const rowsOf = (table, year) => fetchAll(() => tx.from(table).select(COLUMNS).eq('year', year).order('sort_no').order('id'));
+  const oneOf = async (table, id) => must(await tx.from(table).select(COLUMNS).eq('id', id).maybeSingle());
+  const kidCount = async (table, id) => {
+    const { count, error } = await tx.from(table).select('id', { count: 'exact', head: true }).eq('parent_id', id);
+    if (error) throw error;
+    return count;
+  };
+  // New or moved items go last in their level.
+  const nextSort = async (table, year, parentId) => {
+    const q = tx.from(table).select('sort_no').eq('year', year).order('sort_no', { ascending: false }).limit(1);
+    const top = must(await (parentId == null ? q.is('parent_id', null) : q.eq('parent_id', parentId)));
+    return (top[0]?.sort_no || 0) + 1;
+  };
   // The parent must be a main item of the same year; an item that has sub items stays a main item.
-  const checkParent = async (table, year, parentId, selfId) => {
+  const badParent = async (table, year, parentId, selfId) => {
     if (parentId == null) return null;
-    if (parentId === selfId) return 'เลือกข้อหลักไม่ถูกต้อง';
-    const parent = await oneOf(table, parentId);
+    const parent = parentId === selfId ? null : await oneOf(table, parentId);
     if (!parent || parent.year !== year || parent.parent_id != null) return 'เลือกข้อหลักไม่ถูกต้อง';
-    if (selfId != null) {
-      const { count, error } = await tx.from(table).select('id', { count: 'exact', head: true }).eq('parent_id', selfId);
-      if (error) throw error;
-      if (count) return 'ข้อหลักที่มีข้อรองย้ายไปเป็นข้อรองไม่ได้';
-    }
     return null;
   };
 
-  const input = (body, year, { hasKids }) => {
-    const title = String(body.title || '').trim().slice(0, 200);
-    if (!title) return { error: 'ระบุชื่อรายการ' };
-    const parentId = body.parentId == null || body.parentId === '' ? null : Number(body.parentId);
-    if (parentId != null && !Number.isInteger(parentId)) return { error: 'เลือกข้อหลักไม่ถูกต้อง' };
-    const row = {
-      title,
-      parent_id: parentId,
-      owner_id: String(body.ownerId || '').trim().slice(0, 40) || null,
-      note: String(body.note || '').trim().slice(0, 2000) || null,
-      color: parentId == null && COLORS.includes(body.color) ? body.color : null
-    };
-    if (hasKids) return { row };
-    const progress = Number(body.progress ?? 0);
-    if (!Number.isInteger(progress) || progress < 0 || progress > 100) return { error: '% ต้องเป็น 0–100' };
-    // A main item may be left without dates until it has sub items; a sub item always has dates.
-    if (parentId == null && !body.startDate && !body.endDate) return { row: { ...row, start_date: null, end_date: null, progress } };
-    const dates = datesIn(year, body.startDate, body.endDate);
-    if (dates.error) return dates;
-    return { row: { ...row, start_date: dates.start, end_date: dates.end, progress } };
-  };
-
-  route('get', '/api/act/:activity/tasks', async (req, res, activity, table) => {
+  route('get', '/api/act/:activity/tasks', async (req, res, activity, t) => {
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
-    const rows = await rowsOf(table, year);
-    const admins = await tx.from(tablesOf(activity).team).select('employee_id').eq('year', year).eq('role', 'admin').eq('status', 'Active');
-    const adminIds = admins.error ? [] : (admins.data || []).map((r) => String(r.employee_id));
-    const names = await namesOf([...rows.map((r) => r.owner_id), ...adminIds]);
+    const rows = await rowsOf(t.task, year);
+    const names = await namesOf(rows.map((r) => r.owner_id));
     res.json({
       year,
       canEdit: (await accessOf(req, activity, year)).admin,
-      admins: adminIds.map((id) => names.get(id)?.name || id),
       tasks: withSpans(rows).map((row) => ({ ...row, owner_name: row.owner_id ? names.get(String(row.owner_id))?.name || row.owner_id : '' }))
     });
   });
 
-  route('post', '/api/act/:activity/tasks', async (req, res, activity, table) => {
+  route('post', '/api/act/:activity/tasks', async (req, res, activity, t) => {
     const year = yearOf(req.body?.year);
     if (!year || !(await requireAdmin(req, res, activity, year))) return;
-    const { row, error: invalid } = input(req.body || {}, year, { hasKids: false });
-    if (invalid) return fail(res, 400, invalid);
-    const bad = await checkParent(table, year, row.parent_id, null);
+    const { row, error: invalid } = input(req.body || {}, year, false);
+    const bad = invalid || await badParent(t.task, year, row.parent_id, null);
     if (bad) return fail(res, 400, bad);
-    let last = tx.from(table).select('sort_no').eq('year', year).order('sort_no', { ascending: false }).limit(1);
-    last = row.parent_id == null ? last.is('parent_id', null) : last.eq('parent_id', row.parent_id);
-    const { data: top, error: topError } = await last;
-    if (topError) throw topError;
-    const { data, error } = await tx.from(table)
-      .insert({ ...row, year, sort_no: (top?.[0]?.sort_no || 0) + 1, created_by: req.user.employeeId }).select('id').single();
-    if (error) throw error;
-    res.status(201).json({ ok: true, id: data.id });
+    const created = must(await tx.from(t.task)
+      .insert({ ...row, year, sort_no: await nextSort(t.task, year, row.parent_id), created_by: req.user.employeeId }).select('id').single());
+    res.status(201).json({ ok: true, id: created.id });
   });
 
   // Drag: new dates for one or more items at once (dragging a main item moves all its sub items).
-  route('patch', '/api/act/:activity/tasks/dates', async (req, res, activity, table) => {
+  route('patch', '/api/act/:activity/tasks/dates', async (req, res, activity, t) => {
     const year = yearOf(req.body?.year);
     const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 200) : [];
     if (!year || !items.length) return fail(res, 400, 'ไม่มีรายการที่ย้าย');
     if (!(await requireAdmin(req, res, activity, year))) return;
-    const rows = withSpans(await rowsOf(table, year));
+    const rows = withSpans(await rowsOf(t.task, year));
     const changes = [];
     for (const item of items) {
       const row = rows.find((r) => r.id === Number(item.id));
@@ -145,77 +123,59 @@ export function mountPlanner(app) {
       if (dates.error) return fail(res, 400, dates.error);
       changes.push({ id: row.id, start_date: dates.start, end_date: dates.end });
     }
-    const now = new Date().toISOString();
-    for (const change of changes) {
-      const { error } = await tx.from(table).update({ start_date: change.start_date, end_date: change.end_date, updated_at: now }).eq('id', change.id);
-      if (error) throw error;
-    }
+    const updated_at = new Date().toISOString();
+    for (const { id, ...dates } of changes) must(await tx.from(t.task).update({ ...dates, updated_at }).eq('id', id));
     res.json({ ok: true });
   });
 
-  route('patch', '/api/act/:activity/tasks/:id', async (req, res, activity, table) => {
-    const current = await oneOf(table, Number(req.params.id));
+  route('patch', '/api/act/:activity/tasks/:id', async (req, res, activity, t) => {
+    const current = await oneOf(t.task, Number(req.params.id));
     if (!current) return fail(res, 404, 'ไม่พบรายการ');
     if (!(await requireAdmin(req, res, activity, current.year))) return;
-    const { count, error: countError } = await tx.from(table).select('id', { count: 'exact', head: true }).eq('parent_id', current.id);
-    if (countError) throw countError;
-    const { row, error: invalid } = input(req.body || {}, current.year, { hasKids: Boolean(count) });
-    if (invalid) return fail(res, 400, invalid);
-    if (count) row.parent_id = null;
-    const bad = await checkParent(table, current.year, row.parent_id, current.id);
+    const hasKids = (await kidCount(t.task, current.id)) > 0;
+    const { row, error: invalid } = input(req.body || {}, current.year, hasKids);
+    if (!invalid && hasKids && req.body?.parentId) return fail(res, 400, 'ข้อหลักที่มีข้อรองย้ายไปเป็นข้อรองไม่ได้');
+    const bad = invalid || await badParent(t.task, current.year, row.parent_id, current.id);
     if (bad) return fail(res, 400, bad);
-    if (row.parent_id !== current.parent_id) {
-      // Moving to another level puts the item last there.
-      let last = tx.from(table).select('sort_no').eq('year', current.year).order('sort_no', { ascending: false }).limit(1);
-      last = row.parent_id == null ? last.is('parent_id', null) : last.eq('parent_id', row.parent_id);
-      const { data: top, error: topError } = await last;
-      if (topError) throw topError;
-      row.sort_no = (top?.[0]?.sort_no || 0) + 1;
-    }
-    const { error } = await tx.from(table).update({ ...row, updated_at: new Date().toISOString() }).eq('id', current.id);
-    if (error) throw error;
+    if (row.parent_id !== current.parent_id) row.sort_no = await nextSort(t.task, current.year, row.parent_id);
+    must(await tx.from(t.task).update({ ...row, updated_at: new Date().toISOString() }).eq('id', current.id));
     res.json({ ok: true });
   });
 
-  route('delete', '/api/act/:activity/tasks/:id', async (req, res, activity, table) => {
-    const current = await oneOf(table, Number(req.params.id));
+  route('delete', '/api/act/:activity/tasks/:id', async (req, res, activity, t) => {
+    const current = await oneOf(t.task, Number(req.params.id));
     if (!current) return fail(res, 404, 'ไม่พบรายการ');
     if (!(await requireAdmin(req, res, activity, current.year))) return;
-    const { error } = await tx.from(table).delete().eq('id', current.id);
-    if (error) throw error;
+    must(await tx.from(t.task).delete().eq('id', current.id));
     res.json({ ok: true });
   });
 }
 
 // ระบบตั้งค่า > ปฏิทิน: items with their own dates (sub items, and main items without sub items) as calendar events.
-// `active` = activities whose Planner table exists; their old Gantt plan (mt_<act>_plan) is no longer shown.
+// Activities whose Planner table is not created yet are skipped.
 export async function plannerEvents(from, to) {
   const out = [];
-  const active = new Set();
   for (const activity of PLANNER_ON) {
-    const { data, error } = await tx.from(tablesOf(activity).task).select(COLUMNS)
-      .lte('start_date', to).gte('end_date', from).order('start_date').limit(1000);
+    const table = tablesOf(activity).task;
+    const { data, error } = await tx.from(table).select(COLUMNS).lte('start_date', to).gte('end_date', from).order('start_date').limit(1000);
     if (error?.code === 'PGRST205') continue;
     if (error) throw error;
-    active.add(activity);
-    const rows = data || [];
-    // Main items with sub items anywhere in the year are shown through their sub items.
-    const subs = await fetchAll(() => tx.from(tablesOf(activity).task).select('parent_id').not('parent_id', 'is', null).order('id'));
-    const parents = new Set(subs.map((r) => Number(r.parent_id)));
-    const names = await namesOf(rows.map((r) => r.owner_id));
-    for (const row of rows) {
+    // Main items with sub items are shown through their sub items.
+    const parents = new Set((await fetchAll(() => tx.from(table).select('parent_id').not('parent_id', 'is', null).order('id'))).map((r) => Number(r.parent_id)));
+    const names = await namesOf(data.map((r) => r.owner_id));
+    for (const row of data) {
       if (row.parent_id == null && parents.has(Number(row.id))) continue;
       out.push({
         id: `t${row.id}`,
+        activity,
         title: row.title,
         detail: row.note,
         start_date: row.start_date,
         end_date: row.end_date,
         responsible: row.owner_id ? names.get(String(row.owner_id))?.name || row.owner_id : null,
-        status: row.progress >= 100 ? 'done' : 'planned',
-        activity
+        status: row.progress >= 100 ? 'done' : 'planned'
       });
     }
   }
-  return { events: out, active };
+  return out;
 }

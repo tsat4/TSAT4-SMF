@@ -23,10 +23,6 @@ function atxDate(iso) {
   return `${d.getDate()} ${ACT_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function atxToday() {
-  return actIso(new Date());
-}
-
 // Problem / after photos: center crop to 16:9, 1280x720 JPEG.
 function atxWideJpeg(file) {
   return new Promise((resolve, reject) => {
@@ -87,10 +83,6 @@ const atxFilter = { quarter: '', type: '', areaType: '', area: '', q: '' };
 const ATX_QUARTERS = { '': 'ทั้งปี', 1: 'Q1 (ม.ค.–มี.ค.)', 2: 'Q2 (เม.ย.–มิ.ย.)', 3: 'Q3 (ก.ค.–ก.ย.)', 4: 'Q4 (ต.ค.–ธ.ค.)' };
 
 const atxHeads = { audits: { sort: '', dir: 'asc', filters: {} }, issues: { sort: '', dir: 'asc', filters: {} } };
-function atxColumnHead(key, reload) {
-  const head = atxHeads[key];
-  return { ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; reload(); } };
-}
 
 async function atxAudits(body, activity, me) {
   const data = await a5Api(activity, `audits?year=${a5Year}`);
@@ -126,7 +118,7 @@ async function atxAudits(body, activity, me) {
       <td>${a.team ? `<span class="a5-dot is-done" style="--team:${a5TeamColor(a.team)}"></span> ${esc(a.team)}` : '-'}</td>
       <td>${Number(a.total_score)}</td><td>${Number(a.percent_score)}%</td>
       <td><span class="badge ${a.result === 'PASS' ? '' : 'badge-danger'}">${esc(a.result || '-')}</span></td>
-      <td><span class="badge ${a.status === 'COMPLETED' ? 'badge-success' : 'badge-warning'}">${esc(a.status)}</span>${a.openIssues ? ` <span class="sum-meta">Issue ค้าง ${a.openIssues}</span>` : ''}</td></tr>`).join(''), `ยังไม่มีใบตรวจปี ${a5Year}`, atxColumnHead('audits', () => draw()));
+      <td><span class="badge ${a.status === 'COMPLETED' ? 'badge-success' : 'badge-warning'}">${esc(a.status)}</span>${a.openIssues ? ` <span class="sum-meta">Issue ค้าง ${a.openIssues}</span>` : ''}</td></tr>`).join(''), `ยังไม่มีใบตรวจปี ${a5Year}`, headFor(atxHeads.audits, () => draw()));
     $('atx-count').textContent = `แสดง ${rows.length} จาก ${data.audits.length} ใบตรวจ · เลือกแถวแล้วแก้ไขคะแนนหรือลบ · ดับเบิลคลิกดูรายละเอียด`;
     picked = null;
     $('atx-edit').disabled = true;
@@ -172,7 +164,7 @@ async function atxAuditDetail(activity, id) {
 
 // New audit, or edit one (editId): type and area are fixed when editing.
 async function atxForm(body, activity, me, editId = 0) {
-  const state = { type: '', areaId: '', date: atxToday(), team: '', participated: new Set(), receivers: [], scores: {}, text: {}, photo: {}, editId, auditNo: '', ownItems: new Set() };
+  const state = { type: '', areaId: '', date: actIso(new Date()), team: '', participated: new Set(), receivers: [], scores: {}, text: {}, photo: {}, editId, auditNo: '', ownItems: new Set() };
   let form = await a5Api(activity, `audit-form?year=${a5Year}`);
   if (!editId && !form.types.length) throw new Error('คุณยังไม่มีสิทธิ์ทำการตรวจปีนี้');
   if (!form.items.length) throw new Error(`ยังไม่มีหัวข้อตรวจปี ${a5Year} (admin เพิ่มที่ Setting > หัวข้อตรวจ)`);
@@ -225,7 +217,7 @@ async function atxForm(body, activity, me, editId = 0) {
       <div class="toolbar atx-head">
         ${state.editId ? `<span class="badge badge-primary">${esc(ATX_TYPES[state.type])}</span>` : a5Seg('data-atype', Object.fromEntries(form.types.map((t) => [t, ATX_TYPES[t]])), state.type)}
         ${field('พื้นที่', `<select id="atx-area"${state.editId ? ' disabled' : ''}><option value="">เลือกพื้นที่</option>${areasFor().map((a) => `<option value="${a.id}"${String(a.id) === String(state.areaId) ? ' selected' : ''}>${esc(a.code)} ${esc(a.name)}</option>`).join('')}</select>`, 'grow')}
-        ${field('วันที่ตรวจ', `<input id="atx-date" type="date" max="${atxToday()}" value="${state.date}">`)}
+        ${field('วันที่ตรวจ', `<input id="atx-date" type="date" max="${actIso(new Date())}" value="${state.date}">`)}
         ${state.type === 'COMMITTEE' ? field('ทีม', `<select id="atx-team">${options(form.teams.map((t) => t.team), state.team, (t) => `ทีม ${t}`)}</select>`) : ''}
       </div>
       ${state.type === 'COMMITTEE' ? `<div class="atx-people"><span class="sum-meta">ผู้ตรวจ:</span>${teamMembers().map((m) => `<label class="atx-check"><input type="checkbox" data-part="${esc(m.employeeId)}"${state.participated.has(m.employeeId) ? ' checked' : ''}> ${esc(m.employeeId)} ${esc(m.name)}</label>`).join('') || '<span class="sum-meta">ทีมนี้ยังไม่มีรายชื่อ</span>'}</div>` : ''}
@@ -323,7 +315,7 @@ async function atxIssues(body, activity) {
   fillTable('atx-rows', [{ label: 'เลขที่', key: 'issue_no' }, { label: 'พื้นที่', key: 'area' }, { label: 'ข้อ', key: 'item_no' }, { label: 'คะแนน', key: 'score' }, { label: 'ปัญหา', key: 'description' }, { label: 'ผู้รับผิดชอบ', key: 'responsible' }, { label: 'กำหนดแก้', key: 'due_date' }, { label: 'สถานะ', key: 'status' }, { label: 'รูป', key: 'photos' }], list.map((i) => `<tr data-pick="${i.id}">
     <td>${esc(i.issue_no)}</td><td>${esc(i.area.code || '')} ${esc(i.area.name || '')}</td><td>${i.item.item_no || ''}</td><td>${Number(i.score)}</td>
     <td>${esc(i.description)}</td><td>${esc(i.responsibleName || i.responsible_id || '-')}</td><td>${i.due_date ? atxDate(i.due_date) : '<span class="sum-meta">รอกำหนด</span>'}</td>
-    <td>${atxBadge(i.shownStatus)}</td><td>${i.photos.length}</td></tr>`).join(''), 'ไม่มี Issue', atxColumnHead('issues', () => atxIssues(body, activity).catch(onErr)));
+    <td>${atxBadge(i.shownStatus)}</td><td>${i.photos.length}</td></tr>`).join(''), 'ไม่มี Issue', headFor(atxHeads.issues, () => atxIssues(body, activity).catch(onErr)));
   body.querySelectorAll('[data-iall]').forEach((node) => { node.onclick = () => { atxIssueAll = node.dataset.iall === 'all'; atxIssues(body, activity).catch(onErr); }; });
   a5Lift(body);
   bindRowSelect($('atx-rows'), (id) => atxIssueDetail(activity, data.issues.find((i) => String(i.id) === id), () => atxIssues(body, activity).catch(onErr)));

@@ -1,7 +1,7 @@
 import { mx, tx } from '../../core/db.js';
-import { fail, wrap, cleanTerm } from '../../core/http.js';
-import { requireUser, nameOf } from '../../core/users.js';
-import { accessOf, activityOf, fetchAll, fetchIn, missingTables, namesOf, requireAdmin, tablesOf, yearOf } from './common.js';
+import { fail, cleanTerm } from '../../core/http.js';
+import { nameOf } from '../../core/users.js';
+import { accessOf, actRoute, fetchAll, fetchIn, namesOf, requireAdmin, roundTo, tablesOf, throwIf, yearOf } from './common.js';
 
 // Checklist audits (5S and similar): Dashboard reads for everyone, Setting writes for the year's admins.
 // Tables (Tx Data, one set per activity): db/act/<activity>.sql via tablesOf() · rules: docs/specs/act-5s.md
@@ -9,8 +9,6 @@ const AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
 const ROLES = ['admin', 'chairman', 'auditor'];
 const AUDIT_TYPES = ['SELF', 'COMMITTEE'];
 
-// Decimal rounding (85.15 -> 85.2) like the old system and SQL; plain Math.round(n * 10) gives 85.1.
-const roundTo = (n, digits) => Number(`${Math.round(Number(`${Number(n).toFixed(8)}e${digits}`))}e-${digits}`);
 const round1 = (n) => roundTo(n, 1);
 const round2 = (n) => roundTo(n, 2);
 const avg = (list) => (list.length ? list.reduce((s, n) => s + Number(n), 0) / list.length : null);
@@ -94,22 +92,7 @@ function areaScores(audits, groups) {
 }
 
 export function mountAudit(app) {
-  const route = (method, path, handler) => app[method](path, wrap(requireUser), wrap(async (req, res) => {
-    const activity = activityOf(req, res);
-    if (!activity) return;
-    try {
-      await handler(req, res, activity);
-    } catch (err) {
-      if (missingTables(res, err, activity)) return;
-      throw err;
-    }
-  }));
-  // Any error goes to the route's catch, which turns a missing table into a clear message.
-  const check = (res, ...errors) => {
-    const error = errors.find((e) => e);
-    if (error) throw error;
-    return false;
-  };
+  const route = actRoute(app);
 
   // ---------- read: everyone signed in ----------
 
@@ -121,7 +104,7 @@ export function mountAudit(app) {
       tx.from(tablesOf(activity).team).select('year'),
       tx.from(tablesOf(activity).audit).select('year')
     ]);
-    if (check(res, team.error, audits.error)) return;
+    throwIf(team.error, audits.error);
     const years = [...new Set([new Date().getFullYear(), year, ...(team.data || []).map((r) => r.year), ...(audits.data || []).map((r) => r.year)].map(Number))].sort();
     res.json({ year, years, access });
   });
@@ -237,7 +220,7 @@ export function mountAudit(app) {
     if (invalid) return fail(res, 400, invalid);
     const { error } = await tx.from(tablesOf(activity).area).insert(row);
     if (error?.code === '23505') return fail(res, 400, `มีรหัสพื้นที่ ${row.code} แล้ว`);
-    if (check(res, error)) return;
+    throwIf(error);
     res.status(201).json({ ok: true });
   });
 
@@ -248,7 +231,7 @@ export function mountAudit(app) {
     if (invalid) return fail(res, 400, invalid);
     const { data, error } = await tx.from(tablesOf(activity).area).update(row).eq('id', Number(req.params.id)).select('id');
     if (error?.code === '23505') return fail(res, 400, `มีรหัสพื้นที่ ${row.code} แล้ว`);
-    if (check(res, error)) return;
+    throwIf(error);
     if (!data?.length) return fail(res, 404, 'ไม่พบพื้นที่');
     res.json({ ok: true });
   });
@@ -259,14 +242,14 @@ export function mountAudit(app) {
     if (!year || !(await requireAdmin(req, res, activity, year))) return;
     const id = Number(req.params.id);
     const used = await tx.from(tablesOf(activity).audit).select('id', { count: 'exact', head: true }).eq('area_id', id);
-    if (check(res, used.error)) return;
+    throwIf(used.error);
     if (used.count) {
       const { error } = await tx.from(tablesOf(activity).area).update({ status: 'Inactive' }).eq('id', id);
-      if (check(res, error)) return;
+      throwIf(error);
       return res.json({ ok: true, inactive: true });
     }
     const { error } = await tx.from(tablesOf(activity).area).delete().eq('id', id);
-    if (check(res, error)) return;
+    throwIf(error);
     res.json({ ok: true });
   });
 
@@ -275,15 +258,15 @@ export function mountAudit(app) {
     if (!year || !(await requireAdmin(req, res, activity, year))) return;
     const areaId = Number(req.params.id);
     const area = await tx.from(tablesOf(activity).area).select('id').eq('id', areaId).maybeSingle();
-    if (check(res, area.error)) return;
+    throwIf(area.error);
     if (!area.data) return fail(res, 404, 'ไม่พบพื้นที่');
     const employeeId = String(req.body?.employeeId || '').trim();
     // The owner is a team row (role owner, area_id); one per area per year, so replace it.
     const team = tablesOf(activity).team;
     const removed = await tx.from(team).delete().eq('year', year).eq('area_id', areaId).eq('role', 'owner');
-    if (check(res, removed.error)) return;
+    throwIf(removed.error);
     const { error } = employeeId ? await tx.from(team).insert({ year, employee_id: employeeId, role: 'owner', area_id: areaId, status: 'Active' }) : { error: null };
-    if (check(res, error)) return;
+    throwIf(error);
     res.json({ ok: true });
   });
 
@@ -297,18 +280,18 @@ export function mountAudit(app) {
     if (role === 'auditor' && !/^[A-Z]$/.test(team)) return fail(res, 400, 'ผู้ตรวจต้องเลือกทีม A–Z');
     const { error } = await tx.from(tablesOf(activity).team).insert({ year, employee_id: employeeId, role, team, status: 'Active' });
     if (error?.code === '23505') return fail(res, 400, 'คนนี้มีบทบาทนี้อยู่แล้ว');
-    if (check(res, error)) return;
+    throwIf(error);
     res.status(201).json({ ok: true });
   });
 
   route('delete', '/api/act/:activity/team/:id', async (req, res, activity) => {
     const { data: row, error } = await tx.from(tablesOf(activity).team).select('id,year,employee_id,role').eq('id', Number(req.params.id)).maybeSingle();
-    if (check(res, error)) return;
+    throwIf(error);
     if (!row) return fail(res, 404, 'ไม่พบรายชื่อ');
     if (!(await requireAdmin(req, res, activity, row.year))) return;
     if (row.role === 'admin' && String(row.employee_id) === req.user.employeeId && !req.user.creator) return fail(res, 400, 'นำสิทธิ์ admin ของตัวเองออกไม่ได้');
     const del = await tx.from(tablesOf(activity).team).delete().eq('id', row.id);
-    if (check(res, del.error)) return;
+    throwIf(del.error);
     res.json({ ok: true });
   });
 
@@ -322,7 +305,7 @@ export function mountAudit(app) {
     const rows = await fetchAll(() => tx.from(table).select(columns.join(',')).eq('year', from));
     if (!rows.length) return fail(res, 400, `ปี ${from} ไม่มีข้อมูลให้คัดลอก`);
     const { error } = await tx.from(table).upsert(rows.map((r) => ({ ...r, year: to })), { onConflict: conflict, ignoreDuplicates: true });
-    if (check(res, error)) return;
+    throwIf(error);
     res.json({ ok: true, copied: rows.length });
   };
   route('post', '/api/act/:activity/team/copy', copyYear('team', ['employee_id', 'role', 'team', 'area_id', 'status'], 'year,employee_id,role,team,area_id'));
@@ -344,34 +327,34 @@ export function mountAudit(app) {
     if (invalid) return fail(res, 400, invalid);
     const { error } = await tx.from(tablesOf(activity).checklist).insert({ ...row, year });
     if (error?.code === '23505') return fail(res, 400, `มีข้อที่ ${row.item_no} ของปี ${year} แล้ว`);
-    if (check(res, error)) return;
+    throwIf(error);
     res.status(201).json({ ok: true });
   });
 
   route('patch', '/api/act/:activity/checklist/:id', async (req, res, activity) => {
     const { data: current, error: readError } = await tx.from(tablesOf(activity).checklist).select('id,year').eq('id', Number(req.params.id)).maybeSingle();
-    if (check(res, readError)) return;
+    throwIf(readError);
     if (!current) return fail(res, 404, 'ไม่พบหัวข้อ');
     if (!(await requireAdmin(req, res, activity, current.year))) return;
     const { row, error: invalid } = itemInput(req.body || {});
     if (invalid) return fail(res, 400, invalid);
     const { error } = await tx.from(tablesOf(activity).checklist).update(row).eq('id', current.id);
     if (error?.code === '23505') return fail(res, 400, `มีข้อที่ ${row.item_no} แล้ว`);
-    if (check(res, error)) return;
+    throwIf(error);
     res.json({ ok: true });
   });
 
   route('delete', '/api/act/:activity/checklist/:id', async (req, res, activity) => {
     const { data: current, error: readError } = await tx.from(tablesOf(activity).checklist).select('id,year').eq('id', Number(req.params.id)).maybeSingle();
-    if (check(res, readError)) return;
+    throwIf(readError);
     if (!current) return fail(res, 404, 'ไม่พบหัวข้อ');
     if (!(await requireAdmin(req, res, activity, current.year))) return;
     const used = await tx.from(tablesOf(activity).score).select('audit_id', { count: 'exact', head: true }).eq('checklist_id', current.id);
-    if (check(res, used.error)) return;
+    throwIf(used.error);
     const { error } = used.count
       ? await tx.from(tablesOf(activity).checklist).update({ status: 'Inactive' }).eq('id', current.id)
       : await tx.from(tablesOf(activity).checklist).delete().eq('id', current.id);
-    if (check(res, error)) return;
+    throwIf(error);
     res.json({ ok: true, inactive: Boolean(used.count) });
   });
 
@@ -388,12 +371,12 @@ export function mountAudit(app) {
     if (team && !/^[A-Z]$/.test(team)) return fail(res, 400, 'ทีมต้องเป็น A–Z');
     if (req.body?.round && !round) return fail(res, 400, 'ครั้งที่ต้องเป็น 1–6');
     const area = await tx.from(tablesOf(activity).area).select('id').eq('id', areaId).maybeSingle();
-    if (check(res, area.error)) return;
+    throwIf(area.error);
     if (!area.data) return fail(res, 404, 'ไม่พบพื้นที่');
     const { error } = team
       ? await tx.from(tablesOf(activity).auditPlan).upsert({ year, area_id: areaId, month, week, round, team }, { onConflict: 'year,area_id,month,week' })
       : await tx.from(tablesOf(activity).auditPlan).delete().eq('year', year).eq('area_id', areaId).eq('month', month).eq('week', week);
-    if (check(res, error)) return;
+    throwIf(error);
     res.json({ ok: true });
   });
 }

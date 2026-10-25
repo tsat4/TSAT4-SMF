@@ -31,10 +31,10 @@ server/
       materials.js           /api/usage-materials, /api/materials
       requisitions.js        /api/summary, pay-centers, stock, requisitions (ขั้นตอนการเบิก)
       tables.js              ตาราง sto ที่แก้ได้ในหน้า System
-    act/index.js             ระบบกิจกรรม: แผน Gantt /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (db/04_act_plan.sql)
-    act/common.js            tablesOf(กิจกรรม) ชื่อตาราง, accessOf (สิทธิ์รายปีจาก mt_<act>_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
+    act/index.js             ระบบกิจกรรม: ปฏิทินรวม /api/act/calendar (อ่านจาก Planner) + รวม route ของ act
+    act/common.js            tablesOf(กิจกรรม) ชื่อตาราง, actRoute (route + ตารางยังไม่มี → 503), must/throwIf, accessOf (สิทธิ์รายปีจาก mt_<act>_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
     act/transaction.js       ระบบตรวจ checklist: บันทึกผลตรวจ Self/Committee + Issue (รูปใน Storage bucket img_<กิจกรรม> ของ Tx Data เช่น img_5s) กติกาเป็นฟังก์ชันแยก ทดสอบใน test:act
-    act/planner.js           Project Planner (100P) /api/act/:activity/tasks ข้อหลัก/ข้อรอง ลากได้ (mt_<act>_task) spec docs/specs/act-planner.md
+    act/planner.js           Project Planner (100P, 5S) /api/act/:activity/tasks ข้อหลัก/ข้อรอง ลากได้ (mt_<act>_task) spec docs/specs/act-planner.md
     act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/act/<กิจกรรม>.sql) summarize()/rank() ทดสอบด้วย npm run test:act
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
 public/
@@ -107,16 +107,16 @@ scripts/
 | mt_sto_buyer | mx | costcenter ที่ซื้อได้ |
 | tx_sto_requisition / _line | tx | ใบเบิกและรายการในใบเบิก |
 | tx_sto_issue | tx | ประวัติการจ่าย |
-| mt_5s_team / _area / _checklist / _audit_plan / _setting / _plan | **tx** | กิจกรรม 5S: ทีมรายปี (รวมเจ้าของพื้นที่ role owner + area_id), พื้นที่, หัวข้อตรวจรายปี, แผนตรวจ, ค่าตั้งต้น, แผน Gantt |
-| mt_100p_team / _setting / _plan / _task | **tx** | กิจกรรม 100P: ทีมรายปี (admin แก้แผน), Project Planner ข้อหลัก/ข้อรอง (db/act/100p.sql) |
+| mt_5s_team / _area / _checklist / _audit_plan / _setting / _task | **tx** | กิจกรรม 5S: ทีมรายปี (รวมเจ้าของพื้นที่ role owner + area_id), พื้นที่, หัวข้อตรวจรายปี, แผนตรวจ, ค่าตั้งต้น, Project Planner |
+| mt_100p_team / _setting / _task | **tx** | กิจกรรม 100P: ทีมรายปี (admin แก้แผน), Project Planner ข้อหลัก/ข้อรอง (db/act/100p.sql) |
 | tx_5s_audit (+ auditors, receivers) / _audit_score / _issue (+ photo_before, photo_after), v_5s_audit_group | **tx** | ผลตรวจ คะแนนรายข้อ Issue และ % ราย ส (9 ตาราง ตั้งแต่ v2 2026-10-25) |
 
 ## Schedule Plan (ระบบกิจกรรม)
 
 - ทุกคนที่ login ดูแผนได้
 - สิทธิ์ของแต่ละกิจกรรมมาจาก `mt_<กิจกรรม>_team` รายปี: role `admin` = แก้ Setting และแผน, `chairman` / `auditor` / เจ้าของพื้นที่ (`mt_<กิจกรรม>_team` role owner) = transaction, ทุกคน = Dashboard · creator ทำได้ทุกอย่าง
-- route เขียนข้อมูลของ act ตรวจ admin ของปีนั้นใน handler (`requireAdmin` / `guardYear`) snapshot จึงแสดงแค่ `auth`
-- แผนของกิจกรรมคือ Project Planner (`mt_<กิจกรรม>_task`, docs/specs/act-planner.md) แก้ที่ Setting · ปฏิทินรวมอ่านจาก Planner ถ้ามีตาราง ไม่งั้นอ่านแผน Gantt เดิม `mt_<กิจกรรม>_plan` (ไม่มีหน้าแก้แล้ว)
+- route เขียนข้อมูลของ act ตรวจ admin ของปีนั้นใน handler (`requireAdmin`) snapshot จึงแสดงแค่ `auth`
+- แผนของกิจกรรมคือ Project Planner (`mt_<กิจกรรม>_task`, docs/specs/act-planner.md) แก้ที่ Setting · ปฏิทินรวมอ่านจาก Planner (ตาราง Gantt เดิม `mt_<กิจกรรม>_plan` เลิกใช้ ไม่อยู่ในแม่แบบแล้ว)
 - เปิดใช้กับกิจกรรมอื่น: ดูหัวข้อท้าย docs/specs/act-planner.md
 - ปฏิทินรวมอยู่ที่ ระบบตั้งค่า > ปฏิทิน แสดงทุกกิจกรรม แยกสีตามกิจกรรม ดูอย่างเดียว กดรายการแล้วไปที่แผนของกิจกรรมนั้นได้
 - ตั้งค่าทีมและเจ้าของพื้นที่ที่ <กิจกรรม> > Setting (หรือ System > Setting สำหรับ creator)

@@ -326,7 +326,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
     field('ระดับ', `<select id="apl-parent"${derived ? ' disabled' : ''}><option value="">ข้อหลัก</option>${phases.map((p) => `<option value="${p.id}"${p.id === pid ? ' selected' : ''}>ข้อรองของ: ${esc(p.title)}</option>`).join('')}</select>`),
     field('ชื่อรายการ', `<input id="apl-title" maxlength="200" value="${esc(task?.title || '')}">`),
     field('ผู้รับผิดชอบ', `<div class="apl-owner"><input id="apl-owner" readonly value="${esc(ownerId ? `${ownerId} · ${task.owner_name}` : '')}" placeholder="ค้นจากรายชื่อด้านล่าง">${button('apl-owner-clear', 'ล้าง')}</div>`),
-    searchBlock(searchSlot('ค้นพนักงาน', 'apl-emp-q', 'apl-emp-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน' }), 'apl-emp-list'),
+    A5_EMP_FIELDS,
     field('วันเริ่ม', `<input id="apl-start" type="date" ${range} value="${esc(start)}"${derived ? ' disabled' : ''}>`),
     field('วันจบ', `<input id="apl-end" type="date" ${range} value="${esc(end)}"${derived ? ' disabled' : ''}>`),
     field(`ความคืบหน้า <span id="apl-pct-v">${task?.progress ?? 0}%</span>`, `<input id="apl-pct" type="range" min="0" max="100" step="5" value="${task?.progress ?? 0}"${derived ? ' disabled' : ''}>`),
@@ -363,13 +363,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
   syncColor();
   $('apl-pct').oninput = () => { $('apl-pct-v').textContent = `${$('apl-pct').value}%`; };
   $('apl-owner-clear').onclick = () => { ownerId = ''; $('apl-owner').value = ''; };
-  const search = async () => {
-    const data = await api(`/api/act/${encodeURIComponent(activity)}/employees?year=${aplYear}&q=${encodeURIComponent($('apl-emp-q').value.trim())}`);
-    fillTable('apl-emp-list', ['รหัส', 'ชื่อ', 'หน่วยงาน'], data.employees.map((p) => `<tr data-pick="${esc(p.employeeId)}" data-name="${esc(p.name)}"><td>${esc(p.employeeId)}</td><td>${esc(p.name)}</td><td>${esc(p.department)}</td></tr>`).join(''), 'ไม่พบพนักงาน');
-    bindRowSelect($('apl-emp-list'), (id, row) => { ownerId = id; $('apl-owner').value = `${id} · ${row.dataset.name}`; });
-  };
-  $('apl-emp-search').onclick = () => search().catch(onErr);
-  onEnter('apl-emp-q', () => search().catch(onErr));
+  a5EmployeeSearch(activity, (p) => { ownerId = p.employeeId; $('apl-owner').value = `${p.employeeId} · ${p.name}`; }, aplYear);
 }
 
 for (const id of APL_ON) VIEWS[`${id}-setting`] = (target) => aplRender(target, id);

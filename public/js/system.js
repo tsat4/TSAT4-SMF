@@ -25,7 +25,7 @@ async function renderSystem(target) {
   const catalog = await api('/api/system/tables');
   const state = { offset: 0, editing: null, rows: [], selected: null };
   const head = { sort: '', dir: 'asc', filters: {} };
-  const columnHead = () => ({ ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; state.offset = 0; loadRows().catch(onErr); } });
+  const columnHead = () => headFor(head, () => { state.offset = 0; loadRows().catch(onErr); });
   target.innerHTML = tablePage('sys', `
     ${field('ตาราง', `<select id="sys-table">${catalog.tables.map((table) => `<option value="${esc(table.name)}">${esc(table.name)}</option>`).join('')}</select>`, 'grow')}
     ${searchSlot('ค้นหา', 'sys-q', 'sys-search', { grow: true })}

@@ -1,5 +1,5 @@
 -- กิจกรรม 5s: เพิ่ม Project Planner ให้ฐานที่ใช้งานอยู่ — รันใน **Tx Data** (รันซ้ำได้) · สร้างจาก scripts/act-sql.js ห้ามแก้มือ
--- คัดลอกแผน Gantt เดิม (mt_5s_plan) เข้า Planner ครั้งเดียว ตอนที่ mt_5s_task ยังว่าง (ไม่ลบแผนเดิม)
+-- คัดลอกแผน Gantt เดิม (mt_5s_plan ถ้ามี) เข้า Planner ครั้งเดียว ตอนที่ mt_5s_task ยังว่าง (ไม่ลบแผนเดิม)
 
 -- ===== 5s: Project Planner =====
 
@@ -26,7 +26,7 @@ create table if not exists public.mt_5s_task (
 create index if not exists mt_5s_task_year on public.mt_5s_task (year, parent_id, sort_no);
 
 do $$ begin
-  if not exists (select 1 from public.mt_5s_task) then
+  if to_regclass('public.mt_5s_plan') is not null and not exists (select 1 from public.mt_5s_task) then
     with g as (
       select extract(year from start_date)::int as year, title, count(*) as n, min(start_date) as first_start,
         min(start_date) as start_date, max(end_date) as end_date,
@@ -54,9 +54,8 @@ end $$;
 
 alter table public.mt_5s_task enable row level security;
 
--- ตรวจ: plan = แผนเดิม (ไม่นับยกเลิก) · main / sub = ข้อหลัก / ข้อรองใน Planner
-select (select count(*) from public.mt_5s_plan where status <> 'cancelled') as plan,
-  (select count(*) from public.mt_5s_task where parent_id is null) as main,
+-- ตรวจ: main / sub = ข้อหลัก / ข้อรองใน Planner (เทียบกับแผนเดิมใน mt_5s_plan ที่ไม่ได้ยกเลิก)
+select (select count(*) from public.mt_5s_task where parent_id is null) as main,
   (select count(*) from public.mt_5s_task where parent_id is not null) as sub;
 
 notify pgrst, 'reload schema';

@@ -87,7 +87,7 @@ async function renderEdit(target) {
     ${tableFoot('edit')}
   </div>`;
   const head = { sort: '', dir: 'asc', filters: {} };
-  const columnHead = () => ({ ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; state.offset = 0; load().catch(onErr); } });
+  const columnHead = () => headFor(head, () => { state.offset = 0; load().catch(onErr); });
   const setFoot = (shown, total) => {
     countText('edit-count', shown, total);
     setPager('edit', state.offset, total);
@@ -408,7 +408,7 @@ function centerText(row) {
 async function renderUsers(target) {
   const state = { offset: 0, selected: null, rows: [], formMode: 'add' };
   const head = { sort: '', dir: 'asc', filters: {} };
-  const columnHead = () => ({ ...head, onChange: (next) => { head.sort = next.sort; head.dir = next.dir; head.filters = next.filters; state.offset = 0; loadRows().catch(onErr); } });
+  const columnHead = () => headFor(head, () => { state.offset = 0; loadRows().catch(onErr); });
   target.innerHTML = tablePage('usage', `
     ${field('ตาราง', '<select id="usage-table"><option value="members">mt_sto_user</option><option value="materials">mt_sto_usage</option></select>', 'grow')}
     ${searchSlot('ค้นหา', 'usage-q', 'usage-search', { grow: true })}

@@ -1,7 +1,6 @@
 DELETE /api/act/:activity/areas/:id auth
 DELETE /api/act/:activity/audits/:id auth
 DELETE /api/act/:activity/checklist/:id auth
-DELETE /api/act/:activity/plan/:id auth
 DELETE /api/act/:activity/tasks/:id auth
 DELETE /api/act/:activity/team/:id auth
 DELETE /api/requisitions/:id/lines/:lineId auth sto:1
@@ -20,7 +19,6 @@ GET /api/act/:activity/dashboard/summary auth
 GET /api/act/:activity/employees auth
 GET /api/act/:activity/issues auth
 GET /api/act/:activity/me auth
-GET /api/act/:activity/plan auth
 GET /api/act/:activity/tasks auth
 GET /api/act/:activity/team auth
 GET /api/act/calendar auth
@@ -42,7 +40,6 @@ PATCH /api/act/:activity/areas/:id auth
 PATCH /api/act/:activity/audits/:id auth
 PATCH /api/act/:activity/checklist/:id auth
 PATCH /api/act/:activity/issues/:id auth
-PATCH /api/act/:activity/plan/:id auth
 PATCH /api/act/:activity/tasks/:id auth
 PATCH /api/act/:activity/tasks/dates auth
 PATCH /api/requisitions/:id/lines/:lineId auth sto:1
@@ -55,7 +52,6 @@ POST /api/act/:activity/checklist auth
 POST /api/act/:activity/checklist/copy auth
 POST /api/act/:activity/issues/:id/action auth
 POST /api/act/:activity/issues/:id/photo auth
-POST /api/act/:activity/plan auth
 POST /api/act/:activity/tasks auth
 POST /api/act/:activity/team auth
 POST /api/act/:activity/team/copy auth

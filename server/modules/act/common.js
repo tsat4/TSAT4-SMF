@@ -1,11 +1,14 @@
 import { mx, tx } from '../../core/db.js';
-import { fail } from '../../core/http.js';
-import { nameOf } from '../../core/users.js';
+import { fail, wrap } from '../../core/http.js';
+import { nameOf, requireUser } from '../../core/users.js';
 
 // Shared by the act routes. Activity data lives in Tx Data (client `tx`), one table set per activity:
 // mt_<key>_* / tx_<key>_* made by scripts/act-sql.js. Employees and logins stay in Mx Data (client `mx`).
 export const ACTIVITIES = ['100p', '5s', 'cfo', 'e-day', 'kaizen', 'lean', 'qcc', 'safety', 'smf'];
-export const PAGE = 1000;
+const PAGE = 1000;
+
+// Decimal rounding (85.15 -> 85.2) like the old system and SQL; plain Math.round(n * 10) gives 85.1.
+export const roundTo = (n, digits) => Number(`${Math.round(Number(`${Number(n).toFixed(8)}e${digits}`))}e-${digits}`);
 
 export function tablesOf(activity) {
   const k = activity.replace(/[^a-z0-9]/g, '');
@@ -14,7 +17,6 @@ export function tablesOf(activity) {
     bucket: `img_${k}`, // Storage bucket for this activity's photos
     team: `mt_${k}_team`,
     setting: `mt_${k}_setting`,
-    plan: `mt_${k}_plan`,
     task: `mt_${k}_task`, // Project Planner (planner.js)
     area: `mt_${k}_area`,
     checklist: `mt_${k}_checklist`,
@@ -38,17 +40,31 @@ export function yearOf(value, fallback = new Date().getFullYear()) {
   return Number.isInteger(n) && n >= 2000 && n <= 2100 ? n : null;
 }
 
-export function activityOf(req, res) {
-  if (ACTIVITIES.includes(req.params.activity)) return req.params.activity;
-  fail(res, 404, 'ไม่พบกิจกรรม');
-  return null;
+// Route maker for /api/act/:activity/...: signed in, a known activity (and one of `only` when given), and the
+// handler gets (req, res, activity, tablesOf(activity)). Any thrown error that means a missing table
+// (PGRST205) becomes a 503 naming the SQL file to run in Tx Data instead of a 500.
+export function actRoute(app, { only, sqlOf = () => null } = {}) {
+  return (method, path, handler) => app[method](path, wrap(requireUser), wrap(async (req, res) => {
+    const { activity } = req.params;
+    if (!ACTIVITIES.includes(activity) || (only && !only.includes(activity))) return fail(res, 404, 'ไม่พบกิจกรรม');
+    try {
+      await handler(req, res, activity, tablesOf(activity));
+    } catch (err) {
+      if (err?.code !== 'PGRST205') throw err;
+      fail(res, 503, `ยังไม่ได้สร้างตารางของกิจกรรมนี้ใน Tx Data (${sqlOf(activity) || tablesOf(activity).sql})`);
+    }
+  }));
 }
 
-// PGRST205 = the table is not created yet: say which SQL file to run in Tx Data instead of a 500.
-export function missingTables(res, error, activity) {
-  if (error?.code !== 'PGRST205') return false;
-  fail(res, 503, `ยังไม่ได้สร้างตารางของกิจกรรมนี้ใน Tx Data (${activity ? tablesOf(activity).sql : 'db/act/<กิจกรรม>.sql'})`);
-  return true;
+// Supabase result -> data, or throw its error (actRoute turns it into a response).
+export function must({ data, error }) {
+  if (error) throw error;
+  return data;
+}
+
+export function throwIf(...errors) {
+  const error = errors.find(Boolean);
+  if (error) throw error;
 }
 
 // Reads every row past PostgREST's 1000-row page. build() must return a fresh query each call.

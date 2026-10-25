@@ -1,6 +1,6 @@
 # Spec: ระบบกิจกรรม 5S (แม่แบบให้กิจกรรมอื่น)
 
-สถานะ: ตกลงกับผู้ใช้แล้ว 2026-10-25 · ทำครบ 3 ส่วนแล้ว (Dashboard / Setting / transaction) · ตารางอยู่ใน **Tx Data** ชื่อ `mt_5s_*` / `tx_5s_*` (`db/act/5s.sql` สร้างจาก scripts/act-sql.js) · เดิม `db/05_act_audit.sql` (ทดสอบด้วยข้อมูลจริงผ่าน) รอผู้ใช้รันใน MX · ยังไม่ได้ทำหน้าจอ
+สถานะ: ตกลงกับผู้ใช้แล้ว 2026-10-25 · ทำครบ 3 ส่วนแล้ว (Dashboard / Setting / transaction) · ตารางอยู่ใน **Tx Data** ชื่อ `mt_5s_*` / `tx_5s_*` (`db/act/5s.sql` สร้างจาก scripts/act-sql.js)
 กิจกรรมอื่น (SAFETY, QCC ฯลฯ) ใช้โครงเดียวกัน แยกข้อมูลด้วยคอลัมน์ `activity`
 
 ## หน้าและสิทธิ์
@@ -77,7 +77,6 @@ mt_<k>_team        id | year | employee_id | role (admin/chairman/auditor/owner)
 mt_<k>_checklist   id | year | item_no | s_group | title | score_max | status              unique(year, item_no)
 mt_<k>_audit_plan  id | year | area_id | month | week 1–4 | round 1–6 | team              unique(year, area_id, month, week)
 mt_<k>_setting     key | value      (pass_percent 80, issue_score 3, ...)
-mt_<k>_plan        แผน Gantt เดิม (เลิกใช้หลังรัน db/act/5s_task.sql ข้อมูลคัดลอกไป mt_<k>_task)
 mt_<k>_task        Project Planner (แผนงาน / Schedule / ปฏิทินรวม)
 tx_<k>_audit        id | audit_no | year | audit_type SELF/COMMITTEE | area_id | plan_id | team | auditors[] | receivers[] | audited_at | total | percent | result | status | created_by
 tx_<k>_audit_score  audit_id | checklist_id | score 0–5                                     pk(audit_id, checklist_id)
@@ -85,8 +84,7 @@ tx_<k>_issue        id | issue_no | audit_id | area_id | checklist_id | score | 
                     | due_date | action_description | action_date | status | verify_audit_no | final_score | closed_by | closed_at
 v_<k>_audit_group   % ของแต่ละหมวดต่อใบตรวจ
 ```
-- v2 ยุบ mt_<k>_area_owner → team (owner), tx_<k>_audit_person → audit.auditors/receivers, tx_<k>_issue_photo → issue.photo_before/photo_after
-  ฐานที่มีข้อมูลอยู่แล้วย้ายด้วย db/act/5s_v2_step1.sql (เพิ่ม + คัดลอก) และ db/act/5s_v2_step2.sql (ลบตารางเก่า)
+- v2 ยุบ mt_<k>_area_owner → team (owner), tx_<k>_audit_person → audit.auditors/receivers, tx_<k>_issue_photo → issue.photo_before/photo_after (ย้ายฐานจริงแล้ว 2026-10-25)
 
 - สิทธิ์ transaction = อยู่ใน mt_<k>_team ปีนั้น (chairman / auditor / owner) · Setting = role admin ปีนั้น
 - `หัวหน้าทีม` ของระบบเดิม = `chairman` · `Auditor` ทีม X = `auditor` + team X · สีทีมคำนวณจากตัวอักษร (ไม่เก็บ)

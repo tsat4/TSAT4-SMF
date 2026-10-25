@@ -84,8 +84,6 @@ html[data-theme="dark"] .nav-acc:has(.nav-btn.active) > .nav-parent,html[data-th
 .app-view{background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:var(--mo-radius);flex:1;min-height:0;min-width:0;overflow:hidden;padding:var(--view-pad);display:flex;flex-direction:column;gap:6px}
 .card{background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:var(--mo-radius);padding:8px;margin:0}
 .card h2,.card-title{font-size:13px;font-weight:500;margin:0 0 8px}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:0;flex:0 0 auto;min-width:0}
-.dash-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
 .kpi{background:var(--mo-surface-2);border:1px solid var(--mo-border);border-radius:var(--mo-radius);padding:8px 10px}
 .kpi-label{font-size:10.5px;color:var(--mo-text-muted)}
 .kpi-value{font-size:18px;font-weight:500;line-height:1.2}
@@ -198,7 +196,6 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
   body.sidebar-collapsed .nav-acc.is-collapsed .nav-sub{display:none}
 }
 @media(max-width:900px){
-  .dash-kpis{grid-template-columns:1fr}
   .header-page span{display:none}
 }
 @media(max-width:650px){
@@ -216,7 +213,6 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 /* Schedule Plan (public/js/act.js) */
 .plan-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:8px}
 .plan-head .sum-meta{margin:0}
-.plan-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .plan-nav{display:flex;gap:4px}
 .plan-label{font-size:13px;font-weight:500;min-width:120px}
 .seg{display:inline-flex;border:1px solid var(--mo-line);border-radius:var(--mo-radius);overflow:hidden}
@@ -225,7 +221,6 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 .seg-btn.is-active{background:var(--mo-primary);color:var(--mo-on-primary);font-weight:500}
 .plan-chip,.plan-item{display:block;width:100%;text-align:left;border:0;border-left:3px solid var(--chip,var(--mo-primary));border-radius:4px;background:var(--mo-info-soft);color:var(--mo-text);font-size:11px;padding:2px 6px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plan-chip.plan-done,.plan-item.plan-done{background:var(--mo-success-soft)}
-.plan-chip.plan-cancelled,.plan-item.plan-cancelled{border-left-color:var(--mo-secondary);background:var(--mo-surface-2);color:var(--mo-text-muted);text-decoration:line-through}
 .plan-item span{color:var(--mo-text-muted);margin-right:6px}
 .plan-empty{color:var(--mo-text-muted);font-size:11px}
 .plan-more{border:0;background:none;color:var(--mo-primary);font-size:11px;padding:2px 4px}
@@ -443,8 +438,6 @@ body[data-zone] .a5-bar{
 }
 body[data-zone] .plan-chip,
 body[data-zone] .plan-item{border:1px solid var(--zone);background:var(--zone-fill);color:var(--mo-text)}
-body[data-zone] .plan-chip.plan-cancelled,
-body[data-zone] .plan-item.plan-cancelled{border-color:var(--mo-secondary);background:var(--mo-surface-2);color:var(--mo-text-muted)}
 body[data-zone] .plan-cell.is-today .plan-day,
 body[data-zone] .plan-col.is-today .plan-col-head{color:var(--zone-ink)}
 body[data-zone] .plan-col.is-today{border-color:var(--zone)}
