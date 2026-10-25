@@ -24,7 +24,7 @@ server/
       materials.js           /api/usage-materials, /api/materials
       requisitions.js        /api/summary, pay-centers, stock, requisitions (ขั้นตอนการเบิก)
       tables.js              ตาราง sto ที่แก้ได้ในหน้า System
-    act/index.js             ระบบกิจกรรม: Schedule Plan  /api/act/:activity/plan (ตาราง db/04_act_plan.sql)
+    act/index.js             ระบบกิจกรรม: แผน /api/act/:activity/plan, ปฏิทินรวม /api/act/calendar (ตาราง db/04_act_plan.sql)
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
 public/
   index.html                 โครงหน้า + sidebar + ลำดับ <script>
@@ -32,7 +32,8 @@ public/
   js/core.js                 helper, popup, api(), หน้า login, router (VIEWS / TITLES / ACCESS)
   js/sto.js                  หน้า Usage: Dashboard / transaction / Setting
   js/units.js                รายชื่อหน่วยงาน PLANTS / ACTIVITIES และหน้าชั่วคราว
-  js/act.js                  Schedule Plan (สัปดาห์ / เดือน / ปี) ในหน้า <กิจกรรม>-setting เปิดใช้ตาม ACT_PLAN_ON
+  js/act.js                  ระบบตั้งค่า > ปฏิทิน: แผนของทุกกิจกรรม (สัปดาห์ / เดือน / ปี) ดูอย่างเดียว + helper กลางของแผน
+  js/act-gantt.js            <กิจกรรม> > Setting: แผนประจำปีแบบ Gantt (สัปดาห์ / เดือน / ปี) เปิดใช้ตาม ACT_GANTT_ON
   js/system.js               หน้าแก้ตารางของ creator
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)
 db/                          SQL ที่ผู้ใช้รันเองใน Supabase + คู่มือ (README.md)
@@ -101,7 +102,9 @@ scripts/
 
 - ทุกคนที่ login ดูแผนได้
 - เพิ่ม/แก้/ลบได้เฉพาะ creator หรือ admin ใน `mt_act_user` ที่ department ตรงกับ `mt_act_owner` ของปีนั้น (ปีของวันเริ่ม) ผู้ดูแลจึงเปลี่ยนได้ทุกปีด้วยการเพิ่มแถวใน mt_act_owner
-- เปิดใช้กับกิจกรรมอื่น: เพิ่ม id ใน `ACT_PLAN_ON` ใน public/js/act.js (server รองรับทุกกิจกรรมใน `ACTIVITIES` แล้ว)
+- แผนแบบ Gantt อยู่ที่ <กิจกรรม> > Setting รายการที่ชื่อเหมือนกันอยู่แถวเดียวกัน แถวที่ระบบสร้างเอง (เช่น Self Audit วันที่ 1–10 ทุกเดือน) กำหนดใน `ACT_GANTT_AUTO`
+- เปิดใช้กับกิจกรรมอื่น: เพิ่ม id ใน `ACT_GANTT_ON` ใน public/js/act-gantt.js (server รองรับทุกกิจกรรมใน `ACTIVITIES` แล้ว)
+- ปฏิทินรวมอยู่ที่ ระบบตั้งค่า > ปฏิทิน แสดงทุกกิจกรรม แยกสีตามกิจกรรม ดูอย่างเดียว กดรายการแล้วไปที่แผนของกิจกรรมนั้นได้
 - ตั้งค่าผู้ดูแลและสมาชิกทำได้ที่หน้า System > Setting (ตาราง mt_act_owner, mt_act_user)
 
 RPC: `mt_sto_stock_adjust(p_costcenter, p_material, p_delta)` (mx), `tx_sto_apply_costcenter(p_id, p_employee, p_costcenter)` (tx)

@@ -4,6 +4,7 @@ DELETE /api/system/tables/:name auth creator
 DELETE /api/usage-materials/:material auth sto:3
 DELETE /api/users/:employeeId auth sto:3
 GET /api/act/:activity/plan auth
+GET /api/act/calendar auth
 GET /api/employees auth sto:3
 GET /api/health
 GET /api/materials auth sto:1

@@ -206,8 +206,8 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb{background:#9aa0a6;
 .seg-btn{border:0;background:var(--mo-input);color:var(--mo-text);min-height:28px;padding:0 12px;font-size:12px}
 .seg-btn+.seg-btn{border-left:1px solid var(--mo-line)}
 .seg-btn.is-active{background:var(--mo-primary);color:var(--mo-on-primary);font-weight:500}
-.plan-chip,.plan-item{display:block;width:100%;text-align:left;border:0;border-left:3px solid var(--mo-primary);border-radius:4px;background:var(--mo-info-soft);color:var(--mo-text);font-size:11px;padding:2px 6px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.plan-chip.plan-done,.plan-item.plan-done{border-left-color:var(--mo-success);background:var(--mo-success-soft)}
+.plan-chip,.plan-item{display:block;width:100%;text-align:left;border:0;border-left:3px solid var(--chip,var(--mo-primary));border-radius:4px;background:var(--mo-info-soft);color:var(--mo-text);font-size:11px;padding:2px 6px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plan-chip.plan-done,.plan-item.plan-done{background:var(--mo-success-soft)}
 .plan-chip.plan-cancelled,.plan-item.plan-cancelled{border-left-color:var(--mo-secondary);background:var(--mo-surface-2);color:var(--mo-text-muted);text-decoration:line-through}
 .plan-item span{color:var(--mo-text-muted);margin-right:6px}
 .plan-empty{color:var(--mo-text-muted);font-size:11px}
@@ -235,4 +235,39 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb{background:#9aa0a6;
   .plan-col{min-height:0}
   .plan-cell{min-height:56px;padding:2px}
   .plan-chip{font-size:10px;padding:1px 3px}
+}
+
+/* Calendar legend (public/js/act.js) */
+.plan-legends{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.plan-legend{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--mo-text-muted)}
+.plan-legend::before{content:"";width:10px;height:10px;border-radius:2px;background:var(--chip)}
+
+/* Gantt plan (public/js/act-gantt.js) */
+.gantt-scroll{overflow-x:auto;border:1px solid var(--mo-border);border-radius:var(--mo-radius)}
+.gantt{--gantt-label:200px;min-width:760px}
+.gantt-row{display:grid;grid-template-columns:var(--gantt-label) minmax(0,1fr);border-bottom:1px solid var(--mo-border);position:relative;z-index:1}
+.gantt-row:last-child{border-bottom:0}
+.gantt-head{background:var(--mo-surface-2);position:sticky;top:0;z-index:3}
+.gantt-label{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;padding:6px 8px;border:0;border-right:1px solid var(--mo-border);background:var(--mo-surface);color:var(--mo-text);font-size:12px;font-weight:500;text-align:left;border-left:4px solid var(--bar,transparent)}
+.gantt-head .gantt-label{background:var(--mo-surface-2);color:var(--mo-text-muted);font-weight:500}
+.gantt-label span{font-size:10.5px;color:var(--mo-text-muted);font-weight:400}
+button.gantt-label{cursor:default}
+button.gantt-label.is-editable{cursor:pointer}
+button.gantt-label.is-editable:hover{background:var(--drive-hover)}
+.gantt-axis{display:grid}
+.gantt-tick{font-size:10.5px;color:var(--mo-text-muted);text-align:center;padding:6px 0;border-left:1px solid var(--mo-border);overflow:hidden;white-space:nowrap}
+.gantt-tick.is-weekend{background:var(--mo-input)}
+.gantt-body{position:relative}
+.gantt-lines{position:absolute;top:0;bottom:0;left:var(--gantt-label);right:0;display:grid;pointer-events:none;z-index:0}
+.gantt-lines > div{border-left:1px solid var(--mo-border)}
+.gantt-lines > div.is-weekend{background:var(--mo-surface-2)}
+.gantt-today{position:absolute;top:0;bottom:0;width:0;border-left:2px solid var(--mo-danger);z-index:2}
+.gantt-key{display:inline-block;width:12px;height:0;border-top:2px solid var(--mo-danger);vertical-align:middle}
+.gantt-track{position:relative;min-height:36px}
+.gantt-bar{position:absolute;top:7px;height:22px;min-width:6px;border:0;border-radius:4px;background:var(--bar);color:#111;font-size:10.5px;font-weight:500;padding:0 6px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:0 1px 1px rgba(0,0,0,.15)}
+.gantt-bar:hover{filter:brightness(1.08)}
+.gantt-bar.is-auto{cursor:default;opacity:.55;background:repeating-linear-gradient(135deg,var(--bar) 0 6px,transparent 6px 9px)}
+.gantt-bar.plan-cancelled{opacity:.35;text-decoration:line-through}
+@media(max-width:650px){
+  .gantt{--gantt-label:120px}
 }

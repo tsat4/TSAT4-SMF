@@ -88,14 +88,34 @@ export default defineModule({
       return true;
     };
 
-    // Everyone signed in may read the plan.
-    app.get('/api/act/:activity/plan', wrap(requireUser), wrap(async (req, res) => {
-      const activity = activityOf(req, res);
-      if (!activity) return;
+    const rangeOf = (req, res) => {
       const from = dateOf(req.query.from);
       const to = dateOf(req.query.to);
       if (!from || !to || to < from) return fail(res, 400, 'ช่วงวันที่ไม่ถูกต้อง');
       if ((Date.parse(to) - Date.parse(from)) / 86400000 > MAX_RANGE_DAYS) return fail(res, 400, 'ช่วงวันที่ยาวเกินไป');
+      return { from, to };
+    };
+
+    // ระบบตั้งค่า > ปฏิทิน: every activity's plan in one list, read-only, for everyone signed in.
+    app.get('/api/act/calendar', wrap(requireUser), wrap(async (req, res) => {
+      const range = rangeOf(req, res);
+      if (!range) return;
+      const { data, error } = await mx.from('mt_act_plan')
+        .select('id,activity,title,detail,start_date,end_date,responsible,status')
+        .in('activity', ACTIVITIES).lte('start_date', range.to).gte('end_date', range.from)
+        .order('start_date').order('id').limit(2000);
+      if (missingTables(res, error)) return;
+      if (error) return fail(res, 400, 'อ่านปฏิทินไม่ได้');
+      res.json({ events: data || [] });
+    }));
+
+    // Everyone signed in may read the plan.
+    app.get('/api/act/:activity/plan', wrap(requireUser), wrap(async (req, res) => {
+      const activity = activityOf(req, res);
+      if (!activity) return;
+      const range = rangeOf(req, res);
+      if (!range) return;
+      const { from, to } = range;
       const { data, error } = await mx.from('mt_act_plan')
         .select('id,activity,title,detail,start_date,end_date,responsible,status')
         .eq('activity', activity).lte('start_date', to).gte('end_date', from)
