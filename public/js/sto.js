@@ -12,7 +12,7 @@ let txPage = 'issue';
 Object.assign(TITLES, {
   store: ['Store', 'ระบบงาน > Store'],
   locked: ['Usage', USAGE],
-  home: ['Dashboard', USAGE],
+  home: ['ภาพรวม', USAGE],
   edit: ['transaction', USAGE],
   setting: ['Setting', USAGE]
 });
@@ -28,7 +28,7 @@ function badge(status) {
 }
 
 async function renderStore(target) {
-  modulePage(target, 'Store', 'ระบบงาน > Store', [['home', 'inventory_2', 'Usage', 'Dashboard, transaction, Setting']]);
+  modulePage(target, 'Store', 'ระบบงาน > Store', [['home', 'inventory_2', 'Usage', 'ภาพรวม, รับเข้า-จ่ายออก, รายเดือน']]);
 }
 
 async function renderLocked(target) {
@@ -272,15 +272,7 @@ async function openAddPopup() {
 }
 
 async function renderHome(target) {
-  const summary = await api('/api/summary');
-  target.innerHTML = `
-    <div class="kpi-grid dash-kpis">
-      <article class="kpi"><div class="kpi-label">ใบเบิกที่ยังไม่จบ</div><div class="kpi-value">${summary.open}</div></article>
-      <article class="kpi"><div class="kpi-label">พร้อมให้รับของ</div><div class="kpi-value">${summary.ready}</div></article>
-      <article class="kpi"><div class="kpi-label">คิวที่ต้องจัด</div><div class="kpi-value">${summary.queue}</div></article>
-    </div>
-    ${cardView('เริ่มเบิก', 'กดเบิก เลือกรายการ ชื่อและหน่วยขึ้นให้อัตโนมัติ ระบุจำนวน แล้วเลือก costcenter จากนั้นตรวจสรุปก่อนกดค้างยืนยัน', button('', 'ไปที่ transaction', 'primary', 'data-go="edit"'))}`;
-  bindGo(target);
+  await stoDashRender(target, 'overview');
 }
 
 function centerText(row) {

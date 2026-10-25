@@ -121,7 +121,9 @@
                   </button>
                 </div>
                 <div class="nav-sub" data-nav-panel="usage">
-                  <button class="nav-btn" data-view="home" data-usage="1" title="Dashboard"><span class="material-symbols-rounded">monitoring</span><span>Dashboard</span></button>
+                  <button class="nav-btn" data-view="home" data-usage="1" title="ภาพรวม"><span class="material-symbols-rounded">monitoring</span><span>ภาพรวม</span></button>
+                  <button class="nav-btn" data-view="dash-flow" data-usage="1" title="รับเข้า-จ่ายออก"><span class="material-symbols-rounded">swap_vert</span><span>รับเข้า-จ่ายออก</span></button>
+                  <button class="nav-btn" data-view="dash-month" data-usage="1" title="รายเดือน"><span class="material-symbols-rounded">bar_chart</span><span>รายเดือน</span></button>
                   <button class="nav-btn" data-view="edit" data-usage="1" title="transaction"><span class="material-symbols-rounded">edit_note</span><span>transaction</span></button>
                   <button class="nav-btn" data-view="setting" data-usage="3" title="Setting"><span class="material-symbols-rounded">settings</span><span>Setting</span></button>
                 </div>
@@ -167,6 +169,7 @@
   <!-- Load order matters: core first, boot last. All scripts share one global scope. -->
   <script src="/js/core.js"></script>
   <script src="/js/sto.js"></script>
+  <script src="/js/sto-dash.js"></script>
   <script src="/js/units.js"></script>
   <script src="/js/act.js"></script>
   <script src="/js/act-gantt.js"></script>

@@ -3,6 +3,7 @@ import { STO_TABLES } from './tables.js';
 import { mountMembers } from './members.js';
 import { mountMaterials } from './materials.js';
 import { mountRequisitions } from './requisitions.js';
+import { mountDashboard } from './dashboard.js';
 
 // ระบบงาน > Store > Usage: members, material master, stock, and requisitions.
 export default defineModule({
@@ -14,5 +15,6 @@ export default defineModule({
     mountMembers(app, mod);
     mountMaterials(app, mod);
     mountRequisitions(app, mod);
+    mountDashboard(app, mod);
   }
 });

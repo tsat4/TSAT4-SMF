@@ -33,6 +33,7 @@ GET /api/stock auth sto:1
 GET /api/summary auth sto:1
 GET /api/system/tables auth creator
 GET /api/system/tables/:name auth creator
+GET /api/usage-dashboard auth sto:1
 GET /api/usage-materials auth sto:3
 GET /api/users auth sto:3
 PATCH /api/act/:activity/areas/:id auth
