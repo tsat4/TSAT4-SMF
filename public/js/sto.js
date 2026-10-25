@@ -28,7 +28,7 @@ function badge(status) {
 }
 
 async function renderStore(target) {
-  modulePage(target, 'Store', 'ระบบงาน > Store', [['home', 'inventory_2', 'Usage', 'ภาพรวม, รับเข้า-จ่ายออก, รายเดือน']]);
+  modulePage(target, 'Store', 'ระบบงาน > Store', [['home', 'inventory_2', 'Usage', 'Dashboard, transaction, Setting']]);
 }
 
 async function renderLocked(target) {

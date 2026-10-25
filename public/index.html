@@ -121,9 +121,21 @@
                   </button>
                 </div>
                 <div class="nav-sub" data-nav-panel="usage">
-                  <button class="nav-btn" data-view="home" data-usage="1" title="ภาพรวม"><span class="material-symbols-rounded">monitoring</span><span>ภาพรวม</span></button>
-                  <button class="nav-btn" data-view="dash-flow" data-usage="1" title="รับเข้า-จ่ายออก"><span class="material-symbols-rounded">swap_vert</span><span>รับเข้า-จ่ายออก</span></button>
-                  <button class="nav-btn" data-view="dash-month" data-usage="1" title="รายเดือน"><span class="material-symbols-rounded">bar_chart</span><span>รายเดือน</span></button>
+                  <div class="nav-acc is-collapsed" data-nav-acc="usage-dash" data-usage="1">
+                    <div class="nav-split">
+                      <button class="nav-btn nav-parent" type="button" data-view="home" data-usage="1" title="Dashboard">
+                        <span class="material-symbols-rounded">monitoring</span><span>Dashboard</span>
+                      </button>
+                      <button class="nav-caret-btn" type="button" data-nav-toggle="usage-dash" aria-expanded="false" aria-label="ย่อ Dashboard" title="ย่อ/ขยาย">
+                        <span class="material-symbols-rounded nav-caret">expand_more</span>
+                      </button>
+                    </div>
+                    <div class="nav-sub" data-nav-panel="usage-dash">
+                      <button class="nav-btn" data-view="home" data-usage="1" title="ภาพรวม"><span class="material-symbols-rounded">dashboard</span><span>ภาพรวม</span></button>
+                      <button class="nav-btn" data-view="dash-flow" data-usage="1" title="รับเข้า-จ่ายออก"><span class="material-symbols-rounded">swap_vert</span><span>รับเข้า-จ่ายออก</span></button>
+                      <button class="nav-btn" data-view="dash-month" data-usage="1" title="รายเดือน"><span class="material-symbols-rounded">bar_chart</span><span>รายเดือน</span></button>
+                    </div>
+                  </div>
                   <button class="nav-btn" data-view="edit" data-usage="1" title="transaction"><span class="material-symbols-rounded">edit_note</span><span>transaction</span></button>
                   <button class="nav-btn" data-view="setting" data-usage="3" title="Setting"><span class="material-symbols-rounded">settings</span><span>Setting</span></button>
                 </div>

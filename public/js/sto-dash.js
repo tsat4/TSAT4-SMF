@@ -105,18 +105,14 @@ function stoDashMonth(data) {
 
 async function stoDashRender(target, page) {
   const data = await api(`/api/usage-dashboard?year=${stoDashYear}`);
-  const pages = [['overview', 'home', 'ภาพรวม'], ['flow', 'dash-flow', 'รับเข้า-จ่ายออก'], ['month', 'dash-month', 'รายเดือน']];
-  const seg = pages.map(([id, view, label]) => `<button class="seg-btn${id === page ? ' is-active' : ''}" type="button" data-dash="${view}">${label}</button>`).join('');
   const years = [stoDashYear - 1, stoDashYear, stoDashYear + 1];
   target.innerHTML = `<div class="view-body sto-dash">
     <div class="sto-dash-bar">
-      <div class="seg" role="group" aria-label="หน้า Dashboard">${seg}</div>
       ${field('ปี', `<select id="sto-dash-year">${years.map((year) => `<option value="${year}"${year === data.year ? ' selected' : ''}>${year}</option>`).join('')}</select>`)}
       <span class="sum-meta">รายการใช้งานทั้งระบบ · จ่ายออกของ ${esc(data.scope)}</span>
     </div>
     ${page === 'flow' ? stoDashFlow(data) : page === 'month' ? stoDashMonth(data) : stoDashOverview(data)}
   </div>`;
-  target.querySelectorAll('[data-dash]').forEach((node) => { node.onclick = () => openView(node.dataset.dash); });
   $('sto-dash-year').onchange = () => {
     stoDashYear = Number($('sto-dash-year').value);
     stoDashRender(target, page).catch(onErr);
