@@ -1,5 +1,5 @@
-// ระบบกิจกรรม > CFO (Carbon Footprint for Organization): Dashboard (Summary / Schedule), transaction (monthly entry
-// per activity), Setting (plan / activities / emission factors / team / company). Server: server/modules/act/cfo.js
+// ระบบกิจกรรม > CFO (Carbon Footprint for Organization): Dashboard (Summary / Scope / Company / Team / Schedule),
+// transaction (TSATP4-CFO Scope pages + บันทึกกิจกรรม), Setting (plan / activities / emission factors / team / company). Server: server/modules/act/cfo.js
 // spec: docs/specs/act-cfo.md · uses the shared year (a5Year), page bar slots and team tab of act-5s.js.
 const CFO = 'cfo';
 const CFO_SCOPE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6'];
@@ -12,14 +12,15 @@ const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['compa
 const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['hfc', 'HFCs'], ['pfc', 'PFCs']];
 let cfoDashTab = 'summary';
 let cfoSetTab = 'plan';
-let cfoMonth = new Date().getMonth() + 1;
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
-const cfoDash = { department: '', chartScope: '', scope: '1', month: '', category: '', activity: '' };
+const cfoDash = { department: '', chartScope: '', scope: '1' };
+// transaction filters: Scope → month (one month, or '' = the year) → category (main) → activity (sub)
+const cfoTx = { scope: '1', month: String(new Date().getMonth() + 1), category: '', activity: '' };
 const cfoHeads = { entries: { sort: '', dir: 'asc', filters: {} }, activities: { sort: '', dir: 'asc', filters: {} }, ef: { sort: '', dir: 'asc', filters: {} } };
 
 const cfoT = (n) => Number(n || 0).toLocaleString('th-TH', { maximumFractionDigits: 3 });
 const cfoPct = (part, total) => (total ? `${Math.round((part / total) * 1000) / 10}%` : '0%');
-const cfoMonthIso = () => `${a5Year}-${String(cfoMonth).padStart(2, '0')}`;
+const cfoMonthIso = (m) => `${a5Year}-${String(m).padStart(2, '0')}`;
 
 // Page frame shared by the three CFO pages: tabs on the left, year (+ extra) on the right, body below.
 async function cfoFrame(target, tabs, attr, active, rightExtra = '') {
@@ -39,7 +40,7 @@ async function cfoDashboard(target) {
   target.querySelectorAll('[data-cfodash]').forEach((node) => { node.onclick = () => { cfoDashTab = node.dataset.cfodash; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   if (cfoDashTab === 'schedule') return aplRender(body, CFO, { inPage: true, readOnly: true });
-  if (cfoDashTab === 'scope') return cfoDrawScope(body);
+  if (cfoDashTab === 'scope') return cfoDrawProgress(body);
   if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
   if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
   return cfoDrawSummary(body);
@@ -96,50 +97,41 @@ async function cfoDrawSummary(body) {
   $('cfo-d-scope').onchange = () => { cfoDash.chartScope = $('cfo-d-scope').value; cfoDrawSummary(body).catch(onErr); };
 }
 
-// Scope (TSATP4-CFO Scope 1 / 2 / 3 pages, one tab with a Scope dropdown): activities grouped by category (main) with their rows (sub).
-// Filters: month (amount / tCO2e of that month, or the year), category, activity. Progress = months recorded / months due.
-async function cfoDrawScope(body) {
-  const scope = Number(cfoDash.scope) || 1;
+// Dashboard > Scope: how complete each activity is this year — 12 month cells (recorded / due but missing),
+// % recorded of the months due, quantity and tCO2e. Filters: Scope, department, search.
+async function cfoDrawProgress(body) {
   const d = await a5Api(CFO, `cfo/progress?year=${a5Year}`);
-  const all = d.rows.filter((r) => String(r.scope_code || '').startsWith(`${scope}-`));
-  const categories = [...new Set(all.map((r) => r.category))];
-  if (!categories.includes(cfoDash.category)) cfoDash.category = '';
-  const inCategory = all.filter((r) => !cfoDash.category || r.category === cfoDash.category);
-  if (!inCategory.some((r) => String(r.id) === cfoDash.activity)) cfoDash.activity = '';
-  const list = inCategory.filter((r) => !cfoDash.activity || String(r.id) === cfoDash.activity);
-  const m = Number(cfoDash.month) || 0;
-  const value = (r, key) => (m ? Number(r.byMonth[m]?.[key] || 0) : Number(r[key] || 0));
-  const groups = [...new Set(list.map((r) => r.category))];
-  const row = (r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.detail || '')}</td><td>${esc(r.source || '')}</td><td class="num">${r.kgco2e == null ? '-' : cfoT(r.kgco2e)}</td>
-    <td><div class="cfo-prog"><span><i style="width:${r.percent}%"></i></span>${r.percent}%<b class="cfo-freq" title="รายเดือน">M</b></div></td>
-    <td class="num">${cfoT(value(r, 'qty'))}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(value(r, 'tco2e'))}</td>
-    <td><button class="icon-btn" type="button" data-hist="${r.id}" title="ประวัติการบันทึก" aria-label="ประวัติการบันทึก ${esc(r.name)}"><span class="material-symbols-rounded">history</span></button></td></tr>`;
+  const scope = Number(cfoDash.scope) || 1;
+  const rows = d.rows.filter((r) => String(r.scope_code || '').startsWith(`${scope}-`));
+  const departments = [...new Set(rows.map((r) => r.department))].sort();
   body.innerHTML = `
     <div class="toolbar a5-filters">
-      ${field('Scope', `<select id="cfo-s-scope">${options(['1', '2', '3'], String(scope), (v) => `Scope ${v}`)}</select>`)}
-      ${field('เดือน', `<select id="cfo-s-month">${options(['', ...Array.from({ length: 12 }, (_, i) => String(i + 1))], cfoDash.month, (v) => (v ? ACT_MONTHS[v - 1] : 'ทั้งหมด'))}</select>`)}
-      ${field('category', `<select id="cfo-s-cat">${options(['', ...categories], cfoDash.category, (v) => v || 'ทั้งหมด')}</select>`)}
-      ${field('Activity', `<select id="cfo-s-act"><option value="">ทั้งหมด</option>${inCategory.map((r) => `<option value="${r.id}"${String(r.id) === cfoDash.activity ? ' selected' : ''}>${esc(r.name)} · ${esc(r.detail || '')}</option>`).join('')}</select>`)}
+      ${field('Scope', `<select id="cfo-p-scope">${options(['1', '2', '3'], String(scope), (v) => `Scope ${v}`)}</select>`)}
+      ${field('หน่วยงาน', `<select id="cfo-f-dept">${options(['', ...departments], cfoFilter.department, (v) => v || 'ทั้งหมด')}</select>`)}
+      ${searchSlot('ค้นหา', 'cfo-f-q', 'cfo-f-search', { placeholder: 'กิจกรรมหรือรายละเอียด' })}
     </div>
-    <div class="table-wrap sheet"><table class="mo-data-table cfo-scope-table"><thead><tr><th>Activity</th><th>Description</th><th>emission source</th><th class="num">kgCO₂e/unit</th><th>Progress</th><th class="num">Amount</th><th>Unit</th><th class="num">tCO₂e</th><th></th></tr></thead>
-      <tbody>${groups.map((g) => `<tr class="cfo-group"><td colspan="9">${esc(g)}</td></tr>${list.filter((r) => r.category === g).map(row).join('')}`).join('') || '<tr><td colspan="9" class="empty">ไม่มีกิจกรรม</td></tr>'}</tbody></table></div>
-    <p class="sum-meta">รวม ${cfoT(list.reduce((t, r) => t + value(r, 'tco2e'), 0))} tCO₂e · ${list.length} กิจกรรม${m ? ` · ${ACT_MONTHS[m - 1]} ${a5Year}` : ` · ปี ${a5Year}`}</p>`;
+    <div class="table-wrap sheet" id="cfo-rows"></div>
+    <p class="sum-meta" id="cfo-sum"></p>`;
+  $('cfo-f-q').value = cfoFilter.q;
+  const draw = () => {
+    const term = cfoFilter.q.trim().toLowerCase();
+    const list = listQuery(rows.filter((r) => (!cfoFilter.department || r.department === cfoFilter.department)
+      && (!term || `${r.name} ${r.detail || ''} ${r.source || ''}`.toLowerCase().includes(term))), cfoHeads.entries, (r, key) => r[key] ?? '');
+    const cells = (r) => `<div class="cfo-months">${Array.from({ length: 12 }, (_, i) => `<i class="${r.months.includes(i + 1) ? 'is-done' : i < d.due ? 'is-missing' : ''}" title="${ACT_MONTHS_SHORT[i]}"></i>`).join('')}</div>`;
+    fillTable('cfo-rows', [{ label: 'หน่วยงาน', key: 'department' }, { label: 'กิจกรรม', key: 'name' }, { label: 'รายละเอียด', key: 'detail' }, { label: 'หมวด', key: 'category' }, 'รายเดือน',
+      { label: 'ครบ', key: 'percent' }, { label: 'ปริมาณรวม', key: 'qty' }, 'หน่วย', { label: 'tCO₂e', key: 'tco2e' }],
+    list.map((r) => `<tr><td>${esc(r.department)}</td><td>${esc(r.name)}</td><td>${esc(r.detail || '')}</td><td>${esc(r.category || '')}</td><td>${cells(r)}</td>
+      <td><div class="cfo-prog"><span><i style="width:${r.percent}%"></i></span>${r.percent}%</div></td><td class="num">${cfoT(r.qty)}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(r.tco2e)}</td></tr>`).join(''), 'ไม่มีกิจกรรม', headFor(cfoHeads.entries, draw));
+    const full = list.filter((r) => r.percent >= 100).length;
+    $('cfo-sum').textContent = `Scope ${scope} · ${list.length} กิจกรรม · ครบถึงเดือนปัจจุบัน ${full} · ขาด ${list.length - full} · รวม ${cfoT(list.reduce((t, r) => t + r.tco2e, 0))} tCO₂e`;
+  };
+  draw();
   a5Lift(body);
-  const redraw = () => cfoDrawScope(body).catch(onErr);
-  $('cfo-s-scope').onchange = () => { cfoDash.scope = $('cfo-s-scope').value; cfoDash.category = ''; cfoDash.activity = ''; redraw(); };
-  $('cfo-s-month').onchange = () => { cfoDash.month = $('cfo-s-month').value; redraw(); };
-  $('cfo-s-cat').onchange = () => { cfoDash.category = $('cfo-s-cat').value; cfoDash.activity = ''; redraw(); };
-  $('cfo-s-act').onchange = () => { cfoDash.activity = $('cfo-s-act').value; redraw(); };
-  body.querySelectorAll('[data-hist]').forEach((btn) => {
-    btn.onclick = () => {
-      const r = all.find((x) => String(x.id) === btn.dataset.hist);
-      const months = Object.keys(r.byMonth).map(Number).sort((x, y) => y - x);
-      openPopup(`ประวัติ ${esc(r.name)} ${esc(r.detail || '')}`, months.length ? `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th class="num">ปริมาณ</th><th>หน่วย</th><th class="num">tCO₂e</th><th>สถานะ</th><th>หมายเหตุ</th><th>เอกสาร</th></tr></thead><tbody>${months.map((k) => {
-        const e = r.byMonth[k];
-        return `<tr><td>${ACT_MONTHS_SHORT[k - 1]} ${a5Year}</td><td class="num">${cfoT(e.qty)}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(e.tco2e)}</td><td>${e.status === 'CONFIRMED' ? 'ยืนยันแล้ว' : 'ร่าง'}</td><td>${esc(e.remark || '')}</td><td>${/^https?:\/\//.test(e.doc || '') ? `<a href="${esc(e.doc)}" target="_blank" rel="noopener">เปิด</a>` : esc(e.doc || '')}</td></tr>`;
-      }).join('')}</tbody></table></div>` : `<p class="empty">ยังไม่มีการบันทึกปี ${a5Year}</p>`, () => closePopup(), 'ปิด');
-    };
-  });
+  $('cfo-p-scope').onchange = () => { cfoDash.scope = $('cfo-p-scope').value; cfoDrawProgress(body).catch(onErr); };
+  $('cfo-f-dept').onchange = () => { cfoFilter.department = $('cfo-f-dept').value; draw(); };
+  const search = () => { cfoFilter.q = $('cfo-f-q').value; draw(); };
+  $('cfo-f-search').onclick = search;
+  onEnter('cfo-f-q', search);
 }
 
 // Google Drive links (uc?export=view / file/d/<id>) show through the thumbnail URL, as TSATP4-CFO drivePhotoUrl_.
@@ -238,80 +230,104 @@ async function cfoDrawTeam(body, admin) {
   if (admin) $('cfo-team-edit').onclick = () => { cfoSetTab = 'team'; openView(`${CFO}-setting`); };
 }
 
-// ---------- transaction: monthly quantities ----------
-
+// ---------- transaction: TSATP4-CFO Scope pages + บันทึกกิจกรรม ----------
+// Activities of one Scope grouped by category (main) with their rows (sub). Month = values of that month (or the year).
+// Pick a row you may record (your department, or all for ผู้จัดทำ) → บันทึกกิจกรรม. ผู้จัดทำ confirms / reopens a month.
 async function cfoEntries(target) {
-  const monthSelect = field('เดือน', `<select id="cfo-month">${options(Array.from({ length: 12 }, (_, i) => i + 1), cfoMonth, (m) => ACT_MONTHS[m - 1])}</select>`);
-  const { me, body } = await cfoFrame(target, null, '', '', monthSelect);
+  const { me, body } = await cfoFrame(target, null, '', '');
   const rerender = () => cfoEntries(target).catch(onErr);
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
-  $('cfo-month').onchange = () => { cfoMonth = Number($('cfo-month').value); rerender(); };
   if (!me.access.member) { body.innerHTML = `<p class="empty">เข้าได้เฉพาะทีม CFO ปี ${a5Year} (ตัวแทนหน่วยงาน / ผู้จัดทำ / ประธาน)</p>`; return; }
-  const d = await a5Api(CFO, `cfo/entries?month=${cfoMonthIso()}`);
-  const departments = [...new Set(d.rows.map((r) => r.department))].sort();
-  const confirmed = d.rows.some((r) => r.entry?.status === 'CONFIRMED');
+  const d = await a5Api(CFO, `cfo/progress?year=${a5Year}`);
+  const scope = Number(cfoTx.scope) || 1;
+  const all = d.rows.filter((r) => String(r.scope_code || '').startsWith(`${scope}-`));
+  const categories = [...new Set(all.map((r) => r.category))];
+  if (!categories.includes(cfoTx.category)) cfoTx.category = '';
+  const inCategory = all.filter((r) => !cfoTx.category || r.category === cfoTx.category);
+  if (!inCategory.some((r) => String(r.id) === cfoTx.activity)) cfoTx.activity = '';
+  const list = inCategory.filter((r) => !cfoTx.activity || String(r.id) === cfoTx.activity);
+  const m = Number(cfoTx.month) || 0;
+  const value = (r, key) => (m ? Number(r.byMonth[m]?.[key] || 0) : Number(r[key] || 0));
+  const confirmed = m && d.rows.some((r) => r.byMonth[m]?.status === 'CONFIRMED');
+  const status = (r) => {
+    const e = m && r.byMonth[m];
+    if (!m) return '';
+    return e ? `<span class="badge ${e.status === 'CONFIRMED' ? 'badge-success' : 'badge-warning'}">${e.status === 'CONFIRMED' ? 'ยืนยันแล้ว' : 'ร่าง'}</span>` : '<span class="sum-meta">ยังไม่บันทึก</span>';
+  };
+  const groups = [...new Set(list.map((r) => r.category))];
+  const row = (r) => `<tr data-pick="${r.id}"${r.canEdit ? '' : ' class="is-muted"'}><td>${esc(r.name)}</td><td>${esc(r.detail || '')}</td><td>${esc(r.source || '')}</td><td class="num">${r.kgco2e == null ? '-' : cfoT(r.kgco2e)}</td>
+    <td><div class="cfo-prog"><span><i style="width:${r.percent}%"></i></span>${r.percent}%<b class="cfo-freq" title="รายเดือน">M</b></div></td>
+    <td class="num">${cfoT(value(r, 'qty'))}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(value(r, 'tco2e'))}</td><td>${status(r)}</td>
+    <td><button class="icon-btn" type="button" data-hist="${r.id}" title="ประวัติการบันทึก" aria-label="ประวัติการบันทึก ${esc(r.name)}"><span class="material-symbols-rounded">history</span></button></td></tr>`;
   body.innerHTML = `
     <div class="toolbar a5-filters">
-      ${field('Scope', `<select id="cfo-f-scope">${options(['', '1', '2', '3'], cfoFilter.scope, (v) => (v ? `Scope ${v}` : 'ทั้งหมด'))}</select>`)}
-      ${field('หน่วยงาน', `<select id="cfo-f-dept">${options(['', ...departments], cfoFilter.department, (v) => v || 'ทั้งหมด')}</select>`)}
-      ${searchSlot('ค้นหา', 'cfo-f-q', 'cfo-f-search', { placeholder: 'กิจกรรมหรือรายละเอียด' })}
-      <div class="action-bar">${button('cfo-edit', 'บันทึก', 'primary', 'disabled')}${d.admin ? button('cfo-confirm', confirmed ? 'เปิดให้แก้เดือนนี้' : 'ยืนยันเดือนนี้') : ''}</div>
+      ${field('Scope', `<select id="cfo-s-scope">${options(['1', '2', '3'], String(scope), (v) => `Scope ${v}`)}</select>`)}
+      ${field('เดือน', `<select id="cfo-s-month">${options(['', ...Array.from({ length: 12 }, (_, i) => String(i + 1))], cfoTx.month, (v) => (v ? ACT_MONTHS[v - 1] : 'ทั้งปี'))}</select>`)}
+      ${field('category', `<select id="cfo-s-cat">${options(['', ...categories], cfoTx.category, (v) => v || 'ทั้งหมด')}</select>`)}
+      ${field('Activity', `<select id="cfo-s-act"><option value="">ทั้งหมด</option>${inCategory.map((r) => `<option value="${r.id}"${String(r.id) === cfoTx.activity ? ' selected' : ''}>${esc(r.name)} · ${esc(r.detail || '')}</option>`).join('')}</select>`)}
+      <div class="action-bar">${button('cfo-record', 'บันทึกกิจกรรม', 'primary', 'disabled')}${d.admin ? button('cfo-confirm', confirmed ? 'เปิดให้แก้เดือนนี้' : 'ยืนยันเดือนนี้', 'secondary', m ? '' : 'disabled title="เลือกเดือนก่อน"') : ''}</div>
     </div>
-    <div class="table-wrap sheet" id="cfo-rows"></div>
-    <p class="sum-meta" id="cfo-sum"></p>`;
-  $('cfo-f-q').value = cfoFilter.q;
-  let picked = null;
-  const draw = () => {
-    const term = cfoFilter.q.trim().toLowerCase();
-    const list = listQuery(d.rows.filter((r) => (!cfoFilter.scope || String(r.scope_code || '').startsWith(`${cfoFilter.scope}-`))
-      && (!cfoFilter.department || r.department === cfoFilter.department)
-      && (!term || `${r.name} ${r.detail || ''} ${r.source || ''}`.toLowerCase().includes(term))), cfoHeads.entries, (r, key) => (key === 'qty' || key === 'tco2e' ? Number(r.entry?.[key] ?? -1) : key === 'status' ? r.entry?.status || '' : r[key] ?? ''));
-    fillTable('cfo-rows', [{ label: 'หน่วยงาน', key: 'department' }, { label: 'กิจกรรม', key: 'name' }, { label: 'รายละเอียด', key: 'detail' }, { label: 'หมวด', key: 'scope_code' },
-      { label: 'แหล่งปล่อย', key: 'source' }, { label: 'ปริมาณ', key: 'qty' }, 'หน่วย', { label: 'tCO₂e', key: 'tco2e' }, { label: 'สถานะ', key: 'status' }],
-    list.map((r) => `<tr data-pick="${r.id}"${r.canEdit ? '' : ' class="is-muted"'}><td>${esc(r.department)}</td><td>${esc(r.name)}</td><td>${esc(r.detail || '')}</td><td>${esc(r.scope_code || '')}</td><td>${esc(r.source || '')}</td>
-      <td class="num">${r.entry ? cfoT(r.entry.qty) : '<span class="sum-meta">ยังไม่บันทึก</span>'}</td><td>${esc(r.unit || '')}</td><td class="num">${r.entry ? cfoT(r.entry.tco2e) : ''}</td>
-      <td>${r.entry ? `<span class="badge ${r.entry.status === 'CONFIRMED' ? 'badge-success' : 'badge-warning'}">${r.entry.status === 'CONFIRMED' ? 'ยืนยันแล้ว' : 'ร่าง'}</span>` : ''}</td></tr>`).join(''), 'ไม่มีกิจกรรม', headFor(cfoHeads.entries, draw));
-    const done = list.filter((r) => r.entry);
-    $('cfo-sum').textContent = `${ACT_MONTHS[cfoMonth - 1]} ${a5Year} · บันทึกแล้ว ${done.length}/${list.length} กิจกรรม · รวม ${cfoT(done.reduce((s, r) => s + r.entry.tco2e, 0))} tCO₂e`;
-    const open = (id) => { const row = d.rows.find((r) => String(r.id) === String(id)); if (row?.canEdit) cfoEntryForm(row, d.septic, rerender); };
-    bindRowSelect($('cfo-rows'), (id) => { picked = id; $('cfo-edit').disabled = !d.rows.find((r) => String(r.id) === id)?.canEdit; });
-    $('cfo-rows').querySelectorAll('tr[data-pick]').forEach((tr) => { tr.ondblclick = () => open(tr.dataset.pick); });
-    $('cfo-edit').onclick = () => open(picked);
-  };
-  draw();
+    <div class="table-wrap sheet" id="cfo-rows"><table class="mo-data-table cfo-scope-table"><thead><tr><th>Activity</th><th>Description</th><th>emission source</th><th class="num">kgCO₂e/unit</th><th>Progress</th><th class="num">Amount</th><th>Unit</th><th class="num">tCO₂e</th><th>สถานะ</th><th></th></tr></thead>
+      <tbody>${groups.map((g) => `<tr class="cfo-group"><td colspan="10">${esc(g)}</td></tr>${list.filter((r) => r.category === g).map(row).join('')}`).join('') || '<tr><td colspan="10" class="empty">ไม่มีกิจกรรม</td></tr>'}</tbody></table></div>
+    <p class="sum-meta">รวม ${cfoT(list.reduce((t, r) => t + value(r, 'tco2e'), 0))} tCO₂e · ${list.length} กิจกรรม${m ? ` · ${ACT_MONTHS[m - 1]} ${a5Year} บันทึกแล้ว ${list.filter((r) => r.byMonth[m]).length}` : ` · ปี ${a5Year}`}</p>`;
   a5Lift(body);
-  $('cfo-f-scope').onchange = () => { cfoFilter.scope = $('cfo-f-scope').value; draw(); };
-  $('cfo-f-dept').onchange = () => { cfoFilter.department = $('cfo-f-dept').value; draw(); };
-  const search = () => { cfoFilter.q = $('cfo-f-q').value; draw(); };
-  $('cfo-f-search').onclick = search;
-  onEnter('cfo-f-q', search);
+  $('cfo-s-scope').onchange = () => { cfoTx.scope = $('cfo-s-scope').value; cfoTx.category = ''; cfoTx.activity = ''; rerender(); };
+  $('cfo-s-month').onchange = () => { cfoTx.month = $('cfo-s-month').value; rerender(); };
+  $('cfo-s-cat').onchange = () => { cfoTx.category = $('cfo-s-cat').value; cfoTx.activity = ''; rerender(); };
+  $('cfo-s-act').onchange = () => { cfoTx.activity = $('cfo-s-act').value; rerender(); };
+  let picked = null;
+  const open = (id) => { const r = all.find((x) => String(x.id) === String(id)); if (r?.canEdit) cfoEntryForm(r, d.septic, m || new Date().getMonth() + 1, rerender); };
+  $('cfo-rows').querySelectorAll('tr[data-pick]').forEach((tr) => {
+    tr.classList.add('row-pick');
+    tr.onclick = () => {
+      $('cfo-rows').querySelectorAll('tr.is-selected').forEach((x) => x.classList.remove('is-selected'));
+      tr.classList.add('is-selected');
+      picked = tr.dataset.pick;
+      $('cfo-record').disabled = !all.find((x) => String(x.id) === picked)?.canEdit;
+    };
+    tr.ondblclick = () => open(tr.dataset.pick);
+  });
+  $('cfo-record').onclick = () => open(picked);
+  body.querySelectorAll('[data-hist]').forEach((btn) => {
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      const r = all.find((x) => String(x.id) === btn.dataset.hist);
+      const months = Object.keys(r.byMonth).map(Number).sort((x, y) => y - x);
+      openPopup(`ประวัติ ${esc(r.name)} ${esc(r.detail || '')}`, months.length ? `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th class="num">ปริมาณ</th><th>หน่วย</th><th class="num">tCO₂e</th><th>สถานะ</th><th>หมายเหตุ</th><th>เอกสาร</th></tr></thead><tbody>${months.map((k) => {
+        const e = r.byMonth[k];
+        return `<tr><td>${ACT_MONTHS_SHORT[k - 1]} ${a5Year}</td><td class="num">${cfoT(e.qty)}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(e.tco2e)}</td><td>${e.status === 'CONFIRMED' ? 'ยืนยันแล้ว' : 'ร่าง'}</td><td>${esc(e.remark || '')}</td><td>${/^https?:\/\//.test(e.doc || '') ? `<a href="${esc(e.doc)}" target="_blank" rel="noopener">เปิด</a>` : esc(e.doc || '')}</td></tr>`;
+      }).join('')}</tbody></table></div>` : `<p class="empty">ยังไม่มีการบันทึกปี ${a5Year}</p>`, () => closePopup(), 'ปิด');
+    };
+  });
   if ($('cfo-confirm')) {
-    $('cfo-confirm').onclick = () => confirmPopup(confirmed ? 'เปิดให้แก้' : 'ยืนยันข้อมูล', `${confirmed ? 'เปิดให้ตัวแทนหน่วยงานแก้' : 'ยืนยัน'}ข้อมูลทั้งหมดของ ${ACT_MONTHS[cfoMonth - 1]} ${a5Year}`, async () => {
-      const r = await a5Api(CFO, 'cfo/confirm', { method: 'POST', body: { month: cfoMonthIso(), status: confirmed ? 'DRAFT' : 'CONFIRMED' } });
+    $('cfo-confirm').onclick = () => m && confirmPopup(confirmed ? 'เปิดให้แก้' : 'ยืนยันข้อมูล', `${confirmed ? 'เปิดให้ตัวแทนหน่วยงานแก้' : 'ยืนยัน'}ข้อมูลทั้งหมดของ ${ACT_MONTHS[m - 1]} ${a5Year} (ทุก Scope)`, async () => {
+      const r = await a5Api(CFO, 'cfo/confirm', { method: 'POST', body: { month: cfoMonthIso(m), status: confirmed ? 'DRAFT' : 'CONFIRMED' } });
       toast(`${confirmed ? 'เปิดแก้' : 'ยืนยัน'} ${r.count} รายการ`);
       rerender();
     }, confirmed ? 'เปิดให้แก้' : 'ยืนยัน');
   }
 }
 
-// Quantity of one activity for the month. Septic tank: people × days → kg CH4 (same formula as the server).
-function cfoEntryForm(row, septic, reload) {
-  const e = row.entry || {};
+// บันทึกกิจกรรม: quantity of one activity for a month (changing the month loads what that month has).
+// Septic tank: people × days → kg CH4 (same formula as the server).
+function cfoEntryForm(row, septic, month, reload) {
   const isSeptic = row.calc === 'septic';
   const kg = () => {
     const n = (k) => Number(septic[k] || 0);
     return Number($('cfo-people').value || 0) * Number($('cfo-days').value || 0) * n('septic_bod') * 0.001 * n('septic_i') * n('septic_b0') * n('septic_mcf');
   };
   const fields = `<p class="sum-meta">${esc(row.department)} · ${esc(row.name)} ${esc(row.detail || '')} · ${esc(row.source || '')} (${cfoT(row.kgco2e)} kgCO₂e/${esc(row.unit || '')})</p>
-    ${isSeptic ? `${field('จำนวนคน', `<input id="cfo-people" type="number" min="0" step="1" value="${esc(e.inputs?.people ?? '')}">`)}
-      ${field('จำนวนวันทำงาน', `<input id="cfo-days" type="number" min="1" step="1" value="${esc(e.inputs?.days ?? '')}">`)}
+    ${field('เดือน', `<select id="cfo-e-month">${options(Array.from({ length: 12 }, (_, i) => i + 1), month, (v) => `${ACT_MONTHS[v - 1]} ${a5Year}${row.byMonth[v] ? ' · บันทึกแล้ว' : ''}`)}</select>`)}
+    ${isSeptic ? `${field('จำนวนคน', '<input id="cfo-people" type="number" min="0" step="1">')}
+      ${field('จำนวนวันทำงาน', '<input id="cfo-days" type="number" min="1" step="1">')}
       <p class="sum-meta" id="cfo-kg"></p>`
-    : field(`ปริมาณ (${esc(row.unit || '')})`, `<input id="cfo-qty" type="number" min="0" step="any" value="${esc(e.qty ?? '')}">`)}
-    ${field('ลิงก์เอกสาร / หลักฐาน', `<input id="cfo-doc" maxlength="500" value="${esc(e.doc || '')}">`)}
-    ${field('หมายเหตุ', `<textarea id="cfo-remark" rows="2" maxlength="500">${esc(e.remark || '')}</textarea>`)}
-    ${e.id ? button('cfo-del', 'ลบข้อมูลเดือนนี้', 'danger') : ''}`;
-  openPopup(`${ACT_MONTHS[cfoMonth - 1]} ${a5Year}`, fields, async () => {
-    const body = { activityId: row.id, month: cfoMonthIso(), doc: $('cfo-doc').value, remark: $('cfo-remark').value };
+    : field(`ปริมาณ (${esc(row.unit || '')})`, '<input id="cfo-qty" type="number" min="0" step="any">')}
+    ${field('ลิงก์เอกสาร / หลักฐาน', '<input id="cfo-doc" maxlength="500">')}
+    ${field('หมายเหตุ', '<textarea id="cfo-remark" rows="2" maxlength="500"></textarea>')}
+    <p class="sum-meta" id="cfo-e-note"></p>
+    ${button('cfo-del', 'ลบข้อมูลเดือนนี้', 'danger')}`;
+  openPopup('บันทึกกิจกรรม', fields, async () => {
+    const body = { activityId: row.id, month: cfoMonthIso($('cfo-e-month').value), doc: $('cfo-doc').value, remark: $('cfo-remark').value };
     if (isSeptic) body.inputs = { people: $('cfo-people').value, days: $('cfo-days').value };
     else body.qty = $('cfo-qty').value;
     await a5Api(CFO, 'cfo/entries', { method: 'PUT', body });
@@ -319,17 +335,27 @@ function cfoEntryForm(row, septic, reload) {
     closePopup();
     reload();
   });
-  if (isSeptic) {
-    const show = () => { $('cfo-kg').textContent = `= ${cfoT(kg())} kg CH₄ · ${cfoT((kg() * Number(row.kgco2e || 0)) / 1000)} tCO₂e`; };
-    $('cfo-people').oninput = show;
-    $('cfo-days').oninput = show;
+  const show = () => { if (isSeptic) $('cfo-kg').textContent = `= ${cfoT(kg())} kg CH₄ · ${cfoT((kg() * Number(row.kgco2e || 0)) / 1000)} tCO₂e`; };
+  const load = () => {
+    const e = row.byMonth[Number($('cfo-e-month').value)] || {};
+    if (isSeptic) { $('cfo-people').value = e.inputs?.people ?? ''; $('cfo-days').value = e.inputs?.days ?? ''; } else $('cfo-qty').value = e.qty ?? '';
+    $('cfo-doc').value = e.doc || '';
+    $('cfo-remark').value = e.remark || '';
+    $('cfo-e-note').textContent = e.id ? `${e.status === 'CONFIRMED' ? 'ยืนยันแล้ว (แก้ได้เฉพาะผู้จัดทำ)' : 'ร่าง'}${e.updated_at ? ` · แก้ล่าสุด ${new Date(e.updated_at).toLocaleString('th-TH')}` : ''}` : 'ยังไม่บันทึกเดือนนี้';
+    $('cfo-del').hidden = !e.id;
     show();
-  }
-  if ($('cfo-del')) $('cfo-del').onclick = () => confirmPopup('ลบข้อมูล', `ลบ ${esc(row.name)} ของ ${ACT_MONTHS[cfoMonth - 1]} ${a5Year}`, async () => {
-    await a5Api(CFO, `cfo/entries/${e.id}`, { method: 'DELETE' });
-    toast('ลบแล้ว');
-    reload();
-  });
+  };
+  $('cfo-e-month').onchange = load;
+  if (isSeptic) { $('cfo-people').oninput = show; $('cfo-days').oninput = show; }
+  load();
+  $('cfo-del').onclick = () => {
+    const e = row.byMonth[Number($('cfo-e-month').value)];
+    if (e?.id) confirmPopup('ลบข้อมูล', `ลบ ${esc(row.name)} ของ ${ACT_MONTHS[Number($('cfo-e-month').value) - 1]} ${a5Year}`, async () => {
+      await a5Api(CFO, `cfo/entries/${e.id}`, { method: 'DELETE' });
+      toast('ลบแล้ว');
+      reload();
+    });
+  };
 }
 
 // ---------- Setting ----------

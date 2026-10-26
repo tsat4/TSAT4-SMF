@@ -67,19 +67,22 @@ export function mountCfo(app) {
     });
   });
 
-  // How complete each activity is in a year: months recorded / months due (this year: up to this month), as TSATP4-CFO getScopeAccount.
+  // Every activity of a year with its months (Dashboard > Scope and transaction): months recorded / months due
+  // (this year: up to this month) as TSATP4-CFO getScopeAccount, plus what this user may record (canEdit).
   route('get', '/api/act/:activity/cfo/progress', async (req, res, activity, t) => {
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
     const now = new Date();
     const due = year < now.getFullYear() ? 12 : year > now.getFullYear() ? 0 : now.getMonth() + 1;
-    const [activities, efs, scopes, gwp, entries, details] = await Promise.all([
+    const [access, settings, activities, efs, scopes, gwp, entries, details] = await Promise.all([
+      accessOf(req, activity, year),
+      settingsOf(t),
       fetchAll(() => tx.from(t.activity).select('id,department,name,detail,calc,status,ef_id,gwp_code').order('id')),
       fetchAll(() => tx.from(t.ef).select('id,scope_code,kind,name,unit,kgco2e').order('id')),
       fetchAll(() => tx.from(t.cfoScope).select('code,name').order('code')),
       fetchAll(() => tx.from(t.gwp).select('code,ch4').order('code')),
       fetchAll(() => tx.from(t.entryView).select('id,month,activity_id,qty,tco2e').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id')),
-      fetchAll(() => tx.from(t.entry).select('id,status,doc,remark,updated_at,updated_by').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id'))
+      fetchAll(() => tx.from(t.entry).select('id,status,inputs,doc,remark,updated_at,updated_by').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id'))
     ]);
     const efById = new Map(efs.map((e) => [e.id, e]));
     const scopeName = new Map(scopes.map((s) => [s.code, s.name]));
@@ -89,12 +92,16 @@ export function mountCfo(app) {
     res.json({
       year,
       due,
+      admin: access.admin,
+      departments: access.departments,
+      septic: Object.fromEntries(Object.entries(settings).filter(([k]) => k.startsWith('septic_'))),
       rows: activities.filter((a) => a.status === 'Active' || entries.some((e) => e.activity_id === a.id)).map((a) => {
         const list = entries.filter((e) => e.activity_id === a.id);
         const months = [...new Set(list.map((e) => Number(e.month.slice(5, 7))))];
         const ef = efById.get(a.ef_id) || {};
         return {
-          id: a.id, department: a.department, name: a.name, detail: a.detail, scope_code: ef.scope_code, category: category(ef), source: ef.name,
+          id: a.id, department: a.department, name: a.name, detail: a.detail, calc: a.calc, scope_code: ef.scope_code, category: category(ef), source: ef.name,
+          canEdit: access.admin || access.departments.includes(a.department),
           unit: a.calc === 'septic' ? 'kg CH₄' : ef.unit, kgco2e: a.calc === 'septic' ? gwpCh4.get(a.gwp_code) : ef.kgco2e,
           byMonth: Object.fromEntries(list.map((e) => [Number(e.month.slice(5, 7)), { qty: e.qty, tco2e: e.tco2e, ...detailOf.get(e.id) }])),
           months: months.sort((x, y) => x - y),
@@ -106,31 +113,7 @@ export function mountCfo(app) {
     });
   });
 
-  // ---------- transaction: one row per activity for the chosen month ----------
-  route('get', '/api/act/:activity/cfo/entries', async (req, res, activity, t) => {
-    const month = monthOf(req.query.month);
-    if (!month) return fail(res, 400, 'เดือนไม่ถูกต้อง');
-    const access = await accessOf(req, activity, Number(month.slice(0, 4)));
-    const [activities, entries, efs, settings] = await Promise.all([
-      fetchAll(() => tx.from(t.activity).select('id,department,name,detail,calc,status,ef_id').order('department').order('id')),
-      fetchAll(() => tx.from(t.entry).select('id,activity_id,qty,inputs,doc,remark,status,ef_id,updated_at').eq('month', month).order('id')),
-      fetchAll(() => tx.from(t.ef).select('id,scope_code,name,unit,kgco2e').order('id')),
-      settingsOf(t)
-    ]);
-    const efById = new Map(efs.map((e) => [e.id, e]));
-    const entryOf = new Map(entries.map((e) => [e.activity_id, e]));
-    const rows = activities.filter((a) => a.status === 'Active' || entryOf.has(a.id)).map((a) => {
-      const entry = entryOf.get(a.id) || null;
-      const ef = efById.get(entry ? entry.ef_id : a.ef_id) || {};
-      return {
-        ...a, scope_code: ef.scope_code, source: ef.name, unit: ef.unit, kgco2e: ef.kgco2e,
-        entry: entry && { ...entry, tco2e: Math.round(Number(entry.qty) * Number(ef.kgco2e || 0)) / 1000 },
-        canEdit: access.admin || access.departments.includes(a.department)
-      };
-    });
-    res.json({ month, admin: access.admin, departments: access.departments, rows, septic: Object.fromEntries(Object.entries(settings).filter(([k]) => k.startsWith('septic_'))) });
-  });
-
+  // ---------- transaction: save one activity × month ----------
   route('put', '/api/act/:activity/cfo/entries', async (req, res, activity, t) => {
     const month = monthOf(req.body?.month);
     const activityId = Number(req.body?.activityId);
