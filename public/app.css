@@ -543,9 +543,13 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .tx-order-who dt{margin:0;color:var(--mo-text-muted);font-weight:400}
 .tx-order-who dd{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tx-order-lines{flex:1;min-height:0;overflow:auto}
-.tx-line{display:flex;align-items:center;gap:8px;min-height:32px;border-bottom:1px solid var(--mo-line)}
+.tx-wallet{padding-top:6px}
+.tx-wallet-name{font-size:11px;font-weight:500}
+.tx-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:32px;padding:4px 0;border-bottom:1px solid var(--mo-line)}
+.tx-line-main{display:flex;align-items:center;gap:8px;width:100%;min-width:0}
 .tx-line-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tx-line-qty{flex:0 0 auto;color:var(--mo-text-muted);font-size:12px}
+.tx-line-cc{width:100%;min-height:28px;font:inherit;font-size:12px}
 .tx-line-drop{border:0;background:transparent;color:var(--mo-text-muted);font-size:12px;padding:0}
 .tx-order .hold-btn{width:100%}
 @media (max-width:960px){

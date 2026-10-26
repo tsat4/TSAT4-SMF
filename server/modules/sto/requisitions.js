@@ -25,8 +25,25 @@ async function requesterNames(ids) {
   return new Map((data || []).map((row) => [row.employee_id, nameOf(row)]));
 }
 
+async function sourceMap(ids) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const { data, error } = await mx.from('tx_sto_requisition_line').select('requisition_id,costcenter').in('requisition_id', unique);
+  if (error) throw error;
+  const map = new Map();
+  for (const row of data || []) {
+    if (!row.costcenter || row.costcenter === '-') continue;
+    const list = map.get(row.requisition_id) || [];
+    if (!list.includes(row.costcenter)) list.push(row.costcenter);
+    map.set(row.requisition_id, list);
+  }
+  return map;
+}
+
 async function decorate(headers, linesById = new Map()) {
-  const centers = await costcenterMap(headers.map((row) => row.costcenter));
+  const listed = await sourceMap(headers.map((row) => row.id).filter((id) => !linesById.has(id)));
+  const lineCodes = [...linesById.values()].flat().map((line) => line.costcenter);
+  const centers = await costcenterMap([...headers.map((row) => row.costcenter), ...lineCodes]);
   const people = await requesterNames(headers.map((row) => row.requested_by));
   const materials = await materialMap([...linesById.values()].flat().map((line) => line.material));
   return headers.map((row) => ({
@@ -34,8 +51,12 @@ async function decorate(headers, linesById = new Map()) {
     costcenterName: centers.get(row.costcenter)?.object_name || '',
     department: centers.get(row.costcenter)?.department || '',
     requesterName: people.get(row.requested_by) || '',
+    sources: linesById.has(row.id)
+      ? [...new Set((linesById.get(row.id) || []).map((line) => line.costcenter).filter((code) => code && code !== '-'))]
+      : (listed.get(row.id) || []),
     lines: (linesById.get(row.id) || []).map((line) => ({
       ...line,
+      costcenterName: centers.get(line.costcenter)?.object_name || '',
       materialDescription: materials.get(line.material)?.material_description || '',
       bun: materials.get(line.material)?.bun || ''
     }))
@@ -183,21 +204,19 @@ export function mountRequisitions(app, mod) {
     if (!material || !qty) return fail(res, 400, 'เลือกรายการและจำนวน');
     const costcenter = String(req.body.costcenter || header.costcenter).trim();
     if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
-    if (costcenter !== header.costcenter) {
-      const applied = await mx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
-      if (applied.error) return fail(res, 400, 'บันทึก costcenter ไม่ได้');
-      header.costcenter = costcenter;
-    }
     const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
     if (!item.data || item.data.status !== 'Active') return fail(res, 400, 'รายการนี้ใช้งานไม่ได้');
-    const existing = await mx.from('tx_sto_requisition_line').select('id,qty').eq('requisition_id', id).eq('material', material).maybeSingle();
+    const existing = await mx.from('tx_sto_requisition_line').select('id,qty,costcenter').eq('requisition_id', id).eq('material', material).maybeSingle();
     if (existing.data) {
-      const { error } = await mx.from('tx_sto_requisition_line').update({ qty: qtyOf(Number(existing.data.qty) + qty) }).eq('id', existing.data.id);
+      const { error } = await mx.from('tx_sto_requisition_line').update({
+        qty: qtyOf(Number(existing.data.qty) + qty),
+        costcenter
+      }).eq('id', existing.data.id);
       if (error) return fail(res, 400, 'เพิ่มจำนวนไม่ได้');
     } else {
       const { error } = await mx.from('tx_sto_requisition_line').insert({
         requisition_id: id,
-        costcenter: header.costcenter,
+        costcenter,
         material,
         qty
       });
@@ -207,10 +226,21 @@ export function mountRequisitions(app, mod) {
   }));
 
   app.patch('/api/requisitions/:id/lines/:lineId', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
-    const qty = qtyOf(req.body.qty);
     const header = await ownCart(req, Number(req.params.id));
-    if (!header || !qty) return fail(res, 400, 'แก้จำนวนในตะกร้าไม่ได้');
-    const { data, error } = await mx.from('tx_sto_requisition_line').update({ qty })
+    if (!header) return fail(res, 400, 'แก้ตะกร้าไม่ได้');
+    const patch = {};
+    if (req.body.qty != null) {
+      const qty = qtyOf(req.body.qty);
+      if (!qty) return fail(res, 400, 'แก้จำนวนในตะกร้าไม่ได้');
+      patch.qty = qty;
+    }
+    if (req.body.costcenter != null) {
+      const costcenter = String(req.body.costcenter).trim();
+      if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
+      patch.costcenter = costcenter;
+    }
+    if (!Object.keys(patch).length) return fail(res, 400, 'แก้ตะกร้าไม่ได้');
+    const { data, error } = await mx.from('tx_sto_requisition_line').update(patch)
       .eq('id', Number(req.params.lineId)).eq('requisition_id', header.id).select('id');
     if (error || !data?.length) return fail(res, 400, 'แก้จำนวนไม่ได้');
     res.json({ ok: true });
@@ -235,17 +265,12 @@ export function mountRequisitions(app, mod) {
     const admin = isAdmin(req);
     try {
       if (status === 'submitted' && mine && header.status === 'cart') {
-        const costcenter = String(req.body.costcenter || header.costcenter || '').trim();
-        if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
-        const { data: lines, error: lineError } = await mx.from('tx_sto_requisition_line').select('material').eq('requisition_id', id);
+        const { data: lines, error: lineError } = await mx.from('tx_sto_requisition_line').select('material,costcenter').eq('requisition_id', id);
         if (lineError || !lines?.length) return fail(res, 400, 'ตะกร้าว่าง');
         for (const line of lines) {
-          const stock = await mx.from('mt_sto_stock').select('material').eq('costcenter', costcenter).eq('material', line.material).maybeSingle();
-          if (!stock.data) return fail(res, 400, `costcenter นี้ยังไม่มียอดของ ${line.material}`);
-        }
-        if (costcenter !== header.costcenter) {
-          const applied = await mx.rpc('tx_sto_apply_costcenter', { p_id: id, p_employee: req.user.employeeId, p_costcenter: costcenter });
-          if (applied.error) return fail(res, 400, 'บันทึก costcenter ไม่ได้');
+          if (!(await ownCenter(req, line.costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
+          const stock = await mx.from('mt_sto_stock').select('material').eq('costcenter', line.costcenter).eq('material', line.material).maybeSingle();
+          if (!stock.data) return fail(res, 400, `${line.costcenter} ยังไม่มียอดของ ${line.material}`);
         }
         await move(id, 'cart', { status: 'submitted' });
       } else if (status === 'cancelled' && mine && ['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(header.status)) {

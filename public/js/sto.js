@@ -142,17 +142,40 @@ async function renderEdit(target) {
     const mine = await api('/api/requisitions?scope=mine');
     if (!alive()) return;
     const header = mine.requisitions.find((row) => row.status === 'cart');
-    const cart = header ? (await api(`/api/requisitions/${header.id}`)).requisition : null;
+    const [detail, pay] = await Promise.all([
+      header ? api(`/api/requisitions/${header.id}`) : Promise.resolve(null),
+      api('/api/pay-centers')
+    ]);
     if (!alive() || !$('edit-order')) return;
+    const cart = detail?.requisition || null;
     const lines = cart?.lines || [];
-    $('edit-order-source').textContent = cart && cart.costcenter !== '-'
-      ? `${cart.costcenter}${cart.costcenterName ? ` · ${cart.costcenterName}` : ''}`
-      : 'ยังไม่เลือก';
+    const wallets = [...new Set(lines.map((line) => line.costcenter).filter((code) => code && code !== '-'))];
+    const one = wallets.length === 1 ? lines.find((line) => line.costcenter === wallets[0]) : null;
+    $('edit-order-source').textContent = wallets.length > 1
+      ? 'หลายแหล่ง'
+      : one
+        ? `${one.costcenter}${one.costcenterName ? ` · ${one.costcenterName}` : ''}`
+        : 'ยังไม่เลือก';
     $('edit-order-dept').textContent = cart?.department || me.department || '';
     $('edit-order-emp').textContent = cart?.requested_by || me.employeeId || '';
     $('edit-order-person').textContent = cart?.requesterName || me.name || '';
+    const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
+    const choices = (line) => {
+      const rows = [...centers];
+      if (line.costcenter && !rows.some((row) => row.costcenter === line.costcenter)) {
+        rows.unshift({ costcenter: line.costcenter, objectName: line.costcenterName || '' });
+      }
+      return rows.map((row) => `<option value="${esc(row.costcenter)}"${row.costcenter === line.costcenter ? ' selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName || '')}</option>`).join('');
+    };
+    const groups = new Map();
+    for (const line of lines) {
+      const key = line.costcenter || '-';
+      const list = groups.get(key) || [];
+      list.push(line);
+      groups.set(key, list);
+    }
     $('edit-order').innerHTML = lines.length
-      ? lines.map((line) => `<div class="tx-line"><span class="tx-line-name">${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span><button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button></div>`).join('')
+      ? [...groups.entries()].map(([code, group]) => `<section class="tx-wallet"><div class="tx-wallet-name">${esc(code === '-' ? 'ยังไม่เลือก' : `${code}${group[0].costcenterName ? ` · ${group[0].costcenterName}` : ''}`)}</div>${group.map((line) => `<div class="tx-line"><div class="tx-line-main"><span class="tx-line-name">${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span><button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button></div><select class="tx-line-cc" data-move="${esc(line.id)}" aria-label="ย้ายแหล่งซื้อ">${choices(line)}</select></div>`).join('')}</section>`).join('')
       : '<p class="sum-meta">ยังไม่มีรายการ</p>';
     $('edit-confirm-host').innerHTML = `<button class="btn btn-primary hold-btn" type="button" id="edit-confirm" title="กดค้าง 2 วินาที" ${lines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">ยืนยัน</span></button>`;
     $('edit-order').querySelectorAll('[data-drop]').forEach((node) => {
@@ -161,10 +184,18 @@ async function renderEdit(target) {
         await loadOrder();
       });
     });
+    $('edit-order').querySelectorAll('[data-move]').forEach((node) => {
+      node.onchange = async () => {
+        try {
+          await api(`/api/requisitions/${cart.id}/lines/${node.dataset.move}`, { method: 'PATCH', body: { costcenter: node.value } });
+        } catch (err) { onErr(err); }
+        await loadOrder();
+      };
+    });
     if (lines.length) {
       bindHold($('edit-confirm'), async () => {
         try {
-          await postStatus(cart.id, 'submitted', { costcenter: cart.costcenter });
+          await postStatus(cart.id, 'submitted');
           toast('บันทึกการเบิกแล้ว');
         } catch (err) { onErr(err); }
         await loadOrder();
@@ -232,7 +263,7 @@ async function renderEdit(target) {
       admin ? button('edit-prepare', 'จัดเตรียม', 'secondary', 'disabled') + button('edit-issue', 'จ่าย', 'secondary', 'disabled') : '',
       button('edit-receive', 'รับ', 'primary', 'disabled')
     ].join('');
-    fillTable('edit-rows', [{ label: 'เลขที่', key: 'id' }, { label: 'ผู้เบิก', key: 'requested_by' }, { label: 'costcenter', key: 'costcenter' }, { label: 'สถานะ', key: 'status' }], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก', columnHead());
+    fillTable('edit-rows', [{ label: 'เลขที่', key: 'id' }, { label: 'ผู้เบิก', key: 'requested_by' }, { label: 'costcenter', key: 'costcenter' }, { label: 'สถานะ', key: 'status' }], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.sources?.length > 1 ? esc(row.sources.join(', ')) : row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก', columnHead());
     setFoot(page.length, rows.length);
     bindRowSelect($('edit-rows'), (_id, row) => {
       const own = row.dataset.own === '1';
