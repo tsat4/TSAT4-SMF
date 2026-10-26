@@ -88,8 +88,8 @@ async function a5DrawSummary(body, activity) {
   const q = new URLSearchParams({ year: a5Year, type: a5Summary.type, areaType: a5Summary.areaType, area: a5Summary.area });
   const data = await a5Api(activity, `dashboard/summary?${q}`);
   const areas = data.areas.filter((a) => !a5Summary.areaType || a.areaType === a5Summary.areaType);
-  const max = 100;
   const months = data.months;
+  const pass = data.pass || 80; // pass_percent setting
   const row = (m) => `<tr><td>${ACT_MONTHS_SHORT[m.month - 1]}</td><td>${m.percent}%</td><td>${m.audits}</td></tr>`;
   body.innerHTML = `
     <div class="toolbar a5-filters">
@@ -97,10 +97,12 @@ async function a5DrawSummary(body, activity) {
       ${field('ประเภทพื้นที่', `<select id="a5-atype">${options(['', ...A5_AREA_TYPES], a5Summary.areaType, (v) => v || 'ทั้งหมด')}</select>`)}
       ${field('พื้นที่', `<select id="a5-area"><option value="">ทั้งหมด</option>${areas.map((a) => `<option value="${a.id}"${String(a.id) === String(a5Summary.area) ? ' selected' : ''}>${esc(a.code)} ${esc(a.name)}</option>`).join('')}</select>`, 'grow')}
     </div>
-    <div class="a5-kpis">${(data.groups.length ? data.groups : [1, 2, 3, 4, 5].map((n) => ({ group: n, percent: 0 }))).map((g) => `<article class="kpi"><div class="kpi-label">${esc(a5GroupName(activity, g.group))} · เฉลี่ยทั้งปี</div><div class="kpi-value">${g.percent}%</div></article>`).join('')}</div>
-    <section class="card a5-chart-card">
-      <div class="plan-head"><div class="card-title">${esc(actLabel(activity))} Score % รายเดือน</div><p class="sum-meta">${data.owner ? `เจ้าของพื้นที่: ${esc(data.owner.name || data.owner.employeeId)} · ` : ''}${data.audits} ใบตรวจ</p></div>
-      <div class="a5-chart">${months.map((m) => `<div class="a5-bar-col" title="${ACT_MONTHS[m.month - 1]}: ${m.percent}% (${m.audits} ครั้ง)"><span class="a5-bar-val">${m.audits ? m.percent : ''}</span><div class="a5-bar" style="height:${(m.percent / max) * 100}%"></div><span class="a5-bar-label">${ACT_MONTHS_SHORT[m.month - 1]}</span></div>`).join('')}</div>
+    <div class="ch-kpis">${(data.groups.length ? data.groups : [1, 2, 3, 4, 5].map((n) => ({ group: n, percent: 0 }))).map((g, i) => chartKpi({ label: `${esc(a5GroupName(activity, g.group))} · เฉลี่ยทั้งปี`, value: `${g.percent}%`, pie: g.percent, color: CHART.series[i % CHART.series.length], note: g.percent >= pass ? 'ผ่านเกณฑ์' : g.percent ? `ต่ำกว่าเกณฑ์ ${pass}%` : '' })).join('')}</div>
+    <section class="card ch-card">
+      <div class="ch-head"><div class="card-title">${esc(actLabel(activity))} Score % รายเดือน</div><div class="sum-meta">${data.owner ? `เจ้าของพื้นที่: ${esc(data.owner.name || data.owner.employeeId)} · ` : ''}${data.audits} ใบตรวจ</div></div>
+      ${chartPlot({ id: 'a5-plot', labels: ACT_MONTHS_SHORT, left: 'Score (%)', leftMax: 100, bars: [{ values: months.map((m) => m.percent), colors: [CHART.series[0]] }],
+        lines: [{ values: months.map(() => pass), color: CHART.target, dash: true, dots: false }],
+        legend: [{ box: CHART.series[0], label: `${actLabel(activity)} % เฉลี่ยของเดือน` }, { line: CHART.target, dash: true, label: `เกณฑ์ผ่าน ${pass}%` }] })}
     </section>
     <div class="a5-two">
       <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th>${esc(actLabel(activity))} %</th><th>ครั้ง</th></tr></thead><tbody>${months.slice(0, 6).map(row).join('')}</tbody></table></div>
@@ -111,6 +113,7 @@ async function a5DrawSummary(body, activity) {
   $('a5-type').onchange = () => { a5Summary.type = $('a5-type').value; redraw(); };
   $('a5-atype').onchange = () => { a5Summary.areaType = $('a5-atype').value; a5Summary.area = ''; redraw(); };
   $('a5-area').onchange = () => { a5Summary.area = $('a5-area').value; redraw(); };
+  chartTip('a5-plot', (i) => `<strong>${ACT_MONTHS[i]} ${a5Year}</strong><div class="ch-tip-row"><span>Score</span><b>${months[i].percent}%</b></div><div class="ch-tip-row"><span>ใบตรวจ</span><b>${months[i].audits}</b></div>${months[i].audits ? chartPill(months[i].percent, pass, ' เทียบเกณฑ์', true) : ''}`);
 }
 
 async function a5DrawRanking(body, activity) {

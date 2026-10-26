@@ -120,7 +120,9 @@ export function mountAudit(app) {
     const audits = (await auditsOf(activity, year, req.query.type)).filter((a) => allowed.has(a.area_id));
     const groups = await groupsOf(activity, audits.map((a) => a.id));
     const owner = areaId ? (await ownersOf(activity, year, [areaId])).get(areaId) : '';
+    const pass = await tx.from(tablesOf(activity).setting).select('value').eq('key', 'pass_percent').maybeSingle();
     res.json({
+      pass: Number(pass.data?.value) || 80,
       areas: areas.filter((a) => a.status === 'Active' || allowed.has(a.id)).map((a) => ({ id: a.id, code: a.code, name: a.name, areaType: a.area_type })),
       ...summarize(audits, groups),
       owner: owner ? { employeeId: owner, name: (await namesOf([owner])).get(owner)?.name || '' } : null

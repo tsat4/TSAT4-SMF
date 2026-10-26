@@ -2,10 +2,9 @@
 // transaction (TSATP4-CFO Scope pages + บันทึกกิจกรรม), Setting (plan / activities / emission factors / team / company). Server: server/modules/act/cfo.js
 // spec: docs/specs/act-cfo.md · uses the shared year (a5Year), page bar slots and team tab of act-5s.js.
 const CFO = 'cfo';
-// Cool green tone: this year's Scope 1/2/3 in teal shades, the base year in slate, lines in cyan / slate / green.
-const CFO_SCOPE_COLORS = ['#0f766e', '#14b8a6', '#5eead4'];
-const CFO_BASE_COLORS = ['#334155', '#64748b', '#94a3b8'];
-const CFO_LINE = { now: '#0891b2', base: '#1e293b', target: '#16a34a' };
+// Scope 1/2/3 colours = the shared chart palette (core.js CHART): this year teal shades, the base year slate.
+const CFO_SCOPE_COLORS = CHART.series.slice(0, 3);
+const CFO_BASE_COLORS = CHART.base;
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
 const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
 const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', team: 'ทีม', company: 'บริษัท' };
@@ -50,19 +49,6 @@ async function cfoDashboard(target) {
 }
 
 // Change against the compared year (base year, or last year without one): +x% / −x%.
-function cfoChange(now, was, suffix = '') {
-  if (!was) return '';
-  const pct = Math.round(((now - was) / was) * 1000) / 10;
-  return `<span class="cfo-pill ${pct > 0 ? 'is-up' : 'is-down'}">${pct > 0 ? 'เพิ่มขึ้น' : 'ลดลง'} ${Math.abs(pct)}%${suffix}</span>`;
-}
-
-// Axis top: a round number a bit above the highest value (4 steps).
-function cfoNiceMax(v) {
-  const step = Math.max(v, 1) / 4;
-  const mag = 10 ** Math.floor(Math.log10(step));
-  return [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10].map((n) => n * mag).find((n) => n >= step) * 4;
-}
-
 // Summary (like carbon-form "Accumulation CO2 Emission"): KPI cards with a share pie and a change pill,
 // then per month stacked bars (base year next to this year, by Scope) with cumulative lines for this year, the base
 // year and the target (base × (1 − target%)). Hover a month for its numbers. Department and Scope filter everything.
@@ -80,63 +66,41 @@ async function cfoDrawSummary(body) {
   const cumulative = (list, upto = 11) => { let t = 0; return list.map((v, i) => (i > upto ? null : (t += v))); };
   const cumNow = cumulative(cur, lastMonth);
   const cumBase = hasBase ? cumulative(was) : [];
-  const cumTarget = cumBase.map((v) => v * factor);
-  // Two axes: left = monthly bars, right = cumulative lines (a year adds up to ~12 bars, one axis would flatten them).
-  const yMax = cfoNiceMax(Math.max(...d.months.map((m, i) => Math.max(pick ? cur[i] : m.total, pick ? was[i] : m.base)), 1) * 1.1);
-  const yCum = cfoNiceMax(Math.max(...cumNow.filter((v) => v != null), ...cumBase, 1) * 1.05);
-  const pct = (v) => `${(v / yMax) * 100}%`;
-  const pctCum = (v) => `${(v / yCum) * 100}%`;
-  const total = (list) => list.reduce((t, v) => t + v, 0);
   const share = (list) => list.map((g) => `<tr><td>${esc(g.label)}</td><td class="num">${cfoT(g.tco2e)}</td><td class="num">${cfoPct(g.tco2e, d.total)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">ยังไม่มีข้อมูล</td></tr>';
   const departments = [...new Set([...d.departments.map((x) => x.key), cfoDash.department].filter(Boolean))].sort();
-  const stack = (values, colors, cls) => {
-    const sum = total(values);
-    return `<div class="cfo-stack2 ${cls}" style="height:${pct(sum)}">${sum ? values.map((v, i) => (v ? `<div style="flex:${v};--c:${colors[i]}"></div>` : '')).reverse().join('') : ''}</div>`;
-  };
-  const line = (list, color, dash = '') => {
-    const pts = list.map((v, i) => (v == null ? null : `${((i + 0.5) / 12) * 1200},${1000 - (v / yCum) * 1000}`)).filter(Boolean);
-    return pts.length ? `<polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="2.5" ${dash} vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>` : '';
-  };
-  const dots = (list, color) => list.map((v, i) => (v == null ? '' : `<i class="cfo-pt" style="left:${((i + 0.5) / 12) * 100}%;bottom:${pctCum(v)};--c:${color}"></i>`)).join('');
-  const pie = (part) => {
-    const p = d.total ? (part / d.total) * 100 : 0;
-    return `<span class="cfo-pie" style="--p:${p}%"></span>`;
-  };
+  // Two axes: left = monthly bars, right = cumulative lines (a year adds up to ~12 bars, one axis would flatten them).
+  const chart = chartPlot({
+    id: 'cfo-area',
+    labels: ACT_MONTHS_SHORT,
+    left: 'รายเดือน (tCO₂e)',
+    right: 'สะสม (tCO₂e)',
+    bars: [
+      ...(hasBase ? [{ values: d.months.map((m, i) => (pick ? [was[i]] : m.baseScopes)), colors: pick ? [CFO_BASE_COLORS[pick - 1]] : CFO_BASE_COLORS }] : []),
+      { values: d.months.map((m, i) => (pick ? [cur[i]] : m.scopes)), colors: pick ? [CFO_SCOPE_COLORS[pick - 1]] : CFO_SCOPE_COLORS }
+    ],
+    lines: [
+      ...(hasBase ? [{ values: cumBase, color: CHART.dark, axis: 'right' }, { values: cumBase.map((v) => v * factor), color: CHART.target, dash: true, axis: 'right' }] : []),
+      { values: cumNow, color: CHART.line, axis: 'right' }
+    ],
+    legend: [
+      { line: CHART.line, label: 'ค่าปีปัจจุบัน (สะสม · แกนขวา)' },
+      ...(hasBase ? [{ line: CHART.dark, label: `${baseName} (สะสม)` }, { line: CHART.target, dash: true, label: `ค่าเป้าหมาย (−${c.target}%)` },
+        { head: c.isBase ? 'ปีฐาน' : `ปี ${c.year}` }, ...scopes.map((n) => ({ box: CFO_BASE_COLORS[n - 1], label: `Scope ${n}` }))] : []),
+      { head: `ปี ${a5Year}` }, ...scopes.map((n) => ({ box: CFO_SCOPE_COLORS[n - 1], label: `Scope ${n}` }))
+    ]
+  });
   body.innerHTML = `
     <div class="toolbar a5-filters">
       ${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}
       ${field('Scope', `<select id="cfo-d-scope">${options(['', '1', '2', '3'], cfoDash.chartScope, (v) => (v ? `Scope ${v}` : 'All Scope'))}</select>`)}
     </div>
-    <div class="cfo-kpis">
-      <article class="cfo-kpi"><div><div class="cfo-kpi-label">Total Emission</div><div class="cfo-kpi-row"><strong>${cfoT(d.total)}</strong><small>tCO₂e</small>${cfoChange(d.total, c.total)}</div><div class="cfo-kpi-note">${c.total ? `เทียบ${baseName}` : `ไม่มีข้อมูล${baseName}`}</div></div></article>
-      ${d.scopes.map((x, i) => `<article class="cfo-kpi" style="--scope:${CFO_SCOPE_COLORS[i]}">${pie(x.tco2e)}<div><div class="cfo-kpi-label">SCOPE ${x.scope}</div><div class="cfo-kpi-row"><strong>${cfoT(x.tco2e)}</strong><small>t</small>${cfoChange(x.tco2e, c.scopes[i])}</div><div class="cfo-kpi-note">${cfoPct(x.tco2e, d.total)} ของทั้งหมด</div></div></article>`).join('')}
+    <div class="ch-kpis">
+      ${chartKpi({ label: 'Total Emission', value: cfoT(d.total), unit: 'tCO₂e', pill: chartPill(d.total, c.total), note: c.total ? `เทียบ${baseName}` : `ไม่มีข้อมูล${baseName}` })}
+      ${d.scopes.map((x, i) => chartKpi({ label: `SCOPE ${x.scope}`, value: cfoT(x.tco2e), unit: 't', pill: chartPill(x.tco2e, c.scopes[i]), note: `${cfoPct(x.tco2e, d.total)} ของทั้งหมด`, color: CFO_SCOPE_COLORS[i], pie: d.total ? (x.tco2e / d.total) * 100 : 0 })).join('')}
     </div>
-    <section class="card cfo-chart-card">
-      <div class="cfo-chart-head"><div><div class="card-title">Accumulation CO₂ Emission${pick ? ` · Scope ${pick}` : ''}</div><div class="sum-meta">แท่ง = รายเดือน (แกนซ้าย) · เส้น = สะสม (แกนขวา) หน่วย tCO₂e</div></div></div>
-      <div class="cfo-plot">
-        <div class="cfo-ytitle">รายเดือน (tCO₂e)</div>
-        <div class="cfo-yaxis">${[4, 3, 2, 1, 0].map((n) => `<span>${cfoT(Math.round((yMax / 4) * n))}</span>`).join('')}</div>
-        <div class="cfo-area" id="cfo-area">
-          ${[0, 1, 2, 3, 4].map((n) => `<i class="cfo-grid" style="bottom:${n * 25}%"></i>`).join('')}
-          <div class="cfo-cols">${d.months.map((m, i) => `<div class="cfo-col" data-m="${i}"><div class="cfo-pair">
-            ${hasBase ? stack(pick ? [was[i]] : m.baseScopes, pick ? [CFO_BASE_COLORS[pick - 1]] : CFO_BASE_COLORS, 'is-base') : ''}
-            ${stack(pick ? [cur[i]] : m.scopes, pick ? [CFO_SCOPE_COLORS[pick - 1]] : CFO_SCOPE_COLORS, '')}</div></div>`).join('')}</div>
-          <svg class="cfo-lines" viewBox="0 0 1200 1000" preserveAspectRatio="none" aria-hidden="true">
-            ${line(cumBase, CFO_LINE.base)}${line(cumTarget, CFO_LINE.target, 'stroke-dasharray="7 5"')}${line(cumNow, CFO_LINE.now)}
-          </svg>
-          ${dots(cumBase, CFO_LINE.base)}${dots(cumTarget, CFO_LINE.target)}${dots(cumNow, CFO_LINE.now)}
-          <div class="cfo-tip" id="cfo-tip" hidden></div>
-        </div>
-        <div class="cfo-yaxis is-right">${[4, 3, 2, 1, 0].map((n) => `<span>${cfoT(Math.round((yCum / 4) * n))}</span>`).join('')}</div>
-        <div class="cfo-ytitle is-right">สะสม (tCO₂e)</div>
-        <div class="cfo-xaxis">${ACT_MONTHS_SHORT.map((x) => `<span>${x}</span>`).join('')}</div>
-      </div>
-      <div class="cfo-legend2">
-        <span><i class="ln" style="--c:${CFO_LINE.now}"></i>ค่าปีปัจจุบัน (สะสม · แกนขวา)</span>
-        ${hasBase ? `<span><i class="ln" style="--c:${CFO_LINE.base}"></i>${esc(baseName)} (สะสม)</span><span><i class="ln is-dash" style="--c:${CFO_LINE.target}"></i>ค่าเป้าหมาย (−${c.target}%)</span>
-        <b>${c.isBase ? 'ปีฐาน' : `ปี ${c.year}`}</b>${scopes.map((n) => `<span><i class="sq" style="--c:${CFO_BASE_COLORS[n - 1]}"></i>Scope ${n}</span>`).join('')}` : ''}
-        <b>ปี ${a5Year}</b>${scopes.map((n) => `<span><i class="sq" style="--c:${CFO_SCOPE_COLORS[n - 1]}"></i>Scope ${n}</span>`).join('')}
-      </div>
+    <section class="card ch-card">
+      <div class="ch-head"><div class="card-title">Accumulation CO₂ Emission${pick ? ` · Scope ${pick}` : ''}</div><div class="sum-meta">แท่ง = รายเดือน (แกนซ้าย) · เส้น = สะสม (แกนขวา) หน่วย tCO₂e</div></div>
+      ${chart}
     </section>
     <div class="table-wrap cfo-month-table"><table class="mo-data-table"><thead><tr><th>เดือน</th>${hasBase ? `<th class="num">${esc(baseName)}</th>` : ''}<th class="num">ปี ${a5Year}</th>${hasBase ? '<th class="num">เป้า</th>' : ''}<th class="num">Scope 1</th><th class="num">Scope 2</th><th class="num">Scope 3</th></tr></thead>
       <tbody>${d.months.map((m) => `<tr><td>${ACT_MONTHS[m.month - 1]}</td>${hasBase ? `<td class="num">${cfoT(m.base)}</td>` : ''}<td class="num">${cfoT(m.total)}</td>${hasBase ? `<td class="num">${cfoT(m.target)}</td>` : ''}${m.scopes.map((x) => `<td class="num">${cfoT(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
@@ -148,21 +112,13 @@ async function cfoDrawSummary(body) {
   $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawSummary(body).catch(onErr); };
   $('cfo-d-scope').onchange = () => { cfoDash.chartScope = $('cfo-d-scope').value; cfoDrawSummary(body).catch(onErr); };
   // Hover a month: its emission, against the target and the base year.
-  const tip = $('cfo-tip');
-  body.querySelectorAll('.cfo-col').forEach((col) => {
-    col.onmouseenter = () => {
-      const i = Number(col.dataset.m);
-      const target = was[i] * factor;
-      tip.innerHTML = `<strong>การปล่อยคาร์บอนเดือน ${ACT_MONTHS_SHORT[i]}</strong>
-        <div class="cfo-tip-row"><span>ปี ${a5Year}</span><b>${cfoT(cur[i])} tCO₂e</b></div>
-        ${hasBase ? `<div class="cfo-tip-row"><span>${esc(baseName)}</span><b>${cfoT(was[i])}</b></div><div class="cfo-tip-row"><span>เป้า</span><b>${cfoT(target)}</b></div>
-        ${cur[i] ? `${cfoChange(cur[i], target, ' เทียบกับค่าเป้าหมาย')}<div class="cfo-tip-note">${cfoChange(cur[i], was[i], ` เทียบกับ${c.isBase ? 'ค่าปีฐาน' : `ปี ${c.year}`}`)}</div>` : ''}` : ''}
-        <div class="cfo-tip-row"><span>สะสมถึงเดือนนี้</span><b>${cfoT(cumNow[i] ?? 0)}</b></div>`;
-      tip.hidden = false;
-      const left = ((i + 0.5) / 12) * 100;
-      tip.style.left = `${Math.min(Math.max(left, 12), 88)}%`;
-    };
-    col.onmouseleave = () => { tip.hidden = true; };
+  chartTip('cfo-area', (i) => {
+    const target = was[i] * factor;
+    return `<strong>การปล่อยคาร์บอนเดือน ${ACT_MONTHS_SHORT[i]}</strong>
+      <div class="ch-tip-row"><span>ปี ${a5Year}</span><b>${cfoT(cur[i])} tCO₂e</b></div>
+      ${hasBase ? `<div class="ch-tip-row"><span>${esc(baseName)}</span><b>${cfoT(was[i])}</b></div><div class="ch-tip-row"><span>เป้า</span><b>${cfoT(target)}</b></div>
+      ${cur[i] ? `${chartPill(cur[i], target, ' เทียบกับค่าเป้าหมาย')}<div class="ch-tip-note">${chartPill(cur[i], was[i], ` เทียบกับ${c.isBase ? 'ค่าปีฐาน' : `ปี ${c.year}`}`)}</div>` : ''}` : ''}
+      <div class="ch-tip-row"><span>สะสมถึงเดือนนี้</span><b>${cfoT(cumNow[i] ?? 0)}</b></div>`;
   });
 }
 

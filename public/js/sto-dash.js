@@ -1,5 +1,6 @@
 // Store > Usage dashboard. The sidebar has one Dashboard button. The pages are buttons inside that page.
-const STO_DASH_COLORS = ['#3b82f6', '#ff8a1f', '#3ecf8e', '#a78bfa', '#f87171', '#f59e0b', '#14b8a6', '#71717a'];
+// Charts use the shared look (core.js chartPlot / chartKpi / CHART palette).
+const STO_DASH_COLORS = CHART.series;
 let stoDashYear = new Date().getFullYear();
 let stoDashPage = 'overview';
 
@@ -17,17 +18,14 @@ function stoDashDelta(current, previous) {
 }
 
 function stoDashKpi(icon, label, value, extra = '') {
-  return `<article class="kpi sto-kpi"><span class="sto-kpi-icon material-symbols-rounded">${icon}</span><div><div class="kpi-label">${label}</div><div class="kpi-value">${value}</div>${extra}</div></article>`;
+  return chartKpi({ icon, label, value, note: extra });
 }
 
+// Monthly quantity issued: a line on the shared chart (hover a month for its numbers).
 function stoDashLine(months) {
-  const values = months.map((row) => row.outQty);
-  const max = Math.max(...values, 1);
-  const step = 320 / Math.max(values.length - 1, 1);
-  const points = values.map((value, index) => `${index * step},${110 - (value / max) * 96}`).join(' ');
-  const area = `0,110 ${points} ${(values.length - 1) * step},110`;
-  const labels = months.map((row) => `<span>${row.label}</span>`).join('');
-  return `<div class="sto-line"><svg viewBox="0 0 320 120" role="img" aria-label="จ่ายออกรายเดือน"><polygon class="sto-area" points="${area}"></polygon><polyline points="${points}" fill="none" stroke="currentColor" stroke-width="2"></polyline>${values.map((value, index) => `<circle cx="${index * step}" cy="${110 - (value / max) * 96}" r="2.5"></circle>`).join('')}</svg><div class="sto-line-axis">${labels}</div></div>`;
+  return chartPlot({ id: 'sto-plot', labels: months.map((row) => row.label), left: 'จำนวนจ่ายออก', digits: 2,
+    lines: [{ values: months.map((row) => row.outQty), color: CHART.line }],
+    legend: [{ line: CHART.line, label: 'จ่ายออก' }] });
 }
 
 function stoDashDonut(slices) {
@@ -43,9 +41,11 @@ function stoDashDonut(slices) {
   return `<div class="sto-donut-wrap"><div class="sto-donut" style="background:conic-gradient(${paint})"><div class="sto-donut-hole"></div></div><ul class="sto-legend">${legend || '<li>ไม่มีข้อมูล</li>'}</ul></div>`;
 }
 
+// Received next to issued per month on the shared chart.
 function stoDashBars(months) {
-  const max = Math.max(...months.map((row) => Math.max(row.inQty, row.outQty)), 1);
-  return `<div class="sto-plot" style="--plot-height:168px">${months.map((row) => `<div class="sto-col" title="${esc(row.label)} รับเข้า ${stoDashNum(row.inQty, 2)} จ่ายออก ${stoDashNum(row.outQty, 2)}"><i class="is-in" style="height:${row.inQty / max * 100}%"></i><i class="is-out" style="height:${row.outQty / max * 100}%"></i><span>${row.label}</span></div>`).join('')}</div>`;
+  return chartPlot({ id: 'sto-plot', labels: months.map((row) => row.label), left: 'จำนวน', digits: 2,
+    bars: [{ values: months.map((row) => row.inQty), colors: [CHART.base[1]] }, { values: months.map((row) => row.outQty), colors: [CHART.series[0]] }],
+    legend: [{ box: CHART.base[1], label: 'รับเข้า' }, { box: CHART.series[0], label: 'จ่ายออก' }] });
 }
 
 function stoDashRanks(rows, pick, digits) {
@@ -61,7 +61,7 @@ function stoDashMonthTable(months) {
 
 function stoDashOverview(data) {
   const k = data.kpis;
-  return `<div class="sto-kpis">
+  return `<div class="ch-kpis">
       ${stoDashKpi('inventory_2', 'รายการใช้งาน', stoDashNum(k.items), `<span class="sto-delta">${stoDashNum(k.groups)} ${esc(data.groupBy)}</span>`)}
       ${stoDashKpi('output', 'จ่ายออกปีนี้', stoDashNum(k.outQty, 2), stoDashDelta(k.outQtyNow, k.outQtyPrev))}
       ${stoDashKpi('payments', 'มูลค่าจ่ายออก', stoDashNum(k.outValue, 2), stoDashDelta(k.outValueNow, k.outValuePrev))}
@@ -76,14 +76,14 @@ function stoDashOverview(data) {
 
 function stoDashFlow(data) {
   const k = data.kpis;
-  return `<div class="sto-kpis">
+  return `<div class="ch-kpis">
       ${stoDashKpi('input', 'รับเข้า', stoDashNum(k.inQty, 2), '<span class="sto-delta">ยังไม่มีรายการรับเข้า</span>')}
       ${stoDashKpi('output', 'จ่ายออก', stoDashNum(k.outQty, 2), stoDashDelta(k.outQtyNow, k.outQtyPrev))}
       ${stoDashKpi('account_balance', 'คงเหลือ', stoDashNum(k.stockQty, 2), `<span class="sto-delta">มูลค่า ${stoDashNum(k.stockValue, 2)}</span>`)}
     </div>
     <section class="card sto-month-card">
       <div class="card-title">รับเข้าและจ่ายออกรายเดือน</div>
-      <p class="sum-meta"><i class="sto-key is-in"></i> รับเข้า <i class="sto-key is-out"></i> จ่ายออก · ขอบเขต ${esc(data.scope)}</p>
+      <p class="sum-meta">ขอบเขต ${esc(data.scope)}</p>
       ${stoDashBars(data.months)}
       ${stoDashMonthTable(data.months)}
     </section>`;
@@ -117,6 +117,10 @@ async function stoDashRender(target) {
     ${pageBar(seg, year, 'sto-dash')}
     ${page === 'flow' ? stoDashFlow(data) : page === 'month' ? stoDashMonth(data) : stoDashOverview(data)}
   </div>`;
+  chartTip('sto-plot', (i) => {
+    const row = data.months[i];
+    return `<strong>${esc(row.label)} ${data.year}</strong><div class="ch-tip-row"><span>รับเข้า</span><b>${stoDashNum(row.inQty, 2)}</b></div><div class="ch-tip-row"><span>จ่ายออก</span><b>${stoDashNum(row.outQty, 2)}</b></div><div class="ch-tip-row"><span>มูลค่าจ่ายออก</span><b>${stoDashNum(row.outValue, 2)}</b></div>`;
+  });
   target.querySelectorAll('[data-sto-dash]').forEach((node) => {
     node.onclick = () => {
       stoDashPage = node.dataset.stoDash;

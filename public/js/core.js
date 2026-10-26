@@ -147,6 +147,100 @@ function headFor(head, reload) {
   return { ...head, onChange: (next) => { Object.assign(head, next); reload(); } };
 }
 
+// ---------- Charts: one look for every dashboard (CFO style, cool green) ----------
+// Marks: solid edge + the same colour inside 60% transparent (AGENTS.md "หน้าจอ"). CSS: .ch-* in app.css.
+const CHART = {
+  series: ['#0f766e', '#14b8a6', '#5eead4', '#0891b2', '#67e8f9', '#16a34a', '#86efac', '#64748b'],
+  base: ['#334155', '#64748b', '#94a3b8'],
+  line: '#0891b2',
+  dark: '#1e293b',
+  target: '#16a34a'
+};
+
+function chartNum(value, digits = 3) {
+  return Number(value || 0).toLocaleString('th-TH', { maximumFractionDigits: digits });
+}
+
+// Axis top: a round number at or above v, in 4 steps.
+function chartNiceMax(v) {
+  const step = Math.max(v, 1e-9) / 4;
+  const mag = 10 ** Math.floor(Math.log10(step));
+  return [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10].map((n) => n * mag).find((n) => n >= step) * 4;
+}
+
+// "ลดลง x%" / "เพิ่มขึ้น x%" of now against was. Lower is good (green) unless upGood.
+function chartPill(now, was, suffix = '', upGood = false) {
+  if (!was) return '';
+  const pct = Math.round(((now - was) / was) * 1000) / 10;
+  const good = upGood ? pct >= 0 : pct <= 0;
+  return `<span class="ch-pill ${good ? 'is-good' : 'is-bad'}">${pct > 0 ? 'เพิ่มขึ้น' : 'ลดลง'} ${Math.abs(pct)}%${suffix}</span>`;
+}
+
+// KPI card: label, big value (+ unit, pill), note. pie = 0–100 share drawn in color; icon = Material Symbol name.
+function chartKpi({ label, value, unit = '', pill = '', note = '', color = CHART.series[0], pie = null, icon = '' }) {
+  const lead = pie != null ? `<span class="ch-pie" style="--p:${Math.max(0, Math.min(100, pie))}%"></span>` : icon ? `<span class="ch-icon material-symbols-rounded">${icon}</span>` : '';
+  return `<article class="ch-kpi" style="--c:${color}">${lead}<div><div class="ch-kpi-label">${label}</div>
+    <div class="ch-kpi-row"><strong>${value}</strong>${unit ? `<small>${unit}</small>` : ''}${pill}</div>${note ? `<div class="ch-kpi-note">${note}</div>` : ''}</div></article>`;
+}
+
+// Monthly (or any labelled) chart: bars on the left axis — each series one bar per label, a value or a stack
+// [v1, v2, …] coloured by `colors` — and lines on the left or right axis, gridlines, axis titles and a legend.
+// legend: { line: color, dash, label } | { box: color, label } | { head: text }. Hover tip: chartTip(id, (i) => html).
+function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', legend = [], leftMax = 0, digits = 0 }) {
+  const n = labels.length;
+  const sum = (v) => (Array.isArray(v) ? v.reduce((t, x) => t + (Number(x) || 0), 0) : Number(v) || 0);
+  const leftLines = lines.filter((l) => l.axis !== 'right');
+  const rightLines = lines.filter((l) => l.axis === 'right');
+  const yL = leftMax || chartNiceMax(Math.max(...bars.flatMap((b) => b.values.map(sum)), ...leftLines.flatMap((l) => l.values.filter((v) => v != null)), 1) * 1.1);
+  const yR = rightLines.length ? chartNiceMax(Math.max(...rightLines.flatMap((l) => l.values.filter((v) => v != null)), 1) * 1.05) : 0;
+  const ticks = (max) => [4, 3, 2, 1, 0].map((k) => `<span>${chartNum((max / 4) * k, digits)}</span>`).join('');
+  const x = (i) => ((i + 0.5) / n) * 100;
+  const bar = (b, i) => {
+    const v = b.values[i];
+    const parts = Array.isArray(v) ? v : [v];
+    const total = sum(v);
+    return `<div class="ch-stack" style="height:${(total / yL) * 100}%">${total ? parts.map((p, k) => (p ? `<div style="flex:${p};--c:${(b.colors || CHART.series)[k]}"></div>` : '')).reverse().join('') : ''}</div>`;
+  };
+  const scale = (l) => (l.axis === 'right' ? yR : yL);
+  const poly = (l) => {
+    const pts = l.values.map((v, i) => (v == null ? null : `${x(i) * 12},${1000 - (v / scale(l)) * 1000}`)).filter(Boolean);
+    return pts.length ? `<polyline points="${pts.join(' ')}" fill="none" stroke="${l.color}" stroke-width="2.5"${l.dash ? ' stroke-dasharray="7 5"' : ''} vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+  };
+  const dots = (l) => (l.dots === false ? '' : l.values.map((v, i) => (v == null ? '' : `<i class="ch-pt" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}"></i>`)).join(''));
+  const key = (item) => (item.head ? `<b>${esc(item.head)}</b>` : item.line ? `<span><i class="ln${item.dash ? ' is-dash' : ''}" style="--c:${item.line}"></i>${esc(item.label)}</span>` : `<span><i class="sq" style="--c:${item.box}"></i>${esc(item.label)}</span>`);
+  return `<div class="ch-plot${yR ? ' has-right' : ''}">
+      <div class="ch-ytitle">${esc(left)}</div>
+      <div class="ch-yaxis">${ticks(yL)}</div>
+      <div class="ch-area" id="${id}">
+        ${[0, 1, 2, 3, 4].map((k) => `<i class="ch-grid" style="bottom:${k * 25}%"></i>`).join('')}
+        <div class="ch-cols" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${labels.map((_, i) => `<div class="ch-col" data-i="${i}"><div class="ch-pair">${bars.map((b) => bar(b, i)).join('')}</div></div>`).join('')}</div>
+        <svg class="ch-lines" viewBox="0 0 1200 1000" preserveAspectRatio="none" aria-hidden="true">${lines.map(poly).join('')}</svg>
+        ${lines.map(dots).join('')}
+        <div class="ch-tip" hidden></div>
+      </div>
+      ${yR ? `<div class="ch-yaxis is-right">${ticks(yR)}</div><div class="ch-ytitle is-right">${esc(right)}</div>` : ''}
+      <div class="ch-xaxis" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${labels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
+    </div>
+    ${legend.length ? `<div class="ch-legend">${legend.map(key).join('')}</div>` : ''}`;
+}
+
+// Hover box over a chartPlot column; html(i) returns its content (rows: <div class="ch-tip-row"><span>…</span><b>…</b></div>).
+function chartTip(id, html) {
+  const area = $(id);
+  if (!area) return;
+  const tip = area.querySelector('.ch-tip');
+  const n = area.querySelectorAll('.ch-col').length;
+  area.querySelectorAll('.ch-col').forEach((col) => {
+    col.onmouseenter = () => {
+      const i = Number(col.dataset.i);
+      tip.innerHTML = html(i);
+      tip.hidden = false;
+      tip.style.left = `${Math.min(Math.max(((i + 0.5) / n) * 100, 14), 86)}%`;
+    };
+    col.onmouseleave = () => { tip.hidden = true; };
+  });
+}
+
 function tableParams(query, head) {
   if (head?.sort) {
     query.set('sort', head.sort);
