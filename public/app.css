@@ -599,3 +599,4 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-tier-rule::before{content:"";flex:1;border-top:2px dashed var(--tier)}
 @media(max-width:900px){.cfo-co{grid-template-columns:1fr;min-height:0}.cfo-co-text,.cfo-co-logo,.cfo-co-building{grid-column:1;grid-row:auto}}
 
+.cfo-scope-table td:nth-child(-n+3){white-space:normal;min-width:110px}

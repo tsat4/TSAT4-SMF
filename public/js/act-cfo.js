@@ -4,7 +4,7 @@
 const CFO = 'cfo';
 const CFO_SCOPE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6'];
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
-const CFO_DASH_TABS = { summary: 'Summary', s1: 'Scope 1', s2: 'Scope 2', s3: 'Scope 3', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
+const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
 const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', team: 'ทีม', company: 'บริษัท' };
 const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['company_address', 'สถานที่ตั้ง'], ['company_area', 'พื้นที่โรงงาน'], ['company_business', 'ประเภทธุรกิจ'],
   ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
@@ -14,7 +14,7 @@ let cfoDashTab = 'summary';
 let cfoSetTab = 'plan';
 let cfoMonth = new Date().getMonth() + 1;
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
-const cfoDash = { department: '', chartScope: '', month: '', category: '', activity: '' };
+const cfoDash = { department: '', chartScope: '', scope: '1', month: '', category: '', activity: '' };
 const cfoHeads = { entries: { sort: '', dir: 'asc', filters: {} }, activities: { sort: '', dir: 'asc', filters: {} }, ef: { sort: '', dir: 'asc', filters: {} } };
 
 const cfoT = (n) => Number(n || 0).toLocaleString('th-TH', { maximumFractionDigits: 3 });
@@ -39,7 +39,7 @@ async function cfoDashboard(target) {
   target.querySelectorAll('[data-cfodash]').forEach((node) => { node.onclick = () => { cfoDashTab = node.dataset.cfodash; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   if (cfoDashTab === 'schedule') return aplRender(body, CFO, { inPage: true, readOnly: true });
-  if (/^s[123]$/.test(cfoDashTab)) return cfoDrawScope(body, Number(cfoDashTab[1]));
+  if (cfoDashTab === 'scope') return cfoDrawScope(body);
   if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
   if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
   return cfoDrawSummary(body);
@@ -96,9 +96,10 @@ async function cfoDrawSummary(body) {
   $('cfo-d-scope').onchange = () => { cfoDash.chartScope = $('cfo-d-scope').value; cfoDrawSummary(body).catch(onErr); };
 }
 
-// Scope 1 / 2 / 3 (TSATP4-CFO Scope pages): activities grouped by category (main) with their rows (sub).
+// Scope (TSATP4-CFO Scope 1 / 2 / 3 pages, one tab with a Scope dropdown): activities grouped by category (main) with their rows (sub).
 // Filters: month (amount / tCO2e of that month, or the year), category, activity. Progress = months recorded / months due.
-async function cfoDrawScope(body, scope) {
+async function cfoDrawScope(body) {
+  const scope = Number(cfoDash.scope) || 1;
   const d = await a5Api(CFO, `cfo/progress?year=${a5Year}`);
   const all = d.rows.filter((r) => String(r.scope_code || '').startsWith(`${scope}-`));
   const categories = [...new Set(all.map((r) => r.category))];
@@ -115,6 +116,7 @@ async function cfoDrawScope(body, scope) {
     <td><button class="icon-btn" type="button" data-hist="${r.id}" title="ประวัติการบันทึก" aria-label="ประวัติการบันทึก ${esc(r.name)}"><span class="material-symbols-rounded">history</span></button></td></tr>`;
   body.innerHTML = `
     <div class="toolbar a5-filters">
+      ${field('Scope', `<select id="cfo-s-scope">${options(['1', '2', '3'], String(scope), (v) => `Scope ${v}`)}</select>`)}
       ${field('เดือน', `<select id="cfo-s-month">${options(['', ...Array.from({ length: 12 }, (_, i) => String(i + 1))], cfoDash.month, (v) => (v ? ACT_MONTHS[v - 1] : 'ทั้งหมด'))}</select>`)}
       ${field('category', `<select id="cfo-s-cat">${options(['', ...categories], cfoDash.category, (v) => v || 'ทั้งหมด')}</select>`)}
       ${field('Activity', `<select id="cfo-s-act"><option value="">ทั้งหมด</option>${inCategory.map((r) => `<option value="${r.id}"${String(r.id) === cfoDash.activity ? ' selected' : ''}>${esc(r.name)} · ${esc(r.detail || '')}</option>`).join('')}</select>`)}
@@ -123,7 +125,8 @@ async function cfoDrawScope(body, scope) {
       <tbody>${groups.map((g) => `<tr class="cfo-group"><td colspan="9">${esc(g)}</td></tr>${list.filter((r) => r.category === g).map(row).join('')}`).join('') || '<tr><td colspan="9" class="empty">ไม่มีกิจกรรม</td></tr>'}</tbody></table></div>
     <p class="sum-meta">รวม ${cfoT(list.reduce((t, r) => t + value(r, 'tco2e'), 0))} tCO₂e · ${list.length} กิจกรรม${m ? ` · ${ACT_MONTHS[m - 1]} ${a5Year}` : ` · ปี ${a5Year}`}</p>`;
   a5Lift(body);
-  const redraw = () => cfoDrawScope(body, scope).catch(onErr);
+  const redraw = () => cfoDrawScope(body).catch(onErr);
+  $('cfo-s-scope').onchange = () => { cfoDash.scope = $('cfo-s-scope').value; cfoDash.category = ''; cfoDash.activity = ''; redraw(); };
   $('cfo-s-month').onchange = () => { cfoDash.month = $('cfo-s-month').value; redraw(); };
   $('cfo-s-cat').onchange = () => { cfoDash.category = $('cfo-s-cat').value; cfoDash.activity = ''; redraw(); };
   $('cfo-s-act').onchange = () => { cfoDash.activity = $('cfo-s-act').value; redraw(); };
