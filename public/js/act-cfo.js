@@ -78,7 +78,7 @@ async function cfoDrawSummary(body) {
         ${hasBase ? `<span style="--scope:var(--mo-text-muted)"><span class="cfo-dot is-base"></span>${base}</span><span><span class="cfo-line"></span>เป้า −${c.target}%</span>` : ''}</div></div>
       <div class="a5-chart cfo-chart">${d.months.map((m) => {
         const v = scopeOf(m);
-        const segs = cfoDash.chartScope ? `<div style="flex:1;background:${CFO_SCOPE_COLORS[Number(cfoDash.chartScope) - 1]}"></div>` : m.scopes.map((x, i) => (x ? `<div style="flex:${x};background:${CFO_SCOPE_COLORS[i]}"></div>` : '')).reverse().join('');
+        const segs = cfoDash.chartScope ? `<div style="flex:1;--c:${CFO_SCOPE_COLORS[Number(cfoDash.chartScope) - 1]}"></div>` : m.scopes.map((x, i) => (x ? `<div style="flex:${x};--c:${CFO_SCOPE_COLORS[i]}"></div>` : '')).reverse().join('');
         return `<div class="a5-bar-col" title="${ACT_MONTHS[m.month - 1]} ${a5Year}: ${cfoT(v)} tCO₂e${hasBase ? ` · ${base}: ${cfoT(m.base)} · เป้า ${cfoT(m.target)}` : ''}">
           <span class="a5-bar-val">${v ? cfoT(Math.round(v)) : ''}</span>
           <div class="cfo-bars">${hasBase ? `<div class="cfo-stack is-base" style="height:${(baseOf(m) / max) * 100}%"></div>` : ''}<div class="cfo-stack" style="height:${(v / max) * 100}%">${v ? segs : ''}</div>

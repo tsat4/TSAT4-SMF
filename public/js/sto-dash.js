@@ -36,10 +36,10 @@ function stoDashDonut(slices) {
   const stops = slices.map((slice, index) => {
     const start = cursor;
     cursor += Number(slice.share) || 0;
-    return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+    return `color-mix(in srgb, ${colors[index % colors.length]} 40%, transparent) ${start}% ${cursor}%`;
   }).join(', ');
   const paint = slices.length ? stops : '#d4d4d8 0% 100%';
-  const legend = slices.map((slice, index) => `<li><i style="background:${colors[index % colors.length]}"></i><span>${esc(slice.name)}</span><b>${stoDashNum(slice.value, 2)}</b><em>${stoDashNum(slice.share, 1)}%</em></li>`).join('');
+  const legend = slices.map((slice, index) => `<li><i style="--c:${colors[index % colors.length]}"></i><span>${esc(slice.name)}</span><b>${stoDashNum(slice.value, 2)}</b><em>${stoDashNum(slice.share, 1)}%</em></li>`).join('');
   return `<div class="sto-donut-wrap"><div class="sto-donut" style="background:conic-gradient(${paint})"><div class="sto-donut-hole"></div></div><ul class="sto-legend">${legend || '<li>ไม่มีข้อมูล</li>'}</ul></div>`;
 }
 
