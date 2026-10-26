@@ -14,7 +14,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- **Tx Data** CFO: รัน `db/act/cfo.sql` (สร้างตาราง) แล้วตามด้วย `inbox/import_cfo.sql` (ข้อมูลจาก Excel รันซ้ำได้) ผลท้ายไฟล์ต้องได้ scope1_t = 188.863, scope2_t = 6642.520 · ยังไม่มีหน้าจอ CFO ดู/แก้ได้ที่ System > Setting
+- **Tx Data** CFO: รัน `db/act/cfo.sql` แล้ว (ตาราง วิว RLS และ bucket `img_cfo`) ยังต้องรัน `inbox/import_cfo.sql` (ข้อมูลจาก Excel รันซ้ำได้) ผลท้ายไฟล์ต้องได้ scope1_t = 188.863, scope2_t = 6642.520 · หน้าจอมีแล้ว ข้อมูล Excel ยังว่าง
 - **Tx Data** (ไม่ด่วน ทำหลังเห็นแผน 5S ใน Planner แล้ว) ลบตาราง Gantt เดิมที่ไม่มีโค้ดใช้แล้ว: `drop table if exists public.mt_100p_plan; drop table if exists public.mt_5s_plan;`
 
 ## ข้อควรระวัง
@@ -24,6 +24,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Cursor · รัน db/act/cfo.sql ใน Tx Data แล้ว สร้างตารางทีม ตั้งค่า แผนงาน หมวด GWP ค่าแฟกเตอร์ กิจกรรม และรายการรายเดือน พร้อมวิวสองตัว RLS และที่เก็บรูป img_cfo ค่าตั้งต้นบ่อเกรอะ 4 คีย์ ยังไม่ได้ใส่ข้อมูล Excel
 - 2026-10-26 · Claude · หน้าจอ CFO ครบ 3 หน้า (Dashboard / transaction / Setting) + route `/api/act/cfo/cfo/*` · ทีมของ 5S ใช้ตัวเดียวกัน (รองรับรองประธาน / ตัวแทนหน่วยงาน + หน่วยงาน) · คัดลอกทีม/หัวข้อจากปีก่อนเปลี่ยนเป็นเพิ่มทีละแถว (ข้ามที่มีอยู่แล้ว) · importer CFO ให้รหัสกับ EF ที่ไม่มีรหัส (รันซ้ำไม่เพิ่มแถว) · ทดสอบ route จริงกับฐานจำลองผ่านหมด · **ต้องรัน db/act/cfo.sql + inbox/import_cfo.sql ใน Tx Data ก่อน หน้าจอจะขึ้นข้อความให้รันจนกว่าจะรัน**
 - 2026-10-26 · Cursor · ยืนยัน `tx_sto_receive(bigint, text)` อยู่ใน Mx Data และ service_role เรียกได้ แล้วลบทางสำรอง `receiveLineByLine` / `adjustStock` ออกจาก requisitions.js การรับของใช้ฟังก์ชันนี้ทางเดียว
 - 2026-10-26 · Claude · ออกแบบตาราง CFO จาก Excel (15 sheet → 5 ตาราง + 2 view, docs/specs/act-cfo.md) · แม่แบบทีมเพิ่ม role `vice` / `member` + คอลัมน์ `department` (ตัวแทนหน่วยงาน) และใส่ constraint ใหม่ทุกครั้งที่รัน (5S / 100P ได้ด้วยเมื่อรันไฟล์ของตัวเองซ้ำ ไม่จำเป็นต้องรันตอนนี้) · importer `scripts/import_cfo_excel.py` · test:act ตรวจยอดตรง Excel
