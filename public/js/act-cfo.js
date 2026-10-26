@@ -63,13 +63,12 @@ function cfoNiceMax(v) {
   return [1, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10].map((n) => n * mag).find((n) => n >= step) * 4;
 }
 
-// Summary (like carbon-form "Accumulation CO2 Emission"): company banner, KPI cards with a share pie and a change pill,
+// Summary (like carbon-form "Accumulation CO2 Emission"): KPI cards with a share pie and a change pill,
 // then per month stacked bars (base year next to this year, by Scope) with cumulative lines for this year, the base
 // year and the target (base × (1 − target%)). Hover a month for its numbers. Department and Scope filter everything.
 async function cfoDrawSummary(body) {
   const d = await a5Api(CFO, `cfo/summary?year=${a5Year}&department=${encodeURIComponent(cfoDash.department)}`);
   const c = d.compare;
-  const s = d.settings;
   const baseName = c.isBase ? `ค่าปีฐาน (${c.year})` : `ปี ${c.year}`;
   const pick = Number(cfoDash.chartScope) || 0;
   const scopes = pick ? [pick] : [1, 2, 3];
@@ -103,20 +102,11 @@ async function cfoDrawSummary(body) {
     const p = d.total ? (part / d.total) * 100 : 0;
     return `<span class="cfo-pie" style="--p:${p}%"></span>`;
   };
-  const period = `ม.ค. – ธ.ค. ${a5Year}${cfoDash.department ? ` · ${cfoDash.department}` : ''}`;
   body.innerHTML = `
     <div class="toolbar a5-filters">
       ${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}
       ${field('Scope', `<select id="cfo-d-scope">${options(['', '1', '2', '3'], cfoDash.chartScope, (v) => (v ? `Scope ${v}` : 'All Scope'))}</select>`)}
     </div>
-    <section class="cfo-hero">
-      <div class="cfo-hero-top"><h2>${esc(s.company_name || 'Carbon Footprint for Organization')}</h2><span class="cfo-hero-date"><span class="material-symbols-rounded">calendar_month</span>${esc(period)}</span></div>
-      <div class="cfo-hero-facts">
-        ${s.company_business ? `<div><span>ประเภทธุรกิจ</span><strong>${esc(s.company_business)}</strong></div>` : ''}
-        ${s.company_address ? `<div><span>ที่ตั้ง</span><strong>${esc(s.company_address)}</strong></div>` : ''}
-        ${s.base_year ? `<div><span>ปีฐาน · เป้าลด</span><strong>${esc(s.base_year)} · ${c.target}%</strong></div>` : ''}
-      </div>
-    </section>
     <div class="cfo-kpis">
       <article class="cfo-kpi"><div><div class="cfo-kpi-label">Total Emission</div><div class="cfo-kpi-row"><strong>${cfoT(d.total)}</strong><small>tCO₂e</small>${cfoChange(d.total, c.total)}</div><div class="cfo-kpi-note">${c.total ? `เทียบ${baseName}` : `ไม่มีข้อมูล${baseName}`}</div></div></article>
       ${d.scopes.map((x, i) => `<article class="cfo-kpi" style="--scope:${CFO_SCOPE_COLORS[i]}">${pie(x.tco2e)}<div><div class="cfo-kpi-label">SCOPE ${x.scope}</div><div class="cfo-kpi-row"><strong>${cfoT(x.tco2e)}</strong><small>t</small>${cfoChange(x.tco2e, c.scopes[i])}</div><div class="cfo-kpi-note">${cfoPct(x.tco2e, d.total)} ของทั้งหมด</div></div></article>`).join('')}

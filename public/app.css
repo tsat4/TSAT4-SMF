@@ -605,13 +605,6 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 
 .cfo-scope-table td:nth-child(-n+3){white-space:normal;min-width:110px}
 /* CFO Summary (carbon-form style, cool green). Marks: solid border, same colour inside 60% transparent. */
-.cfo-hero{background:linear-gradient(120deg,#0f766e,#115e59 55%,#134e4a);color:#ecfdf5;border-radius:10px;padding:22px 26px;margin-bottom:10px}
-.cfo-hero-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px}
-.cfo-hero h2{margin:0;font-size:28px;font-weight:600;line-height:1.25}
-.cfo-hero-date{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#134e4a;border-radius:8px;padding:7px 12px;font-weight:500;font-size:13px}
-.cfo-hero-date .material-symbols-rounded{font-size:18px}
-.cfo-hero-facts{display:flex;flex-wrap:wrap;gap:12px 40px;margin-top:16px}
-.cfo-hero-facts div{display:flex;flex-direction:column;gap:2px;max-width:420px}.cfo-hero-facts span{font-size:12px;opacity:.85}.cfo-hero-facts strong{font-size:15px;font-weight:500}
 .cfo-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:10px}
 .cfo-kpi{display:flex;align-items:center;gap:12px;background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:10px;padding:12px 14px}
 .cfo-kpi-label{font-size:12px;color:var(--mo-text-muted);font-weight:500}
