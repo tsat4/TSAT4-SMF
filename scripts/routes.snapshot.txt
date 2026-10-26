@@ -17,6 +17,7 @@ GET /api/act/:activity/audits auth
 GET /api/act/:activity/audits/:id auth
 GET /api/act/:activity/cfo/entries auth
 GET /api/act/:activity/cfo/master auth
+GET /api/act/:activity/cfo/progress auth
 GET /api/act/:activity/cfo/summary auth
 GET /api/act/:activity/checklist auth
 GET /api/act/:activity/dashboard/ranking auth

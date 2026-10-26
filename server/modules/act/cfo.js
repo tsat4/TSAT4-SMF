@@ -12,7 +12,6 @@ const EF_VALUES = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'hfc', 'pfc', 'u
 const text = (v, max = 500) => String(v ?? '').trim().slice(0, max) || null;
 const numOrNull = (v) => (v === '' || v == null ? null : Number.isFinite(Number(v)) ? Number(v) : NaN);
 const monthOf = (v) => (/^\d{4}-\d{2}$/.test(String(v || '')) ? dateOf(`${v}-01`) : null);
-const yearRange = (year) => [`${year}-01-01`, `${year}-12-01`];
 
 // Septic tank (IPCC, as TSATP4-CFO septicCalc): kg CH4 = people × days × BOD × 0.001 × I × B0 × MCF.
 export function septicKg(inputs, s) {
@@ -26,14 +25,25 @@ export function mountCfo(app) {
   const thisYear = () => new Date().getFullYear();
 
   // ---------- Dashboard ----------
+  // Year totals by month / scope / category / department, compared with the base year (setting base_year) and
+  // its target (target_percent, default 5% as TSATP4-CFO) or, without a base year, with the year before.
+  // department filters everything; base and target follow the same filter.
   route('get', '/api/act/:activity/cfo/summary', async (req, res, activity, t) => {
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
-    const [from] = yearRange(year - 1);
-    const [, to] = yearRange(year);
-    const rows = await fetchAll(() => tx.from(t.entryView).select('month,scope,scope_code,scope_name,department,tco2e').gte('month', from).lte('month', to).order('id'));
-    const cur = rows.filter((r) => r.month.startsWith(String(year)));
+    const department = text(req.query.department, 80);
+    const settings = await settingsOf(t);
+    const baseYear = yearOf(settings.base_year, 0) || null;
+    const compareYear = baseYear && baseYear !== year ? baseYear : year - 1;
+    const target = Number(settings.target_percent ?? 5) || 0;
+    const rowsOf = (y) => fetchAll(() => {
+      let q = tx.from(t.entryView).select('month,scope,scope_code,scope_name,department,tco2e').gte('month', `${y}-01-01`).lte('month', `${y}-12-01`).order('id');
+      if (department) q = q.eq('department', department);
+      return q;
+    });
+    const [cur, base] = await Promise.all([rowsOf(year), rowsOf(compareYear)]);
     const sum = (list) => Math.round(list.reduce((s, r) => s + Number(r.tco2e), 0) * 1000) / 1000;
+    const inMonth = (list, m) => list.filter((r) => Number(r.month.slice(5, 7)) === m);
     const group = (key, label) => Object.values(cur.reduce((acc, r) => {
       const k = r[key];
       acc[k] = acc[k] || { key: k, label: label(r), tco2e: 0 };
@@ -42,16 +52,48 @@ export function mountCfo(app) {
     }, {})).map((g) => ({ ...g, tco2e: Math.round(g.tco2e * 1000) / 1000 })).sort((a, b) => b.tco2e - a.tco2e);
     res.json({
       year,
+      department,
+      compare: { year: compareYear, isBase: compareYear === baseYear, target, total: sum(base), scopes: [1, 2, 3].map((n) => sum(base.filter((r) => r.scope === n))) },
       total: sum(cur),
-      lastYear: sum(rows.filter((r) => r.month.startsWith(String(year - 1)))),
       scopes: [1, 2, 3].map((scope) => ({ scope, tco2e: sum(cur.filter((r) => r.scope === scope)) })),
       months: Array.from({ length: 12 }, (_, i) => {
-        const list = cur.filter((r) => Number(r.month.slice(5, 7)) === i + 1);
-        return { month: i + 1, scopes: [1, 2, 3].map((scope) => sum(list.filter((r) => r.scope === scope))), total: sum(list) };
+        const list = inMonth(cur, i + 1);
+        const was = sum(inMonth(base, i + 1));
+        return { month: i + 1, scopes: [1, 2, 3].map((n) => sum(list.filter((r) => r.scope === n))), total: sum(list), base: was, target: Math.round(was * (1 - target / 100) * 1000) / 1000 };
       }),
       categories: group('scope_code', (r) => `${r.scope_code} ${r.scope_name}`),
       departments: group('department', (r) => r.department),
-      settings: await settingsOf(t)
+      settings
+    });
+  });
+
+  // How complete each activity is in a year: months recorded / months due (this year: up to this month), as TSATP4-CFO getScopeAccount.
+  route('get', '/api/act/:activity/cfo/progress', async (req, res, activity, t) => {
+    const year = yearOf(req.query.year);
+    if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
+    const now = new Date();
+    const due = year < now.getFullYear() ? 12 : year > now.getFullYear() ? 0 : now.getMonth() + 1;
+    const [activities, efs, entries] = await Promise.all([
+      fetchAll(() => tx.from(t.activity).select('id,department,name,detail,calc,status,ef_id').order('department').order('id')),
+      fetchAll(() => tx.from(t.ef).select('id,scope_code,name,unit').order('id')),
+      fetchAll(() => tx.from(t.entryView).select('id,month,activity_id,qty,tco2e').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id'))
+    ]);
+    const efById = new Map(efs.map((e) => [e.id, e]));
+    res.json({
+      year,
+      due,
+      rows: activities.filter((a) => a.status === 'Active' || entries.some((e) => e.activity_id === a.id)).map((a) => {
+        const list = entries.filter((e) => e.activity_id === a.id);
+        const months = [...new Set(list.map((e) => Number(e.month.slice(5, 7))))];
+        const ef = efById.get(a.ef_id) || {};
+        return {
+          id: a.id, department: a.department, name: a.name, detail: a.detail, scope_code: ef.scope_code, source: ef.name, unit: a.calc === 'septic' ? 'kg CH₄' : ef.unit,
+          months: months.sort((x, y) => x - y),
+          percent: due ? Math.min(100, Math.round((months.filter((m) => m <= due).length / due) * 100)) : 0,
+          qty: Math.round(list.reduce((s, e) => s + Number(e.qty), 0) * 1000) / 1000,
+          tco2e: Math.round(list.reduce((s, e) => s + Number(e.tco2e), 0) * 1000) / 1000
+        };
+      })
     });
   });
 
@@ -94,7 +136,7 @@ export function mountCfo(app) {
     let qty = numOrNull(req.body?.qty);
     if (act.calc === 'septic') {
       inputs = { people: Number(req.body?.inputs?.people), days: Number(req.body?.inputs?.days) };
-      if (!(inputs.people >= 0) || !(inputs.days >= 0)) return fail(res, 400, 'ระบุจำนวนคนและจำนวนวัน');
+      if (!(inputs.people >= 0) || !(inputs.days > 0)) return fail(res, 400, 'ระบุจำนวนคน (0 ขึ้นไป) และจำนวนวันทำงาน (มากกว่า 0)');
       qty = septicKg(inputs, await settingsOf(t));
     }
     if (qty == null || Number.isNaN(qty) || qty < 0) return fail(res, 400, 'ปริมาณต้องเป็นตัวเลข 0 ขึ้นไป');

@@ -560,3 +560,24 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .mo-data-table tr.is-muted td{color:var(--mo-text-muted)}
 .cfo-gas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .cfo-company{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;max-width:1100px}
+.cfo-bars{position:relative;width:76%;height:100%;display:flex;align-items:flex-end;gap:2px}
+.cfo-bars .cfo-stack{width:auto;flex:1}
+.cfo-stack.is-base{background:color-mix(in srgb,var(--mo-text-muted) 35%,transparent)}
+.cfo-target{position:absolute;left:-2px;right:-2px;height:0;border-top:2px dashed var(--mo-danger)}
+.cfo-dot.is-base{background:color-mix(in srgb,var(--mo-text-muted) 35%,transparent)}
+.cfo-line{display:inline-block;width:16px;height:0;border-top:2px dashed var(--mo-danger);vertical-align:middle;margin-right:5px}
+.cfo-change{font-weight:600}.cfo-change.is-up{color:var(--mo-danger)}.cfo-change.is-down{color:var(--mo-success)}
+.cfo-month-table{margin-bottom:8px}
+.cfo-months{display:grid;grid-template-columns:repeat(12,10px);gap:2px}
+.cfo-months i{width:10px;height:10px;border-radius:2px;background:var(--mo-surface-2);border:1px solid var(--mo-border)}
+.cfo-months i.is-done{background:var(--mo-primary);border-color:var(--mo-primary)}
+.cfo-months i.is-missing{background:color-mix(in srgb,var(--mo-danger) 25%,transparent);border-color:var(--mo-danger)}
+.cfo-prog{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
+.cfo-prog span{width:60px;height:6px;border-radius:3px;background:var(--mo-surface-2);overflow:hidden}
+.cfo-prog i{display:block;height:100%;background:var(--mo-primary)}
+.cfo-org{display:flex;flex-direction:column;gap:6px}
+.cfo-org-line{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:12.5px}.cfo-org-line span{color:var(--mo-text-muted)}
+.cfo-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.cfo-photos img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--mo-radius);border:1px solid var(--mo-border)}
+.cfo-org-group{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.cfo-org-person{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--mo-line)}.cfo-org-person span{color:var(--mo-text-muted)}
+

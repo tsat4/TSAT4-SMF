@@ -166,20 +166,23 @@ create table if not exists public.tx_${k}_entry (
 );
 create index if not exists tx_${k}_entry_month on public.tx_${k}_entry (month);
 
--- ค่าตั้งต้นบ่อเกรอะ (IPCC): kg CH4 = คน × วัน × BOD × 0.001 × B0 × MCF × I
+-- ค่าตั้งต้นบ่อเกรอะ (IPCC): kg CH4 = คน × วัน × BOD × 0.001 × B0 × MCF × I · เป้าลด
 insert into public.mt_${k}_setting (key, value) values
-  ('septic_bod', '40'), ('septic_b0', '0.6'), ('septic_mcf', '0.5'), ('septic_i', '1')
+  ('septic_bod', '40'), ('septic_b0', '0.6'), ('septic_mcf', '0.5'), ('septic_i', '1'),
+  ('target_percent', '5')                 -- เป้าลดจากปีฐาน (%) ค่าเดิมของ TSATP4-CFO
 on conflict (key) do nothing;
 
 -- ผลต่อแถว: tCO2e = qty × kgco2e / 1000 · แยกก๊าซ (Scope 1) = qty × EF ก๊าซ × GWP / 1000
+-- บ่อเกรอะ (calc = septic): qty = kg CH4 → tCO2e = qty × GWP CH4 ของรายการ / 1000 (เหมือน TSATP4-CFO saveSepticTx_)
 create or replace view public.v_${k}_entry with (security_invoker = true) as
 select e.id, e.month, e.status, a.department, a.name as activity, a.detail, s.scope, s.code as scope_code, s.name as scope_name,
   f.name as source, f.unit, e.qty, f.kgco2e,
-  round(e.qty * f.kgco2e / 1000, 6) as tco2e,
+  round(e.qty * case when a.calc = 'septic' then g.ch4 else f.kgco2e end / 1000, 6) as tco2e,
   round(e.qty * coalesce(f.co2, 0) * g.co2 / 1000, 6) as tco2e_co2,
-  round(e.qty * (coalesce(f.ch4_fossil, 0) * g.ch4_fossil + coalesce(f.ch4, 0) * g.ch4) / 1000, 6) as tco2e_ch4,
+  round(e.qty * (coalesce(f.ch4_fossil, 0) * g.ch4_fossil + case when a.calc = 'septic' then 1 else coalesce(f.ch4, 0) end * g.ch4) / 1000, 6) as tco2e_ch4,
   round(e.qty * coalesce(f.n2o, 0) * g.n2o / 1000, 6) as tco2e_n2o,
-  round(e.qty * (coalesce(f.hfc, 0) + coalesce(f.pfc, 0)) / 1000, 6) as tco2e_fgas
+  round(e.qty * (coalesce(f.hfc, 0) + coalesce(f.pfc, 0)) / 1000, 6) as tco2e_fgas,
+  e.activity_id                                           -- เพิ่มท้ายสุด: create or replace view เพิ่มคอลัมน์ได้แค่ต่อท้าย
 from public.tx_${k}_entry e
 join public.mt_${k}_activity a on a.id = e.activity_id
 join public.mt_${k}_ef f on f.id = e.ef_id
