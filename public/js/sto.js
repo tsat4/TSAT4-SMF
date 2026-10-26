@@ -9,6 +9,7 @@ const LINE_HEAD = ['หมายเลขเลขรายการ', 'ชื�
 const TX_PAGE = { catalog: 'รายการ', issue: 'เบิกจ่าย', receive: 'รับเข้า', stock: 'Stock' };
 let editMode = 'list';
 let txPage = 'issue';
+let editTick = 0;
 Object.assign(TITLES, {
   store: ['Store', 'ระบบงาน > Store'],
   locked: ['Usage', USAGE],
@@ -66,6 +67,8 @@ function stockBadge(min, current, max) {
 }
 
 async function renderEdit(target) {
+  const gen = ++editTick;
+  const alive = () => gen === editTick;
   const state = { offset: 0, group: '' };
   const admin = rankOf('sto') >= 3;
   const seg = `<div class="seg" role="group" aria-label="หน้า transaction">${Object.entries(TX_PAGE).map(([id, label]) => `<button class="seg-btn${id === txPage ? ' is-active' : ''}" type="button" data-tx="${id}">${label}</button>`).join('')}</div>`;
@@ -101,8 +104,10 @@ async function renderEdit(target) {
   const pageOf = (rows) => rows.slice(state.offset, state.offset + PAGE);
   let groups = null;
   const load = async () => {
+    if (!alive()) return;
     if (txPage === 'catalog') {
       if (!groups) groups = (await api('/api/materials?part=groups')).groups || [];
+      if (!alive()) return;
       await loadCatalog();
     } else if (txPage === 'stock') await loadStock();
     else if (txPage === 'receive') await loadReceive();
@@ -113,12 +118,14 @@ async function renderEdit(target) {
     const named = (groups || []).filter((row) => row.name).sort((a, b) => a.name.localeCompare(b.name, 'th'));
     const blank = (groups || []).some((row) => !row.name);
     const buttonOf = (value, label) => `<button class="tx-group${state.group === value ? ' is-active' : ''}" type="button" data-group="${esc(value)}">${esc(label)}</button>`;
-    $('edit-groups').innerHTML = [
+    const host = $('edit-groups');
+    if (!host) return;
+    host.innerHTML = [
       buttonOf('', 'ทั้งหมด'),
       ...named.map((row) => buttonOf(row.name, row.name)),
       blank ? buttonOf('-', 'ยังไม่จัดกลุ่ม') : ''
     ].join('');
-    $('edit-groups').querySelectorAll('[data-group]').forEach((node) => {
+    host.querySelectorAll('[data-group]').forEach((node) => {
       node.onclick = () => {
         state.group = node.dataset.group;
         state.offset = 0;
@@ -127,9 +134,12 @@ async function renderEdit(target) {
     });
   };
   const loadOrder = async () => {
+    if (!alive()) return;
     const mine = await api('/api/requisitions?scope=mine');
+    if (!alive()) return;
     const header = mine.requisitions.find((row) => row.status === 'cart');
     const cart = header ? (await api(`/api/requisitions/${header.id}`)).requisition : null;
+    if (!alive() || !$('edit-order')) return;
     const lines = cart?.lines || [];
     $('edit-order-name').textContent = cart && cart.costcenter !== '-'
       ? `${cart.costcenter}${cart.costcenterName ? ` · ${cart.costcenterName}` : ''}`
@@ -155,10 +165,12 @@ async function renderEdit(target) {
     }
   };
   const loadCatalog = async () => {
+    if (!alive()) return;
     drawGroups();
     const params = tableParams(new URLSearchParams({ q: $('edit-q').value.trim(), offset: String(state.offset), limit: String(PAGE) }), head);
     if (state.group) params.set('group', state.group);
     const data = await api(`/api/materials?${params}`);
+    if (!alive() || !$('edit-rows')) return;
     const rows = data.materials || [];
     $('edit-rows').innerHTML = rows.length ? rows.map((row) => {
       const img = row.img
@@ -173,29 +185,35 @@ async function renderEdit(target) {
     await loadOrder();
   };
   const loadReceive = async () => {
+    if (!alive() || !$('edit-actions')) return;
     $('edit-q').placeholder = 'เลขที่หรือรายการ';
     $('edit-actions').innerHTML = '';
     fillTable('edit-rows', ['เลขที่', 'รายการ', 'จำนวน', 'costcenter', 'สถานะ'], '', 'ยังไม่มีรายการรับเข้า');
     setFoot(0, 0);
   };
   const loadStock = async () => {
+    if (!alive()) return;
     $('edit-q').placeholder = 'หมายเลขหรือชื่อ';
     $('edit-actions').innerHTML = '';
     const params = tableParams(new URLSearchParams({ q: $('edit-q').value.trim(), offset: String(state.offset) }), head);
     const data = await api(`/api/stock?${params}`);
+    if (!alive() || !$('edit-actions')) return;
     const rows = data.stock || [];
     fillTable('edit-rows', [{ label: 'costcenter', key: 'costcenter' }, { label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'Min', key: 'minQty' }, { label: 'Current', key: 'currentQty' }, { label: 'Max', key: 'maxQty' }, 'สถานะ'], rows.map((row) => `<tr><td>${esc(row.costcenter)}</td><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${esc(row.bun)}</td><td>${row.minQty}</td><td>${row.currentQty}</td><td>${row.maxQty}</td><td>${stockBadge(row.minQty, row.currentQty, row.maxQty)}</td></tr>`).join(''), 'ยังไม่มียอดในขอบเขตของคุณ', columnHead());
     setFoot(rows.length, data.total || 0);
   };
   const loadList = async () => {
+    if (!alive()) return;
     const term = $('edit-q').value.trim().toLowerCase();
     const mine = await api('/api/requisitions?scope=mine');
+    if (!alive()) return;
     let rows = mine.requisitions;
     if (admin) {
       const queue = await api('/api/requisitions?scope=queue');
       const seen = new Set(rows.map((row) => row.id));
       rows = rows.concat(queue.requisitions.filter((row) => !seen.has(row.id)));
     }
+    if (!alive() || !$('edit-actions')) return;
     rows.sort((a, b) => Number(b.id) - Number(a.id));
     rows = rows.filter((row) => !term || `${row.id} ${row.requested_by} ${row.costcenter} ${row.costcenterName} ${STATUS[row.status] || ''}`.toLowerCase().includes(term));
     rows = listQuery(rows, head, (row, key) => (key === 'status' ? STATUS[row.status] || row.status : key === 'costcenter' ? (row.costcenter === '-' ? '' : `${row.costcenter} ${row.costcenterName || ''}`) : row[key]));
@@ -256,10 +274,13 @@ async function renderEdit(target) {
     };
   };
   const loadSummary = async () => {
+    if (!alive()) return;
     const mine = await api('/api/requisitions?scope=mine');
+    if (!alive()) return;
     const cartHeader = mine.requisitions.find((row) => row.status === 'cart' && row.requested_by === me.employeeId);
     if (!cartHeader) { editMode = 'list'; await loadList(); return; }
     const cart = (await api(`/api/requisitions/${cartHeader.id}`)).requisition;
+    if (!alive() || !$('edit-actions')) return;
     const term = $('edit-q').value.trim().toLowerCase();
     const allLines = cart.lines || [];
     const lines = listQuery(allLines.filter((line) => !term || `${line.material} ${line.materialDescription}`.toLowerCase().includes(term)), head, (line, key) => (key === 'materialDescription' ? line.materialDescription : key === 'qty' ? line.qty : line[key]));
@@ -324,7 +345,11 @@ async function renderEdit(target) {
   onEnter('edit-q', () => { state.offset = 0; load().catch(onErr); });
   $('edit-prev').onclick = () => { state.offset = Math.max(0, state.offset - PAGE); load().catch(onErr); };
   $('edit-next').onclick = () => { state.offset += PAGE; load().catch(onErr); };
-  await load();
+  try {
+    await load();
+  } catch (err) {
+    if (alive()) throw err;
+  }
 }
 
 async function putInCart(material, qty, costcenter) {
