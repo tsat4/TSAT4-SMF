@@ -58,8 +58,12 @@ export function mountCfo(app) {
       scopes: [1, 2, 3].map((scope) => ({ scope, tco2e: sum(cur.filter((r) => r.scope === scope)) })),
       months: Array.from({ length: 12 }, (_, i) => {
         const list = inMonth(cur, i + 1);
-        const was = sum(inMonth(base, i + 1));
-        return { month: i + 1, scopes: [1, 2, 3].map((n) => sum(list.filter((r) => r.scope === n))), total: sum(list), base: was, target: Math.round(was * (1 - target / 100) * 1000) / 1000 };
+        const before = inMonth(base, i + 1);
+        const was = sum(before);
+        return {
+          month: i + 1, scopes: [1, 2, 3].map((n) => sum(list.filter((r) => r.scope === n))), total: sum(list),
+          base: was, baseScopes: [1, 2, 3].map((n) => sum(before.filter((r) => r.scope === n))), target: Math.round(was * (1 - target / 100) * 1000) / 1000
+        };
       }),
       categories: group('scope_code', (r) => `${r.scope_code} ${r.scope_name}`),
       departments: group('department', (r) => r.department),
