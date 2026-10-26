@@ -4,17 +4,17 @@
 const CFO = 'cfo';
 const CFO_SCOPE_COLORS = ['#ef4444', '#f59e0b', '#3b82f6'];
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
-const CFO_DASH_TABS = { summary: 'Summary', activity: 'Activity', org: 'องค์กร', schedule: 'Schedule' };
+const CFO_DASH_TABS = { summary: 'Summary', s1: 'Scope 1', s2: 'Scope 2', s3: 'Scope 3', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
 const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', team: 'ทีม', company: 'บริษัท' };
 const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['company_address', 'สถานที่ตั้ง'], ['company_area', 'พื้นที่โรงงาน'], ['company_business', 'ประเภทธุรกิจ'],
-  ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
+  ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
   ['base_year', 'ปีฐาน'], ['target_percent', 'เป้าลด (% จากปีฐาน)'], ['septic_bod', 'บ่อเกรอะ BOD (g/คน/วัน)'], ['septic_b0', 'บ่อเกรอะ B0'], ['septic_mcf', 'บ่อเกรอะ MCF'], ['septic_i', 'บ่อเกรอะ I']];
 const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['hfc', 'HFCs'], ['pfc', 'PFCs']];
 let cfoDashTab = 'summary';
 let cfoSetTab = 'plan';
 let cfoMonth = new Date().getMonth() + 1;
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
-const cfoDash = { department: '', chartScope: '' };
+const cfoDash = { department: '', chartScope: '', month: '', category: '', activity: '' };
 const cfoHeads = { entries: { sort: '', dir: 'asc', filters: {} }, activities: { sort: '', dir: 'asc', filters: {} }, ef: { sort: '', dir: 'asc', filters: {} } };
 
 const cfoT = (n) => Number(n || 0).toLocaleString('th-TH', { maximumFractionDigits: 3 });
@@ -34,13 +34,14 @@ async function cfoFrame(target, tabs, attr, active, rightExtra = '') {
 // ---------- Dashboard ----------
 
 async function cfoDashboard(target) {
-  const { body } = await cfoFrame(target, CFO_DASH_TABS, 'data-cfodash', cfoDashTab);
+  const { me, body } = await cfoFrame(target, CFO_DASH_TABS, 'data-cfodash', cfoDashTab);
   const rerender = () => cfoDashboard(target).catch(onErr);
   target.querySelectorAll('[data-cfodash]').forEach((node) => { node.onclick = () => { cfoDashTab = node.dataset.cfodash; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   if (cfoDashTab === 'schedule') return aplRender(body, CFO, { inPage: true, readOnly: true });
-  if (cfoDashTab === 'activity') return cfoDrawProgress(body);
-  if (cfoDashTab === 'org') return cfoDrawOrg(body);
+  if (/^s[123]$/.test(cfoDashTab)) return cfoDrawScope(body, Number(cfoDashTab[1]));
+  if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
+  if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
   return cfoDrawSummary(body);
 }
 
@@ -95,64 +96,143 @@ async function cfoDrawSummary(body) {
   $('cfo-d-scope').onchange = () => { cfoDash.chartScope = $('cfo-d-scope').value; cfoDrawSummary(body).catch(onErr); };
 }
 
-// Activity completeness for the year: months recorded / months due, 12 month cells, quantity and tCO2e.
-async function cfoDrawProgress(body) {
+// Scope 1 / 2 / 3 (TSATP4-CFO Scope pages): activities grouped by category (main) with their rows (sub).
+// Filters: month (amount / tCO2e of that month, or the year), category, activity. Progress = months recorded / months due.
+async function cfoDrawScope(body, scope) {
   const d = await a5Api(CFO, `cfo/progress?year=${a5Year}`);
-  const departments = [...new Set(d.rows.map((r) => r.department))].sort();
+  const all = d.rows.filter((r) => String(r.scope_code || '').startsWith(`${scope}-`));
+  const categories = [...new Set(all.map((r) => r.category))];
+  if (!categories.includes(cfoDash.category)) cfoDash.category = '';
+  const inCategory = all.filter((r) => !cfoDash.category || r.category === cfoDash.category);
+  if (!inCategory.some((r) => String(r.id) === cfoDash.activity)) cfoDash.activity = '';
+  const list = inCategory.filter((r) => !cfoDash.activity || String(r.id) === cfoDash.activity);
+  const m = Number(cfoDash.month) || 0;
+  const value = (r, key) => (m ? Number(r.byMonth[m]?.[key] || 0) : Number(r[key] || 0));
+  const groups = [...new Set(list.map((r) => r.category))];
+  const row = (r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.detail || '')}</td><td>${esc(r.source || '')}</td><td class="num">${r.kgco2e == null ? '-' : cfoT(r.kgco2e)}</td>
+    <td><div class="cfo-prog"><span><i style="width:${r.percent}%"></i></span>${r.percent}%<b class="cfo-freq" title="รายเดือน">M</b></div></td>
+    <td class="num">${cfoT(value(r, 'qty'))}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(value(r, 'tco2e'))}</td>
+    <td><button class="icon-btn" type="button" data-hist="${r.id}" title="ประวัติการบันทึก" aria-label="ประวัติการบันทึก ${esc(r.name)}"><span class="material-symbols-rounded">history</span></button></td></tr>`;
   body.innerHTML = `
     <div class="toolbar a5-filters">
-      ${field('Scope', `<select id="cfo-f-scope">${options(['', '1', '2', '3'], cfoFilter.scope, (v) => (v ? `Scope ${v}` : 'ทั้งหมด'))}</select>`)}
-      ${field('หน่วยงาน', `<select id="cfo-f-dept">${options(['', ...departments], cfoFilter.department, (v) => v || 'ทั้งหมด')}</select>`)}
-      ${searchSlot('ค้นหา', 'cfo-f-q', 'cfo-f-search', { placeholder: 'กิจกรรมหรือรายละเอียด' })}
+      ${field('เดือน', `<select id="cfo-s-month">${options(['', ...Array.from({ length: 12 }, (_, i) => String(i + 1))], cfoDash.month, (v) => (v ? ACT_MONTHS[v - 1] : 'ทั้งหมด'))}</select>`)}
+      ${field('category', `<select id="cfo-s-cat">${options(['', ...categories], cfoDash.category, (v) => v || 'ทั้งหมด')}</select>`)}
+      ${field('Activity', `<select id="cfo-s-act"><option value="">ทั้งหมด</option>${inCategory.map((r) => `<option value="${r.id}"${String(r.id) === cfoDash.activity ? ' selected' : ''}>${esc(r.name)} · ${esc(r.detail || '')}</option>`).join('')}</select>`)}
     </div>
-    <div class="table-wrap sheet" id="cfo-rows"></div>
-    <p class="sum-meta" id="cfo-sum"></p>`;
-  $('cfo-f-q').value = cfoFilter.q;
-  const draw = () => {
-    const term = cfoFilter.q.trim().toLowerCase();
-    const list = listQuery(d.rows.filter((r) => (!cfoFilter.scope || String(r.scope_code || '').startsWith(`${cfoFilter.scope}-`))
-      && (!cfoFilter.department || r.department === cfoFilter.department)
-      && (!term || `${r.name} ${r.detail || ''} ${r.source || ''}`.toLowerCase().includes(term))), cfoHeads.entries, (r, key) => r[key] ?? '');
-    const cells = (r) => `<div class="cfo-months">${Array.from({ length: 12 }, (_, i) => `<i class="${r.months.includes(i + 1) ? 'is-done' : i < d.due ? 'is-missing' : ''}" title="${ACT_MONTHS_SHORT[i]}"></i>`).join('')}</div>`;
-    fillTable('cfo-rows', [{ label: 'หน่วยงาน', key: 'department' }, { label: 'กิจกรรม', key: 'name' }, { label: 'รายละเอียด', key: 'detail' }, { label: 'หมวด', key: 'scope_code' }, 'รายเดือน',
-      { label: 'ครบ', key: 'percent' }, { label: 'ปริมาณรวม', key: 'qty' }, 'หน่วย', { label: 'tCO₂e', key: 'tco2e' }],
-    list.map((r) => `<tr><td>${esc(r.department)}</td><td>${esc(r.name)}</td><td>${esc(r.detail || '')}</td><td>${esc(r.scope_code || '')}</td><td>${cells(r)}</td>
-      <td><div class="cfo-prog"><span><i style="width:${r.percent}%"></i></span>${r.percent}%</div></td><td class="num">${cfoT(r.qty)}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(r.tco2e)}</td></tr>`).join(''), 'ไม่มีกิจกรรม', headFor(cfoHeads.entries, draw));
-    const full = list.filter((r) => r.percent >= 100).length;
-    $('cfo-sum').textContent = `${list.length} กิจกรรม · ครบถึงเดือนปัจจุบัน ${full} · ขาด ${list.length - full} · รวม ${cfoT(list.reduce((s, r) => s + r.tco2e, 0))} tCO₂e`;
-  };
-  draw();
+    <div class="table-wrap sheet"><table class="mo-data-table cfo-scope-table"><thead><tr><th>Activity</th><th>Description</th><th>emission source</th><th class="num">kgCO₂e/unit</th><th>Progress</th><th class="num">Amount</th><th>Unit</th><th class="num">tCO₂e</th><th></th></tr></thead>
+      <tbody>${groups.map((g) => `<tr class="cfo-group"><td colspan="9">${esc(g)}</td></tr>${list.filter((r) => r.category === g).map(row).join('')}`).join('') || '<tr><td colspan="9" class="empty">ไม่มีกิจกรรม</td></tr>'}</tbody></table></div>
+    <p class="sum-meta">รวม ${cfoT(list.reduce((t, r) => t + value(r, 'tco2e'), 0))} tCO₂e · ${list.length} กิจกรรม${m ? ` · ${ACT_MONTHS[m - 1]} ${a5Year}` : ` · ปี ${a5Year}`}</p>`;
   a5Lift(body);
-  $('cfo-f-scope').onchange = () => { cfoFilter.scope = $('cfo-f-scope').value; draw(); };
-  $('cfo-f-dept').onchange = () => { cfoFilter.department = $('cfo-f-dept').value; draw(); };
-  const search = () => { cfoFilter.q = $('cfo-f-q').value; draw(); };
-  $('cfo-f-search').onclick = search;
-  onEnter('cfo-f-q', search);
+  const redraw = () => cfoDrawScope(body, scope).catch(onErr);
+  $('cfo-s-month').onchange = () => { cfoDash.month = $('cfo-s-month').value; redraw(); };
+  $('cfo-s-cat').onchange = () => { cfoDash.category = $('cfo-s-cat').value; cfoDash.activity = ''; redraw(); };
+  $('cfo-s-act').onchange = () => { cfoDash.activity = $('cfo-s-act').value; redraw(); };
+  body.querySelectorAll('[data-hist]').forEach((btn) => {
+    btn.onclick = () => {
+      const r = all.find((x) => String(x.id) === btn.dataset.hist);
+      const months = Object.keys(r.byMonth).map(Number).sort((x, y) => y - x);
+      openPopup(`ประวัติ ${esc(r.name)} ${esc(r.detail || '')}`, months.length ? `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th class="num">ปริมาณ</th><th>หน่วย</th><th class="num">tCO₂e</th><th>สถานะ</th><th>หมายเหตุ</th><th>เอกสาร</th></tr></thead><tbody>${months.map((k) => {
+        const e = r.byMonth[k];
+        return `<tr><td>${ACT_MONTHS_SHORT[k - 1]} ${a5Year}</td><td class="num">${cfoT(e.qty)}</td><td>${esc(r.unit || '')}</td><td class="num">${cfoT(e.tco2e)}</td><td>${e.status === 'CONFIRMED' ? 'ยืนยันแล้ว' : 'ร่าง'}</td><td>${esc(e.remark || '')}</td><td>${/^https?:\/\//.test(e.doc || '') ? `<a href="${esc(e.doc)}" target="_blank" rel="noopener">เปิด</a>` : esc(e.doc || '')}</td></tr>`;
+      }).join('')}</tbody></table></div>` : `<p class="empty">ยังไม่มีการบันทึกปี ${a5Year}</p>`, () => closePopup(), 'ปิด');
+    };
+  });
 }
 
-// Company overview and the team by role (TSATP4-CFO Company Overview + Team pages), read only.
-async function cfoDrawOrg(body) {
-  const [m, team] = await Promise.all([a5Api(CFO, `cfo/summary?year=${a5Year}`), a5Api(CFO, `team?year=${a5Year}`)]);
-  const s = m.settings;
-  const line = (label, value) => (value ? `<div class="cfo-org-line"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>` : '');
-  // Google Drive links (uc?export=view / file/d/<id>) show through the thumbnail URL, as TSATP4-CFO drivePhotoUrl_.
-  const src = (url) => { const id = String(url || '').match(/[?&]id=([\w-]+)|\/d\/([\w-]+)/); return id ? `https://drive.google.com/thumbnail?id=${id[1] || id[2]}&sz=w1200` : url; };
-  const photo = (url) => (/^https?:\/\//.test(url || '') ? `<a href="${esc(url)}" target="_blank" rel="noopener"><img src="${esc(src(url))}" alt="รูปบริษัท" loading="lazy"></a>` : '');
-  const groups = Object.entries(CFO_ROLE_LABEL).map(([role, label]) => ({ label, people: team.members.filter((p) => p.role === role && p.status === 'Active') })).filter((g) => g.people.length);
+// Google Drive links (uc?export=view / file/d/<id>) show through the thumbnail URL, as TSATP4-CFO drivePhotoUrl_.
+function cfoPhotoSrc(url, width = 1600) {
+  const id = String(url || '').match(/drive\.google\.com.*(?:[?&]id=|\/d\/)([\w-]+)/);
+  return id ? `https://drive.google.com/thumbnail?id=${id[1]}&sz=w${width}` : url;
+}
+
+// Resize a photo to JPEG within 1600 px and about 650 KB (bucket limit 700 KB), keeping its shape.
+function cfoJpeg(file) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      let quality = 0.85;
+      let data = canvas.toDataURL('image/jpeg', quality);
+      while (data.length * 0.75 > 650000 && quality > 0.4) { quality -= 0.1; data = canvas.toDataURL('image/jpeg', quality); }
+      resolve(data);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('เปิดรูปไม่ได้')); };
+    image.src = url;
+  });
+}
+
+// Company Overview (TSATP4-CFO): company lines, customer logo picture (photo 1) and building picture (photo 2).
+async function cfoDrawCompany(body, admin, rerender) {
+  const s = (await a5Api(CFO, 'cfo/master')).settings;
+  const updated = s.company_updated ? new Date(`${s.company_updated}T00:00:00`) : null;
+  const line = (label, value) => (value ? `<div class="cfo-co-line"><span>${esc(label)} :</span><strong>${esc(value)}</strong></div>` : '');
+  const img = (url, cls) => (url ? `<img class="${cls}" src="${esc(cfoPhotoSrc(url))}" alt="" loading="lazy">` : '');
   body.innerHTML = `
-    <div class="a5-two">
-      <section class="card cfo-org">
-        <div class="card-title">${esc(s.company_name || 'ข้อมูลบริษัท')}</div>
-        ${line('สถานที่ตั้ง', s.company_address)}${line('พื้นที่โรงงาน', s.company_area)}${line('ประเภทธุรกิจ', s.company_business)}
-        ${line('กลุ่มลูกค้าหลัก', s.company_customers)}${line('จำนวนพนักงาน', s.company_employees)}
-        ${line('ปีฐาน', s.base_year)}${line('เป้าลด', s.target_percent ? `${s.target_percent}% จากปีฐาน` : '')}
-        <div class="cfo-photos">${photo(s.company_photo1)}${photo(s.company_photo2)}</div>
-      </section>
-      <section class="card cfo-org">
-        <div class="card-title">ทีม CFO ปี ${a5Year}</div>
-        ${groups.map((g) => `<div class="cfo-org-group"><div class="sum-meta">${esc(g.label)} · ${g.people.length}</div>${g.people.map((p) => `<div class="cfo-org-person"><strong>${esc(p.name || p.employee_id)}</strong><span>${esc(p.department || '')}</span></div>`).join('')}</div>`).join('') || '<p class="empty">ยังไม่มีทีมปีนี้</p>'}
-      </section>
-    </div>`;
+    ${admin ? `<div class="action-bar a5-actions">${button('cfo-co-edit', 'แก้ไขข้อมูล')}</div>` : ''}
+    <section class="card cfo-co">
+      <div class="cfo-co-text">
+        <h2>Company Overview</h2>
+        ${line('ชื่อธุรกิจ', s.company_name)}${line('สถานที่ตั้ง', s.company_address)}${line('พื้นที่โรงงาน', s.company_area)}
+        ${line('ประเภทของธุรกิจ', s.company_business)}${line('กลุ่มลูกค้าหลัก', s.company_customers)}
+        ${line('จำนวนพนักงาน', s.company_employees ? `${s.company_employees} คน${updated && !Number.isNaN(updated.getTime()) ? ` อัพเดท ${updated.toLocaleDateString('en-GB')}` : ''}` : '')}
+        ${s.base_year ? line('ปีฐาน', `${s.base_year} · เป้าลด ${s.target_percent || 5}%`) : ''}
+        ${s.company_name ? '' : '<p class="empty">ยังไม่มีข้อมูลบริษัท</p>'}
+      </div>
+      ${img(s.company_photo1, 'cfo-co-logo')}
+      ${img(s.company_photo2, 'cfo-co-building')}
+    </section>`;
+  a5Lift(body);
+  if (!admin) return;
+  $('cfo-co-edit').onclick = () => {
+    const picked = {};
+    const fields = CFO_COMPANY.filter(([key]) => key.startsWith('company_') && !key.startsWith('company_photo'))
+      .map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(s[key] ?? '')}"${key === 'company_updated' ? ' type="date"' : ''}>`)).join('');
+    openPopup('แก้ไข Company Overview', `${fields}
+      ${field('รูปโลโก้ลูกค้า (รูป 1)', '<input id="cfo-s-photo1" type="file" accept="image/*">')}
+      ${field('รูปอาคาร (รูป 2)', '<input id="cfo-s-photo2" type="file" accept="image/*">')}
+      <p class="sum-meta">ไม่เลือกรูป = ใช้รูปเดิม · รูปเก็บใน ${CFO === 'cfo' ? 'img_cfo' : ''}</p>`, async () => {
+      for (const slot of [1, 2]) if (picked[slot]) await a5Api(CFO, 'cfo/photo', { method: 'POST', body: { slot, image: picked[slot] } });
+      const values = Object.fromEntries(CFO_COMPANY.filter(([key]) => $(`cfo-s-${key}`)).map(([key]) => [key, $(`cfo-s-${key}`).value]));
+      await a5Api(CFO, 'cfo/settings', { method: 'PUT', body: values });
+      toast('บันทึกแล้ว');
+      closePopup();
+      rerender();
+    });
+    [1, 2].forEach((slot) => {
+      $(`cfo-s-photo${slot}`).onchange = (e) => { const f = e.target.files[0]; if (f) cfoJpeg(f).then((data) => { picked[slot] = data; }).catch(onErr); };
+    });
+  };
+}
+
+// Team Member (TSATP4-CFO): org chart by level — ประธาน · รองประธาน / ผู้จัดทำ · สมาชิก (ตัวแทนหน่วยงาน).
+async function cfoDrawTeam(body, admin) {
+  const team = await a5Api(CFO, `team?year=${a5Year}`);
+  const active = team.members.filter((p) => p.status === 'Active');
+  const first = (name) => String(name || '').replace(/^(นางสาว|นาง|นาย|Mr\.?|Mrs\.?|Ms\.?|Miss)\s*/, '').split(/\s+/)[0];
+  const tiers = [
+    { label: 'ประธาน', color: 'var(--cfo-tier-1)', people: active.filter((p) => p.role === 'chairman') },
+    { label: 'รองประธาน , ผู้จัดทำ', color: 'var(--cfo-tier-2)', people: [...active.filter((p) => p.role === 'vice'), ...active.filter((p) => p.role === 'admin')] },
+    { label: 'สมาชิก', color: 'var(--cfo-tier-3)', people: active.filter((p) => p.role === 'member').sort((a, b) => String(a.department).localeCompare(String(b.department))) }
+  ];
+  const card = (p) => `<div class="cfo-person"><span class="material-symbols-rounded">person</span><strong>${esc(p.name ? `คุณ${first(p.name)}` : p.employee_id)}</strong><small>${esc(p.department || '')}</small></div>`;
+  body.innerHTML = `
+    ${admin ? `<div class="action-bar a5-actions">${button('cfo-team-edit', 'แก้ไขทีม')}</div>` : ''}
+    <section class="card cfo-team">
+      <div class="plan-head"><div class="card-title">Team Member · ปี ${a5Year}</div><span class="sum-meta">${active.length} คน</span></div>
+      ${tiers.map((t) => `<div class="cfo-tier">${t.people.length ? `<div class="cfo-tier-people">${t.people.map(card).join('')}</div>` : '<p class="empty">ยังไม่มี</p>'}
+        <div class="cfo-tier-rule" style="--tier:${t.color}"><span>${esc(t.label)}</span></div></div>`).join('')}
+    </section>`;
+  a5Lift(body);
+  if (admin) $('cfo-team-edit').onclick = () => { cfoSetTab = 'team'; openView(`${CFO}-setting`); };
 }
 
 // ---------- transaction: monthly quantities ----------
@@ -387,7 +467,7 @@ function cfoSetEf(body, m, rerender) {
 function cfoSetCompany(body, m, rerender) {
   body.innerHTML = `
     ${m.admin ? `<div class="action-bar a5-actions">${button('cfo-save', 'บันทึก', 'primary')}</div>` : ''}
-    <div class="cfo-company">${CFO_COMPANY.map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(m.settings[key] ?? '')}"${m.admin ? '' : ' readonly'}>`)).join('')}</div>`;
+    <div class="cfo-company">${CFO_COMPANY.map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(m.settings[key] ?? '')}"${key === 'company_updated' ? ' type="date"' : ''}${m.admin ? '' : ' readonly'}>`)).join('')}</div>`;
   a5Lift(body);
   if (!m.admin) return;
   $('cfo-save').onclick = () => {

@@ -69,6 +69,15 @@ export function must({ data, error }) {
   return data;
 }
 
+// JPEG data URL from the browser -> bytes for Storage (img_<act> bucket limit 700 KB), or null.
+export function imageBytes(dataUrl) {
+  const match = String(dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return null;
+  const bytes = Buffer.from(match[1], 'base64');
+  if (bytes.length < 32 || bytes.length > 700000 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  return bytes;
+}
+
 export function throwIf(...errors) {
   const error = errors.find(Boolean);
   if (error) throw error;

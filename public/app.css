@@ -580,4 +580,22 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.cfo-photos img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--mo-radius);border:1px solid var(--mo-border)}
 .cfo-org-group{display:flex;flex-direction:column;gap:2px;margin-top:6px}
 .cfo-org-person{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--mo-line)}.cfo-org-person span{color:var(--mo-text-muted)}
+.cfo-scope-table .cfo-group td{background:var(--mo-surface-2);font-weight:600}
+.cfo-freq{display:inline-grid;place-items:center;width:20px;height:20px;border:1px solid var(--mo-border);border-radius:50%;font-size:10px;font-weight:500;color:var(--mo-text-muted);margin-left:4px}
+.cfo-co{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,34%);grid-template-rows:auto 1fr;gap:16px;padding:24px 28px;min-height:520px}
+.cfo-co-text{grid-column:1;grid-row:1 / span 2;display:flex;flex-direction:column;gap:10px;color:var(--mo-primary)}
+.cfo-co-text h2{margin:0 0 6px;font-size:30px;line-height:1.2}
+.cfo-co-line{display:flex;gap:10px;font-size:18px;line-height:1.45}.cfo-co-line span{flex:0 0 auto;font-weight:600}.cfo-co-line strong{font-weight:500}
+.cfo-co-logo{grid-column:2;grid-row:1;width:100%;max-height:220px;object-fit:contain}
+.cfo-co-building{grid-column:1 / span 2;grid-row:3;justify-self:end;width:min(100%,780px);max-height:320px;object-fit:contain}
+:root{--cfo-tier-1:#f97316;--cfo-tier-2:#3b82f6;--cfo-tier-3:#ca8a04}
+.cfo-team{display:flex;flex-direction:column;gap:6px}
+.cfo-tier{display:flex;flex-direction:column;gap:10px;padding-top:16px}
+.cfo-tier-people{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.cfo-person{width:122px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;border:1px solid var(--mo-border);border-radius:var(--mo-radius);background:var(--mo-surface)}
+.cfo-person .material-symbols-rounded{width:44px;height:52px;display:grid;place-items:center;border:1px solid var(--mo-border);border-radius:4px;color:var(--mo-text-muted);background:var(--mo-surface-2)}
+.cfo-person strong{font-size:12.5px;font-weight:500;text-align:center}.cfo-person small{font-size:11px;color:var(--mo-text-muted)}
+.cfo-tier-rule{display:flex;align-items:center;gap:8px;color:var(--tier);font-size:13px;font-weight:500}
+.cfo-tier-rule::before{content:"";flex:1;border-top:2px dashed var(--tier)}
+@media(max-width:900px){.cfo-co{grid-template-columns:1fr;min-height:0}.cfo-co-text,.cfo-co-logo,.cfo-co-building{grid-column:1;grid-row:auto}}
 

@@ -60,6 +60,7 @@ POST /api/act/:activity/audits auth
 POST /api/act/:activity/cfo/activities auth
 POST /api/act/:activity/cfo/confirm auth
 POST /api/act/:activity/cfo/ef auth
+POST /api/act/:activity/cfo/photo auth
 POST /api/act/:activity/checklist auth
 POST /api/act/:activity/checklist/copy auth
 POST /api/act/:activity/issues/:id/action auth

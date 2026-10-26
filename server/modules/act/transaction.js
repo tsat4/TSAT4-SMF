@@ -1,6 +1,6 @@
 import { tx } from '../../core/db.js';
 import { fail } from '../../core/http.js';
-import { accessOf, actRoute, dateOf, fetchAll, fetchIn, must, namesOf, roundTo, tablesOf, yearOf } from './common.js';
+import { accessOf, actRoute, dateOf, fetchAll, fetchIn, imageBytes, must, namesOf, roundTo, tablesOf, yearOf } from './common.js';
 
 // Checklist audits — transaction: record Self / Committee audits and follow Issues to closure.
 // Rules: docs/specs/act-5s.md ("transaction", "Issue"). Pure rule functions are exported for scripts/test-act-audit.js.
@@ -67,14 +67,6 @@ async function settingsOf(activity) {
   const out = { ...DEFAULTS };
   for (const row of data || []) if (row.key in out) out[row.key] = Number(row.value);
   return out;
-}
-
-function imageBytes(dataUrl) {
-  const match = String(dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
-  if (!match) return null;
-  const bytes = Buffer.from(match[1], 'base64');
-  if (bytes.length < 32 || bytes.length > 700000 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
-  return bytes;
 }
 
 export function mountTransaction(app) {

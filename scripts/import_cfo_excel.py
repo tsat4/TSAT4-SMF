@@ -19,7 +19,7 @@ GWP = {'gwp-01': 'AR5'}
 ROLES = {'ประธาน': 'chairman', 'รองประธาน': 'vice', 'ผู้จัดทำ': 'admin', 'สมาชิก': 'member'}
 KIND = {'Mobile Combustion(On-Road)': ('Mobile Combustion', 'On-Road'), 'Mobile Combustion(Off-Road)': ('Mobile Combustion', 'Off-Road')}
 COMPANY = {'ชื่อธุรกิจ': 'company_name', 'สถานที่ตั้ง': 'company_address', 'พื้นที่โรงงาน': 'company_area', 'ประเภทของธุรกิจ': 'company_business',
-           'กลุ่มลูกค้าหลัก': 'company_customers', 'จำนวนพนักงาน': 'company_employees', 'รูปภาพ1': 'company_photo1', 'รูปภาพ2': 'company_photo2'}
+           'กลุ่มลูกค้าหลัก': 'company_customers', 'จำนวนพนักงาน': 'company_employees', 'อัพเดท': 'company_updated', 'รูปภาพ1': 'company_photo1', 'รูปภาพ2': 'company_photo2'}
 notes = []
 
 

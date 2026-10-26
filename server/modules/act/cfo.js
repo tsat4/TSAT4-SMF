@@ -1,11 +1,11 @@
 import { tx } from '../../core/db.js';
 import { fail } from '../../core/http.js';
-import { accessOf, actRoute, dateOf, fetchAll, must, requireAdmin, yearOf } from './common.js';
+import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, requireAdmin, yearOf } from './common.js';
 
 // CFO (Carbon Footprint for Organization): Dashboard totals, monthly entry, and master data (EF, activities, company).
 // Tables: db/act/cfo.sql (scripts/act-sql.js cfoSql) · spec: docs/specs/act-cfo.md
 export const CFO_ON = ['cfo'];
-const SETTING_KEYS = ['company_name', 'company_address', 'company_area', 'company_business', 'company_customers', 'company_employees',
+const SETTING_KEYS = ['company_name', 'company_address', 'company_area', 'company_business', 'company_customers', 'company_employees', 'company_updated',
   'company_photo1', 'company_photo2', 'base_year', 'target_percent', 'septic_bod', 'septic_b0', 'septic_mcf', 'septic_i'];
 const EF_VALUES = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'hfc', 'pfc', 'unit', 'scope_code'];
 
@@ -73,12 +73,19 @@ export function mountCfo(app) {
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
     const now = new Date();
     const due = year < now.getFullYear() ? 12 : year > now.getFullYear() ? 0 : now.getMonth() + 1;
-    const [activities, efs, entries] = await Promise.all([
-      fetchAll(() => tx.from(t.activity).select('id,department,name,detail,calc,status,ef_id').order('department').order('id')),
-      fetchAll(() => tx.from(t.ef).select('id,scope_code,name,unit').order('id')),
-      fetchAll(() => tx.from(t.entryView).select('id,month,activity_id,qty,tco2e').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id'))
+    const [activities, efs, scopes, gwp, entries, details] = await Promise.all([
+      fetchAll(() => tx.from(t.activity).select('id,department,name,detail,calc,status,ef_id,gwp_code').order('id')),
+      fetchAll(() => tx.from(t.ef).select('id,scope_code,kind,name,unit,kgco2e').order('id')),
+      fetchAll(() => tx.from(t.cfoScope).select('code,name').order('code')),
+      fetchAll(() => tx.from(t.gwp).select('code,ch4').order('code')),
+      fetchAll(() => tx.from(t.entryView).select('id,month,activity_id,qty,tco2e').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id')),
+      fetchAll(() => tx.from(t.entry).select('id,status,doc,remark,updated_at,updated_by').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id'))
     ]);
     const efById = new Map(efs.map((e) => [e.id, e]));
+    const scopeName = new Map(scopes.map((s) => [s.code, s.name]));
+    const gwpCh4 = new Map(gwp.map((g) => [g.code, g.ch4]));
+    const detailOf = new Map(details.map((d) => [d.id, d]));
+    const category = (ef) => `${scopeName.get(ef.scope_code) || ef.scope_code || '-'}${ef.scope_code?.startsWith('1-') && ef.kind ? `(${ef.kind})` : ''}`;
     res.json({
       year,
       due,
@@ -87,7 +94,9 @@ export function mountCfo(app) {
         const months = [...new Set(list.map((e) => Number(e.month.slice(5, 7))))];
         const ef = efById.get(a.ef_id) || {};
         return {
-          id: a.id, department: a.department, name: a.name, detail: a.detail, scope_code: ef.scope_code, source: ef.name, unit: a.calc === 'septic' ? 'kg CH₄' : ef.unit,
+          id: a.id, department: a.department, name: a.name, detail: a.detail, scope_code: ef.scope_code, category: category(ef), source: ef.name,
+          unit: a.calc === 'septic' ? 'kg CH₄' : ef.unit, kgco2e: a.calc === 'septic' ? gwpCh4.get(a.gwp_code) : ef.kgco2e,
+          byMonth: Object.fromEntries(list.map((e) => [Number(e.month.slice(5, 7)), { qty: e.qty, tco2e: e.tco2e, ...detailOf.get(e.id) }])),
           months: months.sort((x, y) => x - y),
           percent: due ? Math.min(100, Math.round((months.filter((m) => m <= due).length / due) * 100)) : 0,
           qty: Math.round(list.reduce((s, e) => s + Number(e.qty), 0) * 1000) / 1000,
@@ -250,6 +259,19 @@ export function mountCfo(app) {
     if (must(await tx.from(t.entry).select('id').eq('activity_id', id).limit(1)).length) return fail(res, 400, 'กิจกรรมนี้มีข้อมูลแล้ว ลบไม่ได้ ให้ตั้งเป็น Inactive');
     must(await tx.from(t.activity).delete().eq('id', id));
     res.json({ ok: true });
+  });
+
+  route('post', '/api/act/:activity/cfo/photo', async (req, res, activity, t) => {
+    if (!(await requireAdmin(req, res, activity, thisYear()))) return;
+    const slot = [1, 2].includes(Number(req.body?.slot)) ? Number(req.body.slot) : 0;
+    const bytes = imageBytes(req.body?.image);
+    if (!slot || !bytes) return fail(res, 400, 'รูปต้องเป็น JPEG ไม่เกิน 700 KB');
+    const key = `company/photo${slot}_${Date.now()}.jpg`;
+    const uploaded = await tx.storage.from(t.bucket).upload(key, new Uint8Array(bytes), { contentType: 'image/jpeg', upsert: false });
+    if (uploaded.error) return fail(res, 400, /bucket/i.test(String(uploaded.error.message)) ? `ยังไม่ได้สร้างที่เก็บรูป ${t.bucket} ใน Tx Data` : 'อัปโหลดรูปไม่ได้');
+    const url = tx.storage.from(t.bucket).getPublicUrl(key).data.publicUrl;
+    must(await tx.from(t.setting).upsert([{ key: `company_photo${slot}`, value: url }], { onConflict: 'key' }));
+    res.status(201).json({ url });
   });
 
   route('put', '/api/act/:activity/cfo/settings', async (req, res, activity, t) => {
