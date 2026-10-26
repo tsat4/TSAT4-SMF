@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Cursor · ตอนใส่ตะกร้า Usage ระบุจำนวนและเลือกแหล่งซื้อ (costcenter) แล้วเห็นหน่วยงาน รหัสพนักงาน และผู้เบิกทั้งในฟอร์มและสรุปคำสั่ง
 - 2026-10-26 · Claude · CFO Dashboard: รวมแท็บ Scope 1/2/3 เป็นแท็บ Scope เดียว เลือก Scope จาก dropdown ฝั่งขวา (ผู้ใช้สั่ง)
 - 2026-10-26 · Cursor · รัน inbox/import_cfo.sql ชุดที่เขียนใหม่ตอน 14:02 แถวเดิมมีอยู่แล้ว จึงเพิ่มเฉพาะ company_updated = 2026-05-10 ยอด scope1_t = 188.863 และ scope2_t = 6642.520 ไม่เปลี่ยน
 - 2026-10-26 · Claude · CFO Dashboard เพิ่มแท็บ Scope 1/2/3 (จัดกลุ่มหมวด → กิจกรรม + ประวัติ), Company Overview (แก้ไข + อัปโหลดรูปเข้า img_cfo), Team (ผัง 3 ชั้น) ตามหน้าของ TSATP4-CFO · route ใหม่ `POST /api/act/cfo/cfo/photo` · importer เพิ่ม `company_updated` (สร้าง inbox/import_cfo.sql ใหม่แล้ว รันซ้ำได้)

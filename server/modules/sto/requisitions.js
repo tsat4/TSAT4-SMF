@@ -1,7 +1,7 @@
 import { mx } from '../../core/db.js';
 import { fail, wrap, qtyOf, cleanTerm, listFilters } from '../../core/http.js';
 import { atLeast, rankIn } from '../../core/access.js';
-import { requireUser } from '../../core/users.js';
+import { nameOf, requireUser } from '../../core/users.js';
 import { centersForDepartments, costcenterMap, ownCenter } from '../../core/master.js';
 
 const DRAFT_COSTCENTER = '-';
@@ -17,13 +17,23 @@ async function materialMap(codes) {
   return new Map((data || []).map((row) => [row.material, row]));
 }
 
+async function requesterNames(ids) {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const { data, error } = await mx.from('mt_main_employee').select('employee_id,prefix,first_name,last_name').in('employee_id', unique);
+  if (error) throw error;
+  return new Map((data || []).map((row) => [row.employee_id, nameOf(row)]));
+}
+
 async function decorate(headers, linesById = new Map()) {
   const centers = await costcenterMap(headers.map((row) => row.costcenter));
+  const people = await requesterNames(headers.map((row) => row.requested_by));
   const materials = await materialMap([...linesById.values()].flat().map((line) => line.material));
   return headers.map((row) => ({
     ...row,
     costcenterName: centers.get(row.costcenter)?.object_name || '',
     department: centers.get(row.costcenter)?.department || '',
+    requesterName: people.get(row.requested_by) || '',
     lines: (linesById.get(row.id) || []).map((line) => ({
       ...line,
       materialDescription: materials.get(line.material)?.material_description || '',

@@ -84,8 +84,12 @@ async function renderEdit(target) {
       </section>
       <aside class="tx-order">
         <h2>สรุปคำสั่ง</h2>
-        <div class="tx-order-label">ชื่อ</div>
-        <div class="tx-order-name" id="edit-order-name">ยังไม่เลือก</div>
+        <dl class="tx-order-who">
+          <div><dt>แหล่งซื้อ</dt><dd id="edit-order-source">ยังไม่เลือก</dd></div>
+          <div><dt>หน่วยงาน</dt><dd id="edit-order-dept"></dd></div>
+          <div><dt>รหัสพนักงาน</dt><dd id="edit-order-emp"></dd></div>
+          <div><dt>ผู้เบิก</dt><dd id="edit-order-person"></dd></div>
+        </dl>
         <div class="tx-order-lines" id="edit-order"></div>
         <div id="edit-confirm-host"></div>
       </aside>
@@ -141,9 +145,12 @@ async function renderEdit(target) {
     const cart = header ? (await api(`/api/requisitions/${header.id}`)).requisition : null;
     if (!alive() || !$('edit-order')) return;
     const lines = cart?.lines || [];
-    $('edit-order-name').textContent = cart && cart.costcenter !== '-'
+    $('edit-order-source').textContent = cart && cart.costcenter !== '-'
       ? `${cart.costcenter}${cart.costcenterName ? ` · ${cart.costcenterName}` : ''}`
       : 'ยังไม่เลือก';
+    $('edit-order-dept').textContent = cart?.department || me.department || '';
+    $('edit-order-emp').textContent = cart?.requested_by || me.employeeId || '';
+    $('edit-order-person').textContent = cart?.requesterName || me.name || '';
     $('edit-order').innerHTML = lines.length
       ? lines.map((line) => `<div class="tx-line"><span class="tx-line-name">${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span><button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button></div>`).join('')
       : '<p class="sum-meta">ยังไม่มีรายการ</p>';
@@ -352,6 +359,14 @@ async function renderEdit(target) {
   }
 }
 
+function cartWhoFields(department) {
+  return [
+    field('หน่วยงาน', `<input value="${esc(department || me.department || '')}" readonly>`),
+    field('รหัสพนักงาน', `<input value="${esc(me.employeeId || '')}" readonly>`),
+    field('ผู้เบิก', `<input value="${esc(me.name || '')}" readonly>`)
+  ].join('');
+}
+
 async function putInCart(material, qty, costcenter) {
   const mine = await api('/api/requisitions?scope=mine');
   const cartHeader = mine.requisitions.find((row) => row.status === 'cart');
@@ -374,12 +389,13 @@ async function openCartPopup(item, onDone) {
     field('ชื่อรายการ', `<input value="${esc(item.name)}" readonly>`),
     field('หน่วย', `<input value="${esc(item.bun)}" readonly>`),
     field('จำนวน', '<input id="line-qty" type="number" min="0.001" step="0.001" value="1">'),
-    field('costcenter', centerField)
+    field('แหล่งซื้อ', centerField),
+    cartWhoFields(pay.department)
   ].join(''), async () => {
     const qty = Number($('line-qty').value);
     const costcenter = $('line-cc')?.value || '';
     if (!(qty > 0)) throw new Error('ระบุจำนวน');
-    if (!costcenter) throw new Error('เลือก costcenter');
+    if (!costcenter) throw new Error('เลือกแหล่งซื้อ');
     await putInCart(item.material, qty, costcenter);
     toast('ใส่ตะกร้าแล้ว');
     closePopup();
@@ -403,13 +419,14 @@ async function openAddPopup() {
     field('ชื่อรายการ', '<input id="line-name" readonly>'),
     field('หน่วย', '<input id="line-bun" readonly>'),
     field('จำนวน', '<input id="line-qty" type="number" min="0.001" step="0.001" value="1">'),
-    `<label class="field d-none" id="line-cc-field">costcenter${centerField}</label>`
+    `<label class="field d-none" id="line-cc-field">แหล่งซื้อ${centerField}</label>`,
+    cartWhoFields(pay.department)
   ].join(''), async () => {
     if (!picked) throw new Error('เลือกรายการ');
     const qty = Number($('line-qty').value);
     const costcenter = $('line-cc')?.value || '';
     if (!(qty > 0)) throw new Error('ระบุจำนวน');
-    if (!costcenter) throw new Error('เลือก costcenter');
+    if (!costcenter) throw new Error('เลือกแหล่งซื้อ');
     await putInCart(picked.material, qty, costcenter);
     toast('ใส่ตะกร้าแล้ว');
     closePopup();

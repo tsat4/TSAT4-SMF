@@ -538,8 +538,10 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .tx-card-sum strong{font-size:12px;font-weight:500}
 .tx-card .btn{min-height:22px;width:22px;padding:0;font-size:14px}
 .tx-order h2{margin:0;font-size:14px;font-weight:500}
-.tx-order-label{font-size:11px;color:var(--mo-text-muted)}
-.tx-order-name{font-size:13px}
+.tx-order-who{display:grid;gap:2px;margin:0}
+.tx-order-who div{display:grid;grid-template-columns:78px minmax(0,1fr);gap:6px;align-items:baseline;font-size:12px}
+.tx-order-who dt{margin:0;color:var(--mo-text-muted);font-weight:400}
+.tx-order-who dd{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tx-order-lines{flex:1;min-height:0;overflow:auto}
 .tx-line{display:flex;align-items:center;gap:8px;min-height:32px;border-bottom:1px solid var(--mo-line)}
 .tx-line-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
