@@ -11,14 +11,20 @@ const CHOICES = {
 
 TITLES.system = ['Setting', 'ตารางทั้งระบบ'];
 
-function columnControl(column, value) {
+function columnLabel(table, column) {
+  if (table?.name === 'mt_main_user' && column.name === 'creator') return 'สิทธิ์จัดการระบบ';
+  return column.name;
+}
+
+function columnControl(table, column, value) {
   const id = `sys-${column.name}`;
-  if (column.type === 'password') return field(column.name, `<input id="${id}" type="password" autocomplete="new-password">`);
-  if (column.type === 'bool') return field(column.name, `<select id="${id}"><option value="false">false</option><option value="true"${value ? ' selected' : ''}>true</option></select>`);
-  if (CHOICES[column.type]) return field(column.name, `<select id="${id}">${options(CHOICES[column.type], value)}</select>`);
+  const label = columnLabel(table, column);
+  if (column.type === 'password') return field(label, `<input id="${id}" type="password" autocomplete="new-password">`);
+  if (column.type === 'bool') return field(label, `<select id="${id}"><option value="false">false</option><option value="true"${value ? ' selected' : ''}>true</option></select>`);
+  if (CHOICES[column.type]) return field(label, `<select id="${id}">${options(CHOICES[column.type], value)}</select>`);
   const number = ['int', 'qty', 'money'].includes(column.type);
   const step = column.type === 'int' ? '1' : '0.001';
-  return field(column.name, `<input id="${id}" ${number ? `type="number" step="${step}"` : ''} value="${esc(value ?? '')}">`);
+  return field(label, `<input id="${id}" ${number ? `type="number" step="${step}"` : ''} value="${esc(value ?? '')}">`);
 }
 
 async function renderSystem(target) {
@@ -51,7 +57,7 @@ async function renderSystem(target) {
     countText('sys-count', state.rows.length, data.total);
     setPager('sys', state.offset, data.total);
     const visible = table.columns.filter((column) => column.type !== 'password');
-    fillTable('sys-rows', visible.map((column) => ({ label: column.name, key: column.name })), state.rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}</tr>`).join(''), 'ไม่มีแถว', columnHead());
+    fillTable('sys-rows', visible.map((column) => ({ label: columnLabel(table, column), key: column.name })), state.rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}</tr>`).join(''), 'ไม่มีแถว', columnHead());
     bindRowSelect($('sys-rows'), (pick) => {
       state.selected = state.rows[Number(pick)];
       $('sys-edit').disabled = false;
@@ -82,8 +88,15 @@ async function renderSystem(target) {
   };
   const drawForm = () => {
     const table = tableOf();
-    const fields = table.columns.map((column) => (column.type === 'read' ? '' : columnControl(column, state.editing ? state.editing[column.name] : ''))).join('');
-    openPopup(`${state.editing ? 'แก้ไขแถว' : 'เพิ่มแถว'} ${esc(table.name)}`, fields, saveRow);
+    const fields = table.columns.map((column) => {
+      if (column.type === 'read') return '';
+      const fresh = !state.editing && table.name === 'mt_main_user' && column.name === 'creator';
+      return columnControl(table, column, state.editing ? state.editing[column.name] : (fresh ? true : ''));
+    }).join('');
+    const title = table.name === 'mt_main_user'
+      ? (state.editing ? 'แก้ไขสิทธิ์จัดการระบบ' : 'เพิ่มสิทธิ์จัดการระบบ')
+      : `${state.editing ? 'แก้ไขแถว' : 'เพิ่มแถว'} ${esc(table.name)}`;
+    openPopup(title, fields, saveRow);
   };
   $('sys-table').onchange = () => { state.offset = 0; head.sort = ''; head.dir = 'asc'; head.filters = {}; state.editing = null; closePopup(); loadRows().catch(onErr); };
   $('sys-add').onclick = () => { state.editing = null; drawForm(); };
@@ -93,7 +106,8 @@ async function renderSystem(target) {
     const table = tableOf();
     const key = {};
     table.pk.forEach((column) => { key[column] = state.selected[column]; });
-    confirmPopup(`ลบแถว ${esc(table.name)}`, 'ตรวจแถวที่เลือกอีกครั้งก่อนลบ', async () => {
+    const removing = table.name === 'mt_main_user' ? 'นำสิทธิ์จัดการระบบออก' : `ลบแถว ${esc(table.name)}`;
+    confirmPopup(removing, 'ตรวจแถวที่เลือกอีกครั้งก่อนลบ', async () => {
       await api(`/api/system/tables/${encodeURIComponent(table.name)}`, { method: 'DELETE', body: { key } });
       toast('ลบแล้ว');
       await loadRows();

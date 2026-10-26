@@ -1,7 +1,7 @@
 import { mx, dbReady } from './db.js';
 import { fail } from './http.js';
 import { cookies, readSession, setSession } from './session.js';
-import { MEMBER_TABLES, isCreatorRow } from './access.js';
+import { CREATOR_ID, MEMBER_TABLES, isCreatorRow } from './access.js';
 
 export function nameOf(employee) {
   if (!employee) return '';
@@ -45,6 +45,7 @@ export function publicUser(row) {
   return {
     employeeId: row.employee_id,
     creator: isCreatorRow(row),
+    founder: row.employee_id === CREATOR_ID,
     roles,
     usageRole: roles.sto ?? null,
     status: row.status,

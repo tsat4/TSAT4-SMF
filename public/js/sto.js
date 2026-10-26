@@ -567,12 +567,12 @@ async function renderUsers(target) {
       state.rows = page;
       countText('usage-count', page.length, filtered.length);
       setPager('usage', state.offset, filtered.length);
-      fillTable('usage-rows', [{ label: 'รหัส', key: 'employeeId' }, { label: 'ชื่อ', key: 'name' }, { label: 'หน่วยงาน', key: 'department' }, { label: 'costcenter', key: 'costcenter' }, { label: 'บทบาท', key: 'role' }, { label: 'สถานะ', key: 'status' }], page.map((row, index) => `<tr data-pick="${index}" data-creator="${row.creator ? '1' : '0'}"><td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.creator ? ' · ผู้สร้างระบบ' : ''}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีแถว', columnHead());
+      fillTable('usage-rows', [{ label: 'รหัส', key: 'employeeId' }, { label: 'ชื่อ', key: 'name' }, { label: 'หน่วยงาน', key: 'department' }, { label: 'costcenter', key: 'costcenter' }, { label: 'บทบาท', key: 'role' }, { label: 'สถานะ', key: 'status' }], page.map((row, index) => `<tr data-pick="${index}" data-founder="${row.founder ? '1' : '0'}"><td>${esc(row.employeeId)}</td><td>${esc(row.name)}</td><td>${esc(row.department)}</td><td>${esc(centerText(row))}</td><td>${esc(USAGE_ROLE[row.role] || row.role)}${row.founder ? ' · ผู้สร้างระบบ' : row.creator ? ' · ผู้ช่วยดูแลระบบ' : ''}</td><td>${esc(row.status)}</td></tr>`).join(''), 'ไม่มีแถว', columnHead());
     }
     bindRowSelect($('usage-rows'), (pick, row) => {
       state.selected = state.rows[Number(pick)];
       $('usage-edit').disabled = false;
-      $('usage-del').disabled = kind() === 'members' && row.dataset.creator === '1';
+      $('usage-del').disabled = kind() === 'members' && row.dataset.founder === '1';
     });
   };
   const saveRow = async () => {

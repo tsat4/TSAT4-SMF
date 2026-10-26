@@ -128,7 +128,10 @@ export default defineModule({
       const { spec, client } = opened;
       const { out, error: invalid } = await adminPayload(spec, req.body || {}, { insert: true });
       if (invalid) return fail(res, 400, invalid);
-      if (req.params.name === 'mt_main_user' && out.creator && out.employee_id !== CREATOR_ID) return fail(res, 400, 'กำหนดผู้สร้างระบบเพิ่มไม่ได้');
+      if (req.params.name === 'mt_main_user') {
+        const employee = await client.from('mt_main_employee').select('status').eq('employee_id', out.employee_id).maybeSingle();
+        if (employee.error || !employee.data || employee.data.status !== 'Active') return fail(res, 400, 'พนักงานนี้ใช้งานไม่ได้');
+      }
       if (memberTables.has(req.params.name) && out.employee_id === CREATOR_ID && out.role && out.role !== 'admin') return fail(res, 400, 'ผู้สร้างระบบเป็น Admin เสมอ');
       if (req.params.name === 'mt_main_user' && !out.password_hash) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
       if (req.params.name === 'mt_main_user') out.role = 'employee';

@@ -33,7 +33,8 @@ export function mountMembers(app, mod) {
         department: employee.department || row.department || '',
         role: row.role,
         status: row.status,
-        creator: Boolean(account.creator) || row.employee_id === CREATOR_ID
+        creator: Boolean(account.creator) || row.employee_id === CREATOR_ID,
+        founder: row.employee_id === CREATOR_ID
       };
     });
     const centers = await centersForDepartments(users.map((row) => row.department));

@@ -278,7 +278,7 @@ function showShell() {
   $('password-gate').classList.add('d-none');
   $('shell').classList.remove('d-none');
   $('header-user').textContent = me.name || me.employeeId;
-  const access = me.creator ? 'ผู้สร้างระบบ' : (USAGE_ROLE[me.usageRole] || 'ยังไม่เข้า Usage');
+  const access = me.founder ? 'ผู้สร้างระบบ' : me.creator ? 'ผู้ช่วยดูแลระบบ' : (USAGE_ROLE[me.usageRole] || 'ยังไม่เข้า Usage');
   $('header-role').textContent = `${access} · ${me.employeeId}`;
   document.querySelectorAll('[data-usage]').forEach((node) => node.classList.toggle('d-none', Number(node.dataset.usage) > rankOf('sto')));
   document.querySelectorAll('[data-system]').forEach((node) => node.classList.toggle('d-none', !me.creator));

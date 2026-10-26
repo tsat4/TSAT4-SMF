@@ -65,7 +65,7 @@ scripts/
   - ผลที่ได้คือ `req.user.roles = { sto: 'admin', pd1: null, ... }` (ส่งไป frontend ทาง `/api/me` และ `usageRole` ยังส่งอยู่เพื่อให้เข้ากับของเดิม)
 - server: `atLeast(mod, 1|2|3)` เป็น guard ของ route ส่วน `rankIn(req.user, mod.id)` ใช้เช็กในโค้ด
 - frontend: `rankOf('sto')` และ `ACCESS[view] = ['sto', n]` ถ้า rank ไม่ถึงจะเปิดเป็นหน้า `locked`
-- creator (`CREATOR_ID` หรือ `mt_main_user.creator`) เป็น admin ของทุกโมดูลเสมอ และเป็นคนเดียวที่เห็นหน้า System
+- creator (`CREATOR_ID` หรือ `mt_main_user.creator`) เป็น admin ของทุกโมดูลเสมอ และเห็นหน้า System ผู้สร้างระบบมีคนเดียวคือ `CREATOR_ID` คนที่ `creator` เป็นจริงคนอื่นเป็นผู้ช่วยดูแลระบบ
 - ขอบเขตข้อมูล: ผู้ใช้เห็นเฉพาะ costcenter ที่ `mt_main_costcenter.department` ตรงกับ department ของตัวเอง (`ownCenter`)
   (ตาราง department master ถูกตัดทิ้งไปแล้วโดยตั้งใจ ชื่อหน่วยงานเก็บไว้ที่ costcenter)
 
