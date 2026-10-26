@@ -142,10 +142,7 @@ async function renderEdit(target) {
     const mine = await api('/api/requisitions?scope=mine');
     if (!alive()) return;
     const header = mine.requisitions.find((row) => row.status === 'cart');
-    const [detail, pay] = await Promise.all([
-      header ? api(`/api/requisitions/${header.id}`) : Promise.resolve(null),
-      api('/api/pay-centers')
-    ]);
+    const detail = header ? await api(`/api/requisitions/${header.id}`) : null;
     if (!alive() || !$('edit-order')) return;
     const cart = detail?.requisition || null;
     const lines = cart?.lines || [];
@@ -159,14 +156,6 @@ async function renderEdit(target) {
     $('edit-order-dept').textContent = cart?.department || me.department || '';
     $('edit-order-emp').textContent = cart?.requested_by || me.employeeId || '';
     $('edit-order-person').textContent = cart?.requesterName || me.name || '';
-    const centers = [...(pay.costcenters || [])].sort((a, b) => String(a.costcenter).localeCompare(String(b.costcenter)));
-    const choices = (line) => {
-      const rows = [...centers];
-      if (line.costcenter && !rows.some((row) => row.costcenter === line.costcenter)) {
-        rows.unshift({ costcenter: line.costcenter, objectName: line.costcenterName || '' });
-      }
-      return rows.map((row) => `<option value="${esc(row.costcenter)}"${row.costcenter === line.costcenter ? ' selected' : ''}>${esc(row.costcenter)} · ${esc(row.objectName || '')}</option>`).join('');
-    };
     const groups = new Map();
     for (const line of lines) {
       const key = line.costcenter || '-';
@@ -174,8 +163,9 @@ async function renderEdit(target) {
       list.push(line);
       groups.set(key, list);
     }
+    const walletTitle = (code, group) => (code === '-' ? 'ยังไม่เลือก' : `${code}${group[0].costcenterName ? ` · ${group[0].costcenterName}` : ''}`);
     $('edit-order').innerHTML = lines.length
-      ? [...groups.entries()].map(([code, group]) => `<section class="tx-wallet"><div class="tx-wallet-name">${esc(code === '-' ? 'ยังไม่เลือก' : `${code}${group[0].costcenterName ? ` · ${group[0].costcenterName}` : ''}`)}</div>${group.map((line) => `<div class="tx-line"><div class="tx-line-main"><span class="tx-line-name">${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span><button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button></div><select class="tx-line-cc" data-move="${esc(line.id)}" aria-label="ย้ายแหล่งซื้อ">${choices(line)}</select></div>`).join('')}</section>`).join('')
+      ? [...groups.entries()].map(([code, group]) => `<section class="tx-wallet"><div class="tx-wallet-name">${esc(walletTitle(code, group))}</div>${group.map((line) => `<div class="tx-line"><span class="tx-line-name">- ${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span><button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button></div>`).join('')}</section>`).join('')
       : '<p class="sum-meta">ยังไม่มีรายการ</p>';
     $('edit-confirm-host').innerHTML = `<button class="btn btn-primary hold-btn" type="button" id="edit-confirm" title="กดค้าง 2 วินาที" ${lines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">ยืนยัน</span></button>`;
     $('edit-order').querySelectorAll('[data-drop]').forEach((node) => {
@@ -183,14 +173,6 @@ async function renderEdit(target) {
         await api(`/api/requisitions/${cart.id}/lines/${node.dataset.drop}`, { method: 'DELETE' });
         await loadOrder();
       });
-    });
-    $('edit-order').querySelectorAll('[data-move]').forEach((node) => {
-      node.onchange = async () => {
-        try {
-          await api(`/api/requisitions/${cart.id}/lines/${node.dataset.move}`, { method: 'PATCH', body: { costcenter: node.value } });
-        } catch (err) { onErr(err); }
-        await loadOrder();
-      };
     });
     if (lines.length) {
       bindHold($('edit-confirm'), async () => {
