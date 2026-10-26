@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Cursor · ย่อการ์ด Deck ของหน้ารายการ Usage ให้แถวเตี้ยลง
 - 2026-10-26 · Cursor · แท็บทุกหน้าไม่มีเส้นกั้นระหว่างปุ่ม และหน้ารายการ Usage เป็น Deck รูป ชื่อ รหัส สต็อกคงเหลือ ปุ่มเพิ่มลงตะกร้า
 - 2026-10-25 · Cursor · รัน db/act/5s_task.sql ใน Tx Data แล้ว สร้าง mt_5s_task พร้อม RLS แผนเดิมใน mt_5s_plan ว่าง จึงไม่ได้คัดลอก (plan 0, main 0, sub 0)
 - 2026-10-25 · Claude · ตรวจโค้ดตามที่ผู้ใช้สั่ง (ลบที่ไม่ใช้ ย่อ รวมที่ซ้ำ): เลิกใช้แผน Gantt เดิมทั้งหมด (ลบ route `/api/act/:activity/plan`, ตาราง mt_<act>_plan ออกจากแม่แบบ, ปฏิทินอ่านจาก Planner อย่างเดียว) · ทุกกิจกรรมมี Planner ในแม่แบบ (`--task` เลิกใช้, `--plan` → `--no-audit`) · route ของ act ใช้ `actRoute()` ตัวเดียวใน common.js (เดิมซ้ำ 3 ไฟล์) + `must` / `throwIf` / `roundTo` · หัวตารางเรียง/กรองใช้ `headFor()` ใน core.js (เดิมซ้ำ 5 ที่ รวม sto.js และ system.js) · Planner ใช้ช่องค้นพนักงานเดียวกับ 5S · ลบ db/04_act_plan.sql, db/05_act_audit.sql, db/act/5s_v2_step1/2.sql (รันแล้ว) และ CSS ที่ไม่ใช้
