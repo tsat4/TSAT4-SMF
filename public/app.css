@@ -217,7 +217,6 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 .plan-label{font-size:13px;font-weight:500;min-width:120px}
 .seg{display:inline-flex;border:1px solid var(--mo-line);border-radius:var(--mo-radius);overflow:hidden}
 .seg-btn{border:0;background:var(--mo-input);color:var(--mo-text);min-height:28px;padding:0 12px;font-size:12px}
-.seg-btn+.seg-btn{border-left:1px solid var(--mo-line)}
 .seg-btn.is-active{background:var(--mo-primary);color:var(--mo-on-primary);font-weight:500}
 .plan-chip,.plan-item{display:block;width:100%;text-align:left;border:0;border-left:3px solid var(--chip,var(--mo-primary));border-radius:4px;background:var(--mo-info-soft);color:var(--mo-text);font-size:11px;padding:2px 6px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .plan-chip.plan-done,.plan-item.plan-done{background:var(--mo-success-soft)}
@@ -525,7 +524,18 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .tx-group{border:1px solid var(--mo-line);background:var(--mo-surface);color:var(--mo-text);border-radius:999px;min-height:28px;padding:0 12px;font-size:12px}
 .tx-group.is-active{border-color:var(--zone,var(--mo-primary));background:var(--zone-fill,var(--mo-info-soft));color:var(--zone-ink,var(--mo-primary));font-weight:500}
 .tx-list .search-slot,.tx-list .table-foot{flex:0 0 auto}
-.tx-list .table-wrap{flex:1}
+.tx-list .table-wrap,.tx-deck{flex:1}
+.tx-deck{min-height:0;overflow:auto;border:1px solid var(--mo-line);border-radius:var(--mo-radius);background:var(--mo-surface)}
+.tx-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid var(--mo-line)}
+.tx-card-img{width:64px;height:64px;flex:0 0 64px;border-radius:6px;object-fit:cover;background:var(--mo-surface-2)}
+.tx-card-img.is-empty{display:grid;place-items:center;color:var(--mo-text-muted)}
+.tx-card-img .material-symbols-rounded{font-size:28px}
+.tx-card-body{flex:1;min-width:0}
+.tx-card-title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-card-sub{margin-top:2px;font-size:12px;color:var(--mo-text-muted)}
+.tx-card-sum{display:flex;flex-direction:column;align-items:flex-end;flex:0 0 auto;min-width:72px}
+.tx-card-sum span{font-size:11px;color:var(--mo-text-muted)}
+.tx-card-sum strong{font-size:13px;font-weight:600}
 .tx-order h2{margin:0;font-size:14px;font-weight:500}
 .tx-order-label{font-size:11px;color:var(--mo-text-muted)}
 .tx-order-name{font-size:13px}

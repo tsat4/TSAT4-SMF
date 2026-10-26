@@ -27,6 +27,12 @@ function moneyText(value) {
   return Number.isFinite(amount) ? amount.toFixed(2) : '';
 }
 
+function qtyText(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return '0';
+  return String(Math.round(amount * 1000) / 1000);
+}
+
 function badge(status) {
   const kind = status === 'ready' || status === 'received' ? 'badge-success' : status === 'cancelled' ? 'badge-danger' : status === 'cart' ? 'badge-warning' : 'badge-primary';
   return `<span class="badge ${kind}">${esc(STATUS[status] || status)}</span>`;
@@ -70,7 +76,7 @@ async function renderEdit(target) {
       <section class="tx-list">
         <div class="tx-groups" id="edit-groups"></div>
         ${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'หมายเลข ชื่อ หรือ group' })}
-        <div class="table-wrap sheet" id="edit-rows"></div>
+        <div class="tx-deck" id="edit-rows"></div>
         ${tableFoot('edit')}
       </section>
       <aside class="tx-order">
@@ -154,7 +160,12 @@ async function renderEdit(target) {
     if (state.group) params.set('group', state.group);
     const data = await api(`/api/materials?${params}`);
     const rows = data.materials || [];
-    fillTable('edit-rows', [{ label: 'กลุ่ม', key: 'usage_group' }, 'รูปภาพ', { label: 'รหัสรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'material_description' }, { label: 'ราคา', key: 'price' }, ''], rows.map((row) => `<tr><td>${esc(row.usage_group || '')}</td><td>${usageThumb(row.img)}</td><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${moneyText(row.price)}</td><td><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}">+</button></td></tr>`).join(''), 'ไม่พบรายการ', columnHead());
+    $('edit-rows').innerHTML = rows.length ? rows.map((row) => {
+      const img = row.img
+        ? `<img class="tx-card-img" src="${esc(row.img)}" alt="">`
+        : '<div class="tx-card-img is-empty" aria-hidden="true"><span class="material-symbols-rounded">image</span></div>';
+      return `<article class="tx-card">${img}<div class="tx-card-body"><div class="tx-card-title">${esc(row.material_description)}</div><div class="tx-card-sub">${esc(row.material)}</div></div><div class="tx-card-sum"><span>คงเหลือ</span><strong>${qtyText(row.currentQty)} ${esc(row.bun || '')}</strong></div><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}" aria-label="เพิ่มลงตะกร้า">+</button></article>`;
+    }).join('') : '<p class="empty">ไม่พบรายการ</p>';
     setFoot(rows.length, data.total || 0);
     $('edit-rows').querySelectorAll('[data-add]').forEach((node) => {
       node.onclick = () => openCartPopup({ material: node.dataset.add, name: node.dataset.name || '', bun: node.dataset.bun || '' }, loadOrder).catch(onErr);

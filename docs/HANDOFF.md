@@ -14,9 +14,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- **Tx Data** (ไม่ด่วน ทำหลังรัน 5s_task.sql และเห็นแผน 5S ใน Planner แล้ว) ลบตาราง Gantt เดิมที่ไม่มีโค้ดใช้แล้ว: `drop table if exists public.mt_100p_plan; drop table if exists public.mt_5s_plan;`
-- **Tx Data** SQL Editor: รัน `db/act/5s_task.sql` (สร้าง mt_5s_task และคัดลอกแผน Gantt เดิมของ 5S เข้า Planner ครั้งเดียว รันซ้ำได้ ไม่ลบแผนเดิม) ผลท้ายไฟล์: plan = จำนวนแผนเดิมที่ไม่ยกเลิก, main/sub = ข้อหลัก/ข้อรอง · ก่อนรัน 5S > Setting > แผนงาน และ Dashboard > Schedule จะบอกให้รันไฟล์นี้
-- ไม่มี
+- **Tx Data** (ไม่ด่วน ทำหลังเห็นแผน 5S ใน Planner แล้ว) ลบตาราง Gantt เดิมที่ไม่มีโค้ดใช้แล้ว: `drop table if exists public.mt_100p_plan; drop table if exists public.mt_5s_plan;`
 
 ## ข้อควรระวัง
 
@@ -25,6 +23,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Cursor · แท็บทุกหน้าไม่มีเส้นกั้นระหว่างปุ่ม และหน้ารายการ Usage เป็น Deck รูป ชื่อ รหัส สต็อกคงเหลือ ปุ่มเพิ่มลงตะกร้า
+- 2026-10-25 · Cursor · รัน db/act/5s_task.sql ใน Tx Data แล้ว สร้าง mt_5s_task พร้อม RLS แผนเดิมใน mt_5s_plan ว่าง จึงไม่ได้คัดลอก (plan 0, main 0, sub 0)
 - 2026-10-25 · Claude · ตรวจโค้ดตามที่ผู้ใช้สั่ง (ลบที่ไม่ใช้ ย่อ รวมที่ซ้ำ): เลิกใช้แผน Gantt เดิมทั้งหมด (ลบ route `/api/act/:activity/plan`, ตาราง mt_<act>_plan ออกจากแม่แบบ, ปฏิทินอ่านจาก Planner อย่างเดียว) · ทุกกิจกรรมมี Planner ในแม่แบบ (`--task` เลิกใช้, `--plan` → `--no-audit`) · route ของ act ใช้ `actRoute()` ตัวเดียวใน common.js (เดิมซ้ำ 3 ไฟล์) + `must` / `throwIf` / `roundTo` · หัวตารางเรียง/กรองใช้ `headFor()` ใน core.js (เดิมซ้ำ 5 ที่ รวม sto.js และ system.js) · Planner ใช้ช่องค้นพนักงานเดียวกับ 5S · ลบ db/04_act_plan.sql, db/05_act_audit.sql, db/act/5s_v2_step1/2.sql (รันแล้ว) และ CSS ที่ไม่ใช้
 - 2026-10-25 · Claude · **Cursor: ของฝั่งระบบงานที่น่าจะไม่ใช้แล้ว ตรวจแล้วลบได้** — แผนรวม TX เข้า MX ใน db/README.md ถูกแทนด้วยการแยกฐานแล้ว: `db/01_inspect.sql`, `db/02_create_tx_in_mx.sql`, `db/02_generate_mx_sql.sql`, `db/07_drop_act_from_mx.sql`, `db/08_drop_sto_from_tx.sql` (รันแล้ว), `scripts/migrate-tx-to-mx.js` + `npm run migrate:tx`, ส่วนที่ทดสอบไฟล์เหล่านี้ใน `scripts/test-db.js` และเขียน db/README.md ใหม่ให้เหลือ `03_receive_rpc.sql` · ใน requisitions.js ถ้า RPC `tx_sto_receive` ใช้ได้แล้ว ลบ `receiveLineByLine` / `adjustStock` ได้ (README เดิมบอกไว้)
 - 2026-10-25 · Cursor · Usage > transaction หน้ารายการแบ่งเป็นปุ่มกลุ่มกรอง ตารางรายการพร้อมค้นหา และสรุปคำสั่งพร้อมปุ่มยืนยัน

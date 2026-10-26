@@ -1,7 +1,8 @@
 import { mx } from '../../core/db.js';
 import { fail, wrap, amountOf, cleanTerm, adminWriteError, applyListQuery } from '../../core/http.js';
-import { atLeast } from '../../core/access.js';
+import { atLeast, rankIn } from '../../core/access.js';
 import { requireUser } from '../../core/users.js';
+import { centersForDepartments } from '../../core/master.js';
 
 function usageGroupOf(value) {
   return String(value || '').trim().slice(0, 40);
@@ -19,6 +20,27 @@ async function saveUsageImage(material, dataUrl) {
   if (uploaded.error) return null;
   const { data } = mx.storage.from('usage-img').getPublicUrl(path);
   return `${data.publicUrl}?v=${Date.now()}`;
+}
+
+async function currentStock(req, mod, materials) {
+  const codes = [...new Set(materials.map((row) => row.material).filter(Boolean))];
+  const totals = new Map();
+  if (!codes.length) return totals;
+  let centers = null;
+  if (rankIn(req.user, mod.id) < 3) {
+    const grouped = await centersForDepartments([req.user.department || '']);
+    centers = (grouped.get(req.user.department) || []).map((row) => row.costcenter);
+    if (!centers.length) return totals;
+  }
+  for (let from = 0; ; from += 1000) {
+    let query = mx.from('mt_sto_stock').select('material,current_qty').in('material', codes);
+    if (centers) query = query.in('costcenter', centers);
+    const { data, error } = await query.range(from, from + 999);
+    if (error) throw error;
+    for (const row of data || []) totals.set(row.material, (totals.get(row.material) || 0) + (Number(row.current_qty) || 0));
+    if (!data || data.length < 1000) break;
+  }
+  return totals;
 }
 
 export function mountMaterials(app, mod) {
@@ -130,6 +152,15 @@ export function mountMaterials(app, mod) {
     if (term) query = query.or(`material.ilike.%${term}%,material_description.ilike.%${term}%,usage_group.ilike.%${term}%`);
     const { data, error, count } = await query;
     if (error) return fail(res, 400, 'ค้นหารายการไม่ได้');
-    res.json({ materials: data || [], total: count || 0 });
+    let totals;
+    try {
+      totals = await currentStock(req, mod, data || []);
+    } catch {
+      return fail(res, 400, 'อ่านยอดคงเหลือไม่ได้');
+    }
+    res.json({
+      materials: (data || []).map((row) => ({ ...row, currentQty: totals.get(row.material) || 0 })),
+      total: count || 0
+    });
   }));
 }
