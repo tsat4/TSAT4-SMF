@@ -127,6 +127,6 @@ RPC: `mt_sto_stock_adjust(p_costcenter, p_material, p_delta)` (mx), `tx_sto_appl
 
 ## หนี้ทางเทคนิคที่รู้แล้ว (ยังไม่แก้)
 
-- mx กับ tx อยู่คนละโปรเจกต์ Supabase จึง join หรือใช้ FK ข้ามกันไม่ได้ และการตัดสต็อกตอน `received` ยังไม่ใช่ transaction เดียว กำลังแก้อยู่โดยรวมฐาน (ดู `db/README.md`) เมื่อมี RPC `tx_sto_receive` แล้ว server จะใช้เอง
+- mx กับ tx อยู่คนละโปรเจกต์ Supabase จึง join หรือใช้ FK ข้ามกันไม่ได้ การรับของเรียก `tx_sto_receive` บน Mx Data ซึ่งตัดสต็อกและเปลี่ยนสถานะใน transaction เดียว
 - ทุก request อ่านตารางสมาชิกของทุกโมดูล ถ้ามีเกิน 8–10 โมดูล ควรรวมเป็นตารางเดียว `mt_main_user_role(employee_id, module_id, role, status)`
 - ยังไม่มีเทสต์ที่ต่อฐานข้อมูลจริง `npm run check` ตรวจได้แค่โครงสร้าง, route, สิทธิ์ และการ boot

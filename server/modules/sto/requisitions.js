@@ -6,19 +6,6 @@ import { centersForDepartments, costcenterMap, ownCenter } from '../../core/mast
 
 const DRAFT_COSTCENTER = '-';
 
-async function adjustStock(costcenter, material, delta) {
-  const { error } = await mx.rpc('mt_sto_stock_adjust', {
-    p_costcenter: costcenter,
-    p_material: material,
-    p_delta: delta
-  });
-  if (error) {
-    const text = error.message || '';
-    if (text.includes('not enough')) throw new Error('ยอดคงเหลือไม่พอ');
-    throw new Error('ปรับยอดคงเหลือไม่ได้');
-  }
-}
-
 async function materialMap(codes) {
   const unique = [...new Set(codes.filter(Boolean))];
   if (!unique.length) return new Map();
@@ -57,41 +44,14 @@ async function move(id, from, patch) {
 }
 
 // tx_sto_receive (db/03_receive_rpc.sql, Mx Data) cuts all stock and marks the requisition received
-// in one transaction. If the function is missing, fall back to the old line-by-line way.
+// in one transaction.
 async function receive(header) {
   const { error } = await mx.rpc('tx_sto_receive', { p_id: header.id, p_employee: header.requested_by });
   if (!error) return;
-  if (error.code !== 'PGRST202') {
-    const text = error.message || '';
-    if (text.includes('not enough')) throw new Error('ยอดคงเหลือไม่พอ');
-    if (text.includes('no lines')) throw new Error('ใบเบิกไม่มีรายการ');
-    throw new Error('เปลี่ยนสถานะไม่ได้');
-  }
-  await receiveLineByLine(header);
-}
-
-// Not atomic: stock is cut line by line and given back if a later line fails.
-async function receiveLineByLine(header) {
-  const { data: lines, error } = await mx.from('tx_sto_requisition_line')
-    .select('costcenter,material,qty').eq('requisition_id', header.id);
-  if (error || !lines?.length) throw new Error('ใบเบิกไม่มีรายการ');
-  const done = [];
-  try {
-    for (const line of lines) {
-      await adjustStock(line.costcenter, line.material, -Number(line.qty));
-      done.push(line);
-    }
-    await move(header.id, 'ready', { status: 'received', received_by: header.requested_by });
-  } catch (err) {
-    for (const line of done) {
-      try {
-        await adjustStock(line.costcenter, line.material, Number(line.qty));
-      } catch (restoreErr) {
-        console.error(restoreErr);
-      }
-    }
-    throw err;
-  }
+  const text = error.message || '';
+  if (text.includes('not enough')) throw new Error('ยอดคงเหลือไม่พอ');
+  if (text.includes('no lines')) throw new Error('ใบเบิกไม่มีรายการ');
+  throw new Error('เปลี่ยนสถานะไม่ได้');
 }
 
 export function mountRequisitions(app, mod) {

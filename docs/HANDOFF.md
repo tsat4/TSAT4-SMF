@@ -24,8 +24,9 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Cursor · ยืนยัน `tx_sto_receive(bigint, text)` อยู่ใน Mx Data และ service_role เรียกได้ แล้วลบทางสำรอง `receiveLineByLine` / `adjustStock` ออกจาก requisitions.js การรับของใช้ฟังก์ชันนี้ทางเดียว
 - 2026-10-26 · Claude · ออกแบบตาราง CFO จาก Excel (15 sheet → 5 ตาราง + 2 view, docs/specs/act-cfo.md) · แม่แบบทีมเพิ่ม role `vice` / `member` + คอลัมน์ `department` (ตัวแทนหน่วยงาน) และใส่ constraint ใหม่ทุกครั้งที่รัน (5S / 100P ได้ด้วยเมื่อรันไฟล์ของตัวเองซ้ำ ไม่จำเป็นต้องรันตอนนี้) · importer `scripts/import_cfo_excel.py` · test:act ตรวจยอดตรง Excel
-- 2026-10-26 · Claude · เคลียร์ของที่ไม่ใช้ (ผู้ใช้สั่ง): ลบไฟล์ย้ายฐาน TX → MX ที่ทำเสร็จแล้ว `db/01_inspect.sql`, `db/02_create_tx_in_mx.sql`, `db/07_drop_act_from_mx.sql`, `db/08_drop_sto_from_tx.sql`, `scripts/migrate-tx-to-mx.js` + `npm run migrate:tx` และไฟล์ที่ไม่ได้ commit `db/02b_mx_after_copy.sql` ในโฟลเดอร์ SMF · เขียน db/README.md ใหม่ (เหลือ 03_receive_rpc.sql และ 02_generate ที่ test:db ใช้) · `receiveLineByLine` / `adjustStock` ใน requisitions.js ยังเก็บไว้ (ใช้เมื่อ RPC `tx_sto_receive` ไม่มี) **Cursor: ถ้ายืนยันว่า RPC อยู่ใน Mx Data แล้ว ลบสองฟังก์ชันนี้ได้**
+- 2026-10-26 · Claude · เคลียร์ของที่ไม่ใช้ (ผู้ใช้สั่ง): ลบไฟล์ย้ายฐาน TX → MX ที่ทำเสร็จแล้ว `db/01_inspect.sql`, `db/02_create_tx_in_mx.sql`, `db/07_drop_act_from_mx.sql`, `db/08_drop_sto_from_tx.sql`, `scripts/migrate-tx-to-mx.js` + `npm run migrate:tx` และไฟล์ที่ไม่ได้ commit `db/02b_mx_after_copy.sql` ในโฟลเดอร์ SMF · เขียน db/README.md ใหม่ (เหลือ 03_receive_rpc.sql และ 02_generate ที่ test:db ใช้) · ทางสำรอง `receiveLineByLine` / `adjustStock` ถูกลบแล้วหลังยืนยัน RPC (ดูบันทึกบนสุด)
 - 2026-10-26 · Cursor · หน้า transaction ไม่พังอีกเมื่อสลับแท็บระหว่างที่ข้อมูลยังโหลด ไม่เขียนทับช่องที่ถูกแทนที่แล้ว
 - 2026-10-26 · Cursor · หน้ารายการ Usage แบ่งกรอบรายการกับสรุปคำสั่งคนละครึ่ง
 - 2026-10-26 · Cursor · หน้ารายการ Usage ขยายกรอบสรุปคำสั่ง และลดกรอบรายการ
