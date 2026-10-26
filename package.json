@@ -8,7 +8,6 @@
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/check.js",
-    "migrate:tx": "node --env-file=.env scripts/migrate-tx-to-mx.js",
     "test:db": "node scripts/test-db.js",
     "test:act": "node scripts/test-act-audit.js"
   },

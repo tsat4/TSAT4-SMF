@@ -51,7 +51,6 @@ public/
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)
 db/                          SQL ที่ผู้ใช้รันเองใน Supabase + คู่มือ (README.md)
 scripts/
-  migrate-tx-to-mx.js        npm run migrate:tx (คัดลอก tx_* จาก TX ไป MX)
   check.js                   npm run check (ดู AGENTS.md)
   routes.snapshot.txt        รายการ route + สิทธิ์ที่ถูกต้อง
 ```
