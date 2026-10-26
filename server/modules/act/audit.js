@@ -6,7 +6,7 @@ import { accessOf, actRoute, fetchAll, fetchIn, namesOf, requireAdmin, roundTo, 
 // Checklist audits (5S and similar): Dashboard reads for everyone, Setting writes for the year's admins.
 // Tables (Tx Data, one set per activity): db/act/<activity>.sql via tablesOf() · rules: docs/specs/act-5s.md
 const AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
-const ROLES = ['admin', 'chairman', 'auditor'];
+const ROLES = ['admin', 'chairman', 'vice', 'auditor', 'member'];
 const AUDIT_TYPES = ['SELF', 'COMMITTEE'];
 
 const round1 = (n) => roundTo(n, 1);
@@ -104,7 +104,8 @@ export function mountAudit(app) {
       tx.from(tablesOf(activity).team).select('year'),
       tx.from(tablesOf(activity).audit).select('year')
     ]);
-    throwIf(team.error, audits.error);
+    // Activities without audit tables (CFO, 100P) have no tx_<act>_audit.
+    throwIf(team.error, audits.error?.code === 'PGRST205' ? null : audits.error);
     const years = [...new Set([new Date().getFullYear(), year, ...(team.data || []).map((r) => r.year), ...(audits.data || []).map((r) => r.year)].map(Number))].sort();
     res.json({ year, years, access });
   });
@@ -163,9 +164,9 @@ export function mountAudit(app) {
   route('get', '/api/act/:activity/team', async (req, res, activity) => {
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
-    const rows = await fetchAll(() => tx.from(tablesOf(activity).team).select('id,employee_id,role,team,status').eq('year', year).neq('role', 'owner').order('role').order('team').order('employee_id'));
+    const rows = await fetchAll(() => tx.from(tablesOf(activity).team).select('*').eq('year', year).neq('role', 'owner').order('role').order('team').order('employee_id'));
     const names = await namesOf(rows.map((r) => r.employee_id));
-    res.json({ year, members: rows.map((r) => ({ ...r, name: names.get(String(r.employee_id))?.name || '', department: names.get(String(r.employee_id))?.department || '' })) });
+    res.json({ year, members: rows.map((r) => ({ ...r, name: names.get(String(r.employee_id))?.name || '', department: r.department || names.get(String(r.employee_id))?.department || '' })) });
   });
 
   route('get', '/api/act/:activity/checklist', async (req, res, activity) => {
@@ -276,9 +277,11 @@ export function mountAudit(app) {
     const employeeId = String(req.body?.employeeId || '').trim();
     const role = ROLES.includes(req.body?.role) ? req.body.role : '';
     const team = role === 'auditor' ? String(req.body?.team || '').trim().toUpperCase() : null;
+    const department = role === 'member' ? String(req.body?.department || '').trim().slice(0, 80) : '';
     if (!employeeId || !role) return fail(res, 400, 'เลือกพนักงานและบทบาท');
     if (role === 'auditor' && !/^[A-Z]$/.test(team)) return fail(res, 400, 'ผู้ตรวจต้องเลือกทีม A–Z');
-    const { error } = await tx.from(tablesOf(activity).team).insert({ year, employee_id: employeeId, role, team, status: 'Active' });
+    if (role === 'member' && !department) return fail(res, 400, 'ตัวแทนหน่วยงานต้องระบุหน่วยงาน');
+    const { error } = await tx.from(tablesOf(activity).team).insert({ year, employee_id: employeeId, role, team, ...(department ? { department } : {}), status: 'Active' });
     if (error?.code === '23505') return fail(res, 400, 'คนนี้มีบทบาทนี้อยู่แล้ว');
     throwIf(error);
     res.status(201).json({ ok: true });
@@ -295,21 +298,26 @@ export function mountAudit(app) {
     res.json({ ok: true });
   });
 
-  // Start a new year from last year's team or checklist; rows that already exist are kept.
-  const copyYear = (key, columns, conflict) => async (req, res, activity) => {
+  // Rows go in one by one so a row that already exists (unique constraint) is simply skipped.
+  const copyYear = (key) => async (req, res, activity) => {
     const table = tablesOf(activity)[key];
     const from = yearOf(req.body?.from);
     const to = yearOf(req.body?.to);
     if (!from || !to || from === to) return fail(res, 400, 'เลือกปีต้นทางและปลายทาง');
     if (!(await requireAdmin(req, res, activity, to))) return;
-    const rows = await fetchAll(() => tx.from(table).select(columns.join(',')).eq('year', from));
+    const rows = await fetchAll(() => tx.from(table).select('*').eq('year', from).order('id'));
     if (!rows.length) return fail(res, 400, `ปี ${from} ไม่มีข้อมูลให้คัดลอก`);
-    const { error } = await tx.from(table).upsert(rows.map((r) => ({ ...r, year: to })), { onConflict: conflict, ignoreDuplicates: true });
-    throwIf(error);
-    res.json({ ok: true, copied: rows.length });
+    let copied = 0;
+    for (const { id, ...row } of rows) {
+      const { error } = await tx.from(table).insert({ ...row, year: to });
+      if (error?.code === '23505') continue;
+      throwIf(error);
+      copied += 1;
+    }
+    res.json({ ok: true, copied });
   };
-  route('post', '/api/act/:activity/team/copy', copyYear('team', ['employee_id', 'role', 'team', 'area_id', 'status'], 'year,employee_id,role,team,area_id'));
-  route('post', '/api/act/:activity/checklist/copy', copyYear('checklist', ['item_no', 's_group', 'title', 'score_max', 'status'], 'year,item_no'));
+  route('post', '/api/act/:activity/team/copy', copyYear('team'));
+  route('post', '/api/act/:activity/checklist/copy', copyYear('checklist'));
 
   const itemInput = (body) => {
     const itemNo = intIn(body.itemNo, 1, 200);

@@ -34,6 +34,7 @@ server/
     act/index.js             ระบบกิจกรรม: ปฏิทินรวม /api/act/calendar (อ่านจาก Planner) + รวม route ของ act
     act/common.js            tablesOf(กิจกรรม) ชื่อตาราง, actRoute (route + ตารางยังไม่มี → 503), must/throwIf, accessOf (สิทธิ์รายปีจาก mt_<act>_team), fetchAll/fetchIn (อ่านเกิน 1000 แถว), namesOf
     act/transaction.js       ระบบตรวจ checklist: บันทึกผลตรวจ Self/Committee + Issue (รูปใน Storage bucket img_<กิจกรรม> ของ Tx Data เช่น img_5s) กติกาเป็นฟังก์ชันแยก ทดสอบใน test:act
+    act/cfo.js               CFO: Dashboard /cfo/summary, บันทึกรายเดือน /cfo/entries + /cfo/confirm, master /cfo/master /cfo/ef /cfo/activities /cfo/settings (docs/specs/act-cfo.md)
     act/planner.js           Project Planner (100P, 5S) /api/act/:activity/tasks ข้อหลัก/ข้อรอง ลากได้ (mt_<act>_task) spec docs/specs/act-planner.md
     act/audit.js             ระบบตรวจ checklist: Dashboard + Setting /api/act/:activity/... (db/act/<กิจกรรม>.sql) summarize()/rank() ทดสอบด้วย npm run test:act
     system/index.js          /api/system/tables (เฉพาะ creator) รวมตารางของทุกโมดูลให้อัตโนมัติ
@@ -46,6 +47,7 @@ public/
   js/act.js                  ระบบตั้งค่า > ปฏิทิน: แผนของทุกกิจกรรม (สัปดาห์ / เดือน / ปี) ดูอย่างเดียว + helper วันที่
   js/act-5s.js               <กิจกรรม> > Dashboard (Summary/Ranking/Schedule/Team) + Setting (แผนงาน/พื้นที่/ทีม/หัวข้อ/แผนตรวจ) เปิดใช้ตาม A5_ON
   js/act-tx.js               <กิจกรรม> > transaction: รายการใบตรวจ + ฟอร์มตรวจ + Issue (ใช้ helper ของ act-5s.js)
+  js/act-cfo.js              CFO: Dashboard (Summary/Schedule), transaction รายเดือน, Setting (แผนงาน/กิจกรรม/EF/ทีม/บริษัท) ใช้ปีและแถวเครื่องมือร่วมกับ act-5s.js
   js/act-planner.js          Project Planner รายปี (W1–W4) / รายเดือน (วัน) ลากแท่งได้: 100P > Setting (APL_ON), 5S > Setting > แผนงาน (แก้) และ Dashboard > Schedule (ดูอย่างเดียว)
   js/system.js               หน้าแก้ตารางของ creator
   js/boot.js                 bind event, สร้าง sidebar, โหลด session (ต้องอยู่ท้ายสุด)

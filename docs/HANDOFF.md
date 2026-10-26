@@ -24,6 +24,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Claude · หน้าจอ CFO ครบ 3 หน้า (Dashboard / transaction / Setting) + route `/api/act/cfo/cfo/*` · ทีมของ 5S ใช้ตัวเดียวกัน (รองรับรองประธาน / ตัวแทนหน่วยงาน + หน่วยงาน) · คัดลอกทีม/หัวข้อจากปีก่อนเปลี่ยนเป็นเพิ่มทีละแถว (ข้ามที่มีอยู่แล้ว) · importer CFO ให้รหัสกับ EF ที่ไม่มีรหัส (รันซ้ำไม่เพิ่มแถว) · ทดสอบ route จริงกับฐานจำลองผ่านหมด · **ต้องรัน db/act/cfo.sql + inbox/import_cfo.sql ใน Tx Data ก่อน หน้าจอจะขึ้นข้อความให้รันจนกว่าจะรัน**
 - 2026-10-26 · Cursor · ยืนยัน `tx_sto_receive(bigint, text)` อยู่ใน Mx Data และ service_role เรียกได้ แล้วลบทางสำรอง `receiveLineByLine` / `adjustStock` ออกจาก requisitions.js การรับของใช้ฟังก์ชันนี้ทางเดียว
 - 2026-10-26 · Claude · ออกแบบตาราง CFO จาก Excel (15 sheet → 5 ตาราง + 2 view, docs/specs/act-cfo.md) · แม่แบบทีมเพิ่ม role `vice` / `member` + คอลัมน์ `department` (ตัวแทนหน่วยงาน) และใส่ constraint ใหม่ทุกครั้งที่รัน (5S / 100P ได้ด้วยเมื่อรันไฟล์ของตัวเองซ้ำ ไม่จำเป็นต้องรันตอนนี้) · importer `scripts/import_cfo_excel.py` · test:act ตรวจยอดตรง Excel
 - 2026-10-26 · Claude · เคลียร์ของที่ไม่ใช้ (ผู้ใช้สั่ง): ลบไฟล์ย้ายฐาน TX → MX ที่ทำเสร็จแล้ว `db/01_inspect.sql`, `db/02_create_tx_in_mx.sql`, `db/07_drop_act_from_mx.sql`, `db/08_drop_sto_from_tx.sql`, `scripts/migrate-tx-to-mx.js` + `npm run migrate:tx` และไฟล์ที่ไม่ได้ commit `db/02b_mx_after_copy.sql` ในโฟลเดอร์ SMF · เขียน db/README.md ใหม่ (เหลือ 03_receive_rpc.sql และ 02_generate ที่ test:db ใช้) · ทางสำรอง `receiveLineByLine` / `adjustStock` ถูกลบแล้วหลังยืนยัน RPC (ดูบันทึกบนสุด)

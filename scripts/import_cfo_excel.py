@@ -91,7 +91,11 @@ def main():
                 notes.append(f"{e.get('ef_id') or e['emission_source']}: no category, skipped")
                 continue
             code = e.get('ef_id')
-            if code:
+            if not code:
+                # No code in Excel: a stable one from the order, so running the import again adds nothing.
+                seen['nocode', sc] += 1
+                code = f"sc{sc}-x{seen['nocode', sc]:03d}"
+            elif code:
                 seen[code] += 1
                 if seen[code] > 1:
                     code = f"{code}-{seen[code]}"

@@ -5,6 +5,7 @@ import { dateOf, tablesOf } from './common.js';
 import { mountAudit } from './audit.js';
 import { mountTransaction } from './transaction.js';
 import { PLANNER_ON, mountPlanner, plannerEvents } from './planner.js';
+import { CFO_ON, mountCfo } from './cfo.js';
 
 // ระบบกิจกรรม (Tx Data): calendar here, Project Planner in planner.js, checklist audit Dashboard/Setting in audit.js,
 // audits and Issues in transaction.js. Each activity has its own tables (db/act/<activity>.sql, scripts/act-sql.js).
@@ -12,7 +13,6 @@ import { PLANNER_ON, mountPlanner, plannerEvents } from './planner.js';
 const MAX_RANGE_DAYS = 400;
 // Activities with checklist-audit tables in Tx Data; they show up in System > Setting with the planner ones.
 const AUDIT_ON = ['5s'];
-const CFO_ON = ['cfo'];
 
 function tablesForSystem() {
   const out = {};
@@ -54,5 +54,6 @@ export default defineModule({
     mountPlanner(app);
     mountAudit(app);
     mountTransaction(app);
+    mountCfo(app);
   }
 });

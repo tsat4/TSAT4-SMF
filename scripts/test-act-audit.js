@@ -200,7 +200,7 @@ if (!fs.existsSync(cfoFile)) {
     (select round(sum(tco2e), 3)::float from v_cfo_entry where scope = 1) s1, (select round(sum(tco2e), 3)::float from v_cfo_entry where scope = 2) s2,
     (select tco2e::float from v_cfo_entry where activity = 'Septic Tank' and month = '2026-01-01') septic`);
   console.log('     cfo', JSON.stringify(c));
-  ok(c.scopes === 23 && c.activities === 34 && c.entries === 187, 'CFO rows imported once (23 scopes, 34 activities, 167 + 20 entries)');
+  ok(c.scopes === 23 && c.ef === 302 && c.activities === 34 && c.entries === 187, 'CFO rows imported once (23 scopes, 302 EF, 34 activities, 167 + 20 entries)');
   ok(Math.abs(c.s1 - 188.863) < 0.01 && Math.abs(c.s2 - 6642.52) < 0.01, `tCO2e = Excel (scope 1 188.863 / scope 2 6642.52, got ${c.s1} / ${c.s2})`);
   ok(c.septic === 32.844, `septic 1,173 kg CH4 x 28 = 32.844 tCO2e (got ${c.septic})`);
 }

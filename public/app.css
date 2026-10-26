@@ -551,3 +551,12 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
   .tx-board{grid-template-columns:1fr}
   .tx-order{min-height:280px}
 }
+/* CFO (act-cfo.js) */
+.cfo-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--scope);margin-right:5px;vertical-align:middle}
+.cfo-legend{display:flex;gap:12px;font-size:12px;color:var(--mo-text-muted)}
+.cfo-stack{width:70%;display:flex;flex-direction:column;border-radius:3px 3px 0 0;overflow:hidden;min-height:1px}
+.cfo-stack > div{min-height:1px}
+.mo-data-table td.num,.mo-data-table th.num{text-align:right;font-variant-numeric:tabular-nums}
+.mo-data-table tr.is-muted td{color:var(--mo-text-muted)}
+.cfo-gas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.cfo-company{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;max-width:1100px}
