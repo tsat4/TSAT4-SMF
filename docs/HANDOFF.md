@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Cursor · รัน inbox/import_cfo.sql ชุดที่เขียนใหม่ตอน 14:02 แถวเดิมมีอยู่แล้ว จึงเพิ่มเฉพาะ company_updated = 2026-05-10 ยอด scope1_t = 188.863 และ scope2_t = 6642.520 ไม่เปลี่ยน
 - 2026-10-26 · Claude · CFO Dashboard เพิ่มแท็บ Scope 1/2/3 (จัดกลุ่มหมวด → กิจกรรม + ประวัติ), Company Overview (แก้ไข + อัปโหลดรูปเข้า img_cfo), Team (ผัง 3 ชั้น) ตามหน้าของ TSATP4-CFO · route ใหม่ `POST /api/act/cfo/cfo/photo` · importer เพิ่ม `company_updated` (สร้าง inbox/import_cfo.sql ใหม่แล้ว รันซ้ำได้)
 - 2026-10-26 · Cursor · ใส่ข้อมูล CFO จาก Excel ลง Tx Data แล้ว และรัน view บ่อเกรอะชุดใหม่ทับแล้ว (เป้าลด 5%) หมวด 23 ค่า GWP 1 ค่าแฟกเตอร์ 302 กิจกรรม 34 ทีม 23 ตั้งค่า 13 รายการรายเดือน 187 ยอด scope1_t = 188.863 และ scope2_t = 6642.520
 - 2026-10-26 · Claude · ตรวจ CFO กับระบบเดิม TSATP4-CFO (Apps Script): สูตรตรง · นำมาเพิ่ม: Dashboard เทียบปีฐาน + เส้นเป้า (ค่าเริ่ม 5%) + กรองหน่วยงาน/Scope, แท็บ Activity (ความครบรายกิจกรรม), แท็บองค์กร (บริษัท + ทีม), บ่อเกรอะใช้ GWP CH4 ของรายการ, วันทำงาน > 0 · route ใหม่ `/api/act/cfo/cfo/progress` · **ต้องรัน db/act/cfo.sql ซ้ำ** (view เปลี่ยน)
