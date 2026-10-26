@@ -107,6 +107,7 @@ scripts/
 | tx_sto_requisition / _line | tx | ใบเบิกและรายการในใบเบิก |
 | tx_sto_issue | tx | ประวัติการจ่าย |
 | mt_5s_team / _area / _checklist / _audit_plan / _setting / _task | **tx** | กิจกรรม 5S: ทีมรายปี (รวมเจ้าของพื้นที่ role owner + area_id), พื้นที่, หัวข้อตรวจรายปี, แผนตรวจ, ค่าตั้งต้น, Project Planner |
+| mt_cfo_scope / _gwp / _ef / _activity, tx_cfo_entry, v_cfo_entry / v_cfo_month (+ team / setting / task) | **tx** | กิจกรรม CFO: หมวด Scope, GWP, Emission factor, กิจกรรมรายหน่วยงาน, ข้อมูลรายเดือน (docs/specs/act-cfo.md) |
 | mt_100p_team / _setting / _task | **tx** | กิจกรรม 100P: ทีมรายปี (admin แก้แผน), Project Planner ข้อหลัก/ข้อรอง (db/act/100p.sql) |
 | tx_5s_audit (+ auditors, receivers) / _audit_score / _issue (+ photo_before, photo_after), v_5s_audit_group | **tx** | ผลตรวจ คะแนนรายข้อ Issue และ % ราย ส (9 ตาราง ตั้งแต่ v2 2026-10-25) |
 

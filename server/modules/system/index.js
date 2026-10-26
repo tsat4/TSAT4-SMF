@@ -12,7 +12,7 @@ const CHOICES = {
   usage: ['viewer', 'user', 'admin'],
   req: ['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'],
   areatype: ['โรงงาน', 'สำนักงาน'],
-  actrole: ['admin', 'chairman', 'auditor', 'owner']
+  actrole: ['admin', 'chairman', 'vice', 'auditor', 'owner', 'member']
 };
 
 function adminValue(column, raw, { insert }) {

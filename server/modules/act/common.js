@@ -24,7 +24,13 @@ export function tablesOf(activity) {
     audit: `tx_${k}_audit`,
     score: `tx_${k}_audit_score`,
     issue: `tx_${k}_issue`,
-    group: `v_${k}_audit_group`
+    group: `v_${k}_audit_group`,
+    // CFO only (scripts/act-sql.js cfoSql)
+    cfoScope: `mt_${k}_scope`,
+    gwp: `mt_${k}_gwp`,
+    ef: `mt_${k}_ef`,
+    activity: `mt_${k}_activity`,
+    entry: `tx_${k}_entry`
   };
 }
 
@@ -91,24 +97,25 @@ export async function namesOf(ids) {
 }
 
 // What the signed-in user may do in one activity for one year.
-// admin -> Setting · chairman / auditor / area owner -> transaction · everyone -> Dashboard
+// admin -> Setting · chairman (+ vice) / auditor / area owner / department member -> transaction · everyone -> Dashboard
 export async function accessOf(req, activity, year) {
   const me = req.user.employeeId;
   const t = tablesOf(activity);
-  const none = { admin: Boolean(req.user.creator), chairman: false, auditor: false, teams: [], ownerAreaIds: [], member: Boolean(req.user.creator) };
+  const none = { admin: Boolean(req.user.creator), chairman: false, auditor: false, teams: [], ownerAreaIds: [], departments: [], member: Boolean(req.user.creator) };
   // One table says who does what this year, area owners included (role owner + area_id).
-  const team = await tx.from(t.team).select('role,team,area_id').eq('year', year).eq('employee_id', me).eq('status', 'Active');
+  const team = await tx.from(t.team).select('*').eq('year', year).eq('employee_id', me).eq('status', 'Active');
   if (team.error?.code === 'PGRST205') return none;
   if (team.error) throw team.error;
   const roles = team.data || [];
   const access = {
     admin: Boolean(req.user.creator) || roles.some((r) => r.role === 'admin'),
-    chairman: roles.some((r) => r.role === 'chairman'),
+    chairman: roles.some((r) => r.role === 'chairman' || r.role === 'vice'),
     auditor: roles.some((r) => r.role === 'auditor'),
     teams: [...new Set(roles.filter((r) => r.team).map((r) => r.team))],
-    ownerAreaIds: roles.filter((r) => r.role === 'owner').map((r) => Number(r.area_id))
+    ownerAreaIds: roles.filter((r) => r.role === 'owner').map((r) => Number(r.area_id)),
+    departments: roles.filter((r) => r.role === 'member').map((r) => r.department)
   };
-  access.member = access.admin || access.chairman || access.auditor || access.ownerAreaIds.length > 0;
+  access.member = roles.length > 0 || access.admin;
   return access;
 }
 

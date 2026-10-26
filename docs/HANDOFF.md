@@ -14,6 +14,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
+- **Tx Data** CFO: รัน `db/act/cfo.sql` (สร้างตาราง) แล้วตามด้วย `inbox/import_cfo.sql` (ข้อมูลจาก Excel รันซ้ำได้) ผลท้ายไฟล์ต้องได้ scope1_t = 188.863, scope2_t = 6642.520 · ยังไม่มีหน้าจอ CFO ดู/แก้ได้ที่ System > Setting
 - **Tx Data** (ไม่ด่วน ทำหลังเห็นแผน 5S ใน Planner แล้ว) ลบตาราง Gantt เดิมที่ไม่มีโค้ดใช้แล้ว: `drop table if exists public.mt_100p_plan; drop table if exists public.mt_5s_plan;`
 
 ## ข้อควรระวัง
@@ -23,6 +24,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-26 · Claude · ออกแบบตาราง CFO จาก Excel (15 sheet → 5 ตาราง + 2 view, docs/specs/act-cfo.md) · แม่แบบทีมเพิ่ม role `vice` / `member` + คอลัมน์ `department` (ตัวแทนหน่วยงาน) และใส่ constraint ใหม่ทุกครั้งที่รัน (5S / 100P ได้ด้วยเมื่อรันไฟล์ของตัวเองซ้ำ ไม่จำเป็นต้องรันตอนนี้) · importer `scripts/import_cfo_excel.py` · test:act ตรวจยอดตรง Excel
 - 2026-10-26 · Claude · เคลียร์ของที่ไม่ใช้ (ผู้ใช้สั่ง): ลบไฟล์ย้ายฐาน TX → MX ที่ทำเสร็จแล้ว `db/01_inspect.sql`, `db/02_create_tx_in_mx.sql`, `db/07_drop_act_from_mx.sql`, `db/08_drop_sto_from_tx.sql`, `scripts/migrate-tx-to-mx.js` + `npm run migrate:tx` และไฟล์ที่ไม่ได้ commit `db/02b_mx_after_copy.sql` ในโฟลเดอร์ SMF · เขียน db/README.md ใหม่ (เหลือ 03_receive_rpc.sql และ 02_generate ที่ test:db ใช้) · `receiveLineByLine` / `adjustStock` ใน requisitions.js ยังเก็บไว้ (ใช้เมื่อ RPC `tx_sto_receive` ไม่มี) **Cursor: ถ้ายืนยันว่า RPC อยู่ใน Mx Data แล้ว ลบสองฟังก์ชันนี้ได้**
 - 2026-10-26 · Cursor · หน้ารายการ Usage แบ่งกรอบรายการกับสรุปคำสั่งคนละครึ่ง
 - 2026-10-26 · Cursor · หน้ารายการ Usage ขยายกรอบสรุปคำสั่ง และลดกรอบรายการ

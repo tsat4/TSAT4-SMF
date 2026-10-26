@@ -181,5 +181,29 @@ if (!fs.existsSync(importFile)) {
   }
 }
 
+// CFO (db/act/cfo.sql + inbox/import_cfo.sql from python -I scripts/import_cfo_excel.py): totals must match the Excel.
+ok(fs.readFileSync(path.join(ROOT, 'db', 'act', 'cfo.sql'), 'utf8') === actSql('cfo', { audit: false }), 'db/act/cfo.sql is up to date (node scripts/act-sql.js cfo --no-audit)');
+await db.exec(actSql('cfo', { audit: false }));
+await db.exec(actSql('cfo', { audit: false }));
+ok(await throws(db, `insert into mt_cfo_team (year, employee_id, role) values (2026, '1', 'member')`), 'a member needs a department');
+await db.exec(`insert into mt_cfo_team (year, employee_id, role, department) values (2026, '1', 'member', 'PD1'), (2026, '1', 'member', 'PD2')`);
+ok(true, 'one person may represent several departments');
+ok(await throws(db, `insert into mt_cfo_scope (code, scope, name) values ('4-1', 4, 'x')`), 'scope is 1-3');
+const cfoFile = path.join(ROOT, 'inbox', 'import_cfo.sql');
+if (!fs.existsSync(cfoFile)) {
+  console.log('skip CFO data: inbox/import_cfo.sql not found (python -I scripts/import_cfo_excel.py)');
+} else {
+  await db.exec(fs.readFileSync(cfoFile, 'utf8'));
+  await db.exec(fs.readFileSync(cfoFile, 'utf8'));
+  const c = await one(db, `select (select count(*)::int from mt_cfo_scope) scopes, (select count(*)::int from mt_cfo_ef) ef, (select count(*)::int from mt_cfo_activity) activities,
+    (select count(*)::int from tx_cfo_entry) entries, (select count(*)::int from mt_cfo_team where role = 'member') members,
+    (select round(sum(tco2e), 3)::float from v_cfo_entry where scope = 1) s1, (select round(sum(tco2e), 3)::float from v_cfo_entry where scope = 2) s2,
+    (select tco2e::float from v_cfo_entry where activity = 'Septic Tank' and month = '2026-01-01') septic`);
+  console.log('     cfo', JSON.stringify(c));
+  ok(c.scopes === 23 && c.activities === 34 && c.entries === 187, 'CFO rows imported once (23 scopes, 34 activities, 167 + 20 entries)');
+  ok(Math.abs(c.s1 - 188.863) < 0.01 && Math.abs(c.s2 - 6642.52) < 0.01, `tCO2e = Excel (scope 1 188.863 / scope 2 6642.52, got ${c.s1} / ${c.s2})`);
+  ok(c.septic === 32.844, `septic 1,173 kg CH4 x 28 = 32.844 tCO2e (got ${c.septic})`);
+}
+
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);
