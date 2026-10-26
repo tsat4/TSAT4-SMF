@@ -85,7 +85,6 @@ async function renderEdit(target) {
       <aside class="tx-order">
         <h2>สรุปคำสั่ง</h2>
         <dl class="tx-order-who">
-          <div><dt>แหล่งซื้อ</dt><dd id="edit-order-source">ยังไม่เลือก</dd></div>
           <div><dt>หน่วยงาน</dt><dd id="edit-order-dept"></dd></div>
           <div><dt>รหัสพนักงาน</dt><dd id="edit-order-emp"></dd></div>
           <div><dt>ผู้เบิก</dt><dd id="edit-order-person"></dd></div>
@@ -146,13 +145,6 @@ async function renderEdit(target) {
     if (!alive() || !$('edit-order')) return;
     const cart = detail?.requisition || null;
     const lines = cart?.lines || [];
-    const wallets = [...new Set(lines.map((line) => line.costcenter).filter((code) => code && code !== '-'))];
-    const one = wallets.length === 1 ? lines.find((line) => line.costcenter === wallets[0]) : null;
-    $('edit-order-source').textContent = wallets.length > 1
-      ? 'หลายแหล่ง'
-      : one
-        ? `${one.costcenter}${one.costcenterName ? ` · ${one.costcenterName}` : ''}`
-        : 'ยังไม่เลือก';
     $('edit-order-dept').textContent = cart?.department || me.department || '';
     $('edit-order-emp').textContent = cart?.requested_by || me.employeeId || '';
     $('edit-order-person').textContent = cart?.requesterName || me.name || '';
@@ -196,7 +188,7 @@ async function renderEdit(target) {
       const img = row.img
         ? `<img class="tx-card-img" src="${esc(row.img)}" alt="">`
         : '<div class="tx-card-img is-empty" aria-hidden="true"><span class="material-symbols-rounded">image</span></div>';
-      return `<article class="tx-card">${img}<div class="tx-card-body"><div class="tx-card-title">${esc(row.material_description)}</div><div class="tx-card-sub">${esc(row.material)}</div></div><div class="tx-card-sum"><span>คงเหลือ</span><strong>${qtyText(row.currentQty)} ${esc(row.bun || '')}</strong></div><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}" aria-label="เพิ่มลงตะกร้า">+</button></article>`;
+      return `<article class="tx-card">${img}<div class="tx-card-body"><div class="tx-card-title">${esc(row.material_description)}</div><div class="tx-card-sub">${esc(row.material)}</div></div><div class="tx-card-sum"><span>ราคา</span><strong>${moneyText(row.price)} ${esc(row.crcy || '')}</strong></div><div class="tx-card-sum"><span>คงเหลือ</span><strong>${qtyText(row.currentQty)} ${esc(row.bun || '')}</strong></div><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}" aria-label="เพิ่มลงตะกร้า">+</button></article>`;
     }).join('') : '<p class="empty">ไม่พบรายการ</p>';
     setFoot(rows.length, data.total || 0);
     $('edit-rows').querySelectorAll('[data-add]').forEach((node) => {
