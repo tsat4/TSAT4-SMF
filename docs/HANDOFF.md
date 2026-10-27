@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-27 · Claude · สีเขียวต่างกันชัดขึ้น (ผู้ใช้สั่ง): Scope 1 #1B5E20 · Scope 2 #7CB342 · Scope 3 #00897B
 - 2026-10-27 · Claude · สีกราฟระบบกิจกรรมเปลี่ยนเป็นชุดเขียวของผู้ใช้ #1B5E20 #2E7D32 #43A047 #66BB6A (`CHART_THEMES.cool`) · ปีฐานคงเทา
 - 2026-10-27 · Claude · CFO Dashboard: ตัดแท็บ Summary 2 · Summary มี Dropdown "หน้า" ก่อนปี (หน้า 1 รายเดือน / หน้า 2 ตาม Scope) · หน้า 2 ย่อให้อยู่ในจอเดียว
 - 2026-10-27 · Cursor · สมาชิก mt_xxx_user ไม่ใส่รหัสผ่าน · Viewer เห็น Dashboard และ Transaction อย่างเดียว · user เพิ่มแก้ไขลบได้ · admin เห็น Setting · เมนูทุกหน่วยเขียน Transaction
