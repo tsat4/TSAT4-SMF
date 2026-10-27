@@ -89,7 +89,7 @@ function setPager(prefix, offset, total) {
   const pages = Math.max(1, Math.ceil(Number(total) / PAGE) || 1);
   const page = total > 0 ? Math.min(pages, Math.floor(offset / PAGE) + 1) : 1;
   const label = $(`${prefix}-page`);
-  if (label) label.textContent = `หน้า ${page} / ${pages}`;
+  if (label) label.textContent = `หน้า ${page.toLocaleString('en-US')} / ${pages.toLocaleString('en-US')}`;
   const prev = $(`${prefix}-prev`);
   const next = $(`${prefix}-next`);
   if (prev) prev.disabled = page <= 1;
@@ -269,7 +269,7 @@ function tableParams(query, head) {
 }
 
 function countText(id, shown, total) {
-  $(id).textContent = `แสดง ${shown} จาก ${total} แถว`;
+  $(id).textContent = `แสดง ${Number(shown).toLocaleString('en-US')} จาก ${Number(total).toLocaleString('en-US')} แถว`;
 }
 
 function bindPager(prefix, state, load) {

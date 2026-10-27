@@ -244,7 +244,7 @@ export function mountLedger(app, mod) {
       const month = monthOf(req.body?.month);
       const qty = qtyOf(req.body?.qty);
       if (!month) return fail(res, 400, 'บันทึกเดือนหน้าไม่ได้');
-      if (!qty) return fail(res, 400, 'ระบุจำนวน');
+      if (!qty) return fail(res, 400, 'จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
       if (req.body?.borrowId) {
         const borrow = await mx.from('tx_sto_borrow').select('*').eq('id', Number(req.body.borrowId)).eq('status', 'open').maybeSingle();
         if (borrow.error || !borrow.data) return fail(res, 400, 'ไม่พบใบยืมที่ยังเปิดอยู่');
@@ -290,7 +290,7 @@ export function mountLedger(app, mod) {
       const month = monthOf(req.body?.month);
       const qty = qtyOf(req.body?.qty);
       if (!month) return fail(res, 400, 'บันทึกเดือนหน้าไม่ได้');
-      if (!qty) return fail(res, 400, 'ระบุจำนวน');
+      if (!qty) return fail(res, 400, 'จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
       const borrower = await centerOf(String(req.body?.borrowerCostcenter || '').trim());
       const lender = await centerOf(String(req.body?.lenderCostcenter || '').trim());
       if (!borrower || (!adminOf(req) && borrower.department !== req.user.department)) return fail(res, 400, 'เลือก costcenter ผู้ยืมในขอบเขตของคุณ');

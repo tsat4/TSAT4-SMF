@@ -113,7 +113,7 @@ export function mountReserves(app, mod) {
     for (const row of rawLines) {
       const code = String(row?.material || '').trim();
       const amount = qtyOf(row?.qty);
-      if (!code || !amount) return fail(res, 400, 'ระบุรหัสรายการและจำนวนทุกแถว');
+      if (!code || !amount) return fail(res, 400, 'ระบุรหัสรายการ และจำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป ทุกแถว');
       lines.push({ material: code, qty: amount });
     }
     const center = (await centers()).find((row) => row.costcenter === costcenter);

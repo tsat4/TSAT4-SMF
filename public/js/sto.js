@@ -25,15 +25,16 @@ function usageThumb(src) {
   return src ? `<img class="usage-thumb" src="${esc(src)}" alt="">` : '';
 }
 
+// Numbers on screen carry thousands separators (x,xxx): money with 2 decimals, quantities up to 3.
 function moneyText(value) {
   const amount = Number(value);
-  return Number.isFinite(amount) ? amount.toFixed(2) : '';
+  return Number.isFinite(amount) ? amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 }
 
 function qtyText(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return '0';
-  return String(Math.round(amount * 1000) / 1000);
+  return amount.toLocaleString('en-US', { maximumFractionDigits: 3 });
 }
 
 function monthNow() {
@@ -85,10 +86,12 @@ function showEdit(mode) {
   openView('edit');
 }
 
+// Stock status: Short = nothing left, Risk = below Min, Normal = Min to Max, Over = above Max.
 function stockBadge(min, current, max) {
-  if (current < min) return '<span class="badge badge-danger">ต่ำกว่า Min</span>';
-  if (current > max) return '<span class="badge badge-warning">เกิน Max</span>';
-  return '<span class="badge badge-success">ในช่วง</span>';
+  if (current <= 0) return '<span class="badge badge-danger" title="คงเหลือ 0">Short</span>';
+  if (current < min) return '<span class="badge badge-warning" title="ต่ำกว่า Min">Risk</span>';
+  if (current > max) return '<span class="badge badge-over" title="เกิน Max">Over</span>';
+  return '<span class="badge badge-success" title="ระหว่าง Min กับ Max">Normal</span>';
 }
 
 async function renderEdit(target) {
@@ -185,7 +188,7 @@ async function renderEdit(target) {
     }
     const walletTitle = (code, group) => (code === '-' ? 'ยังไม่เลือก' : `${code}${group[0].costcenterName ? ` · ${group[0].costcenterName}` : ''}`);
     $('edit-order').innerHTML = lines.length
-      ? [...groups.entries()].map(([code, group]) => `<section class="tx-wallet"><div class="tx-wallet-name">${esc(walletTitle(code, group))}</div>${group.map((line) => `<div class="tx-line"><span class="tx-line-name">- ${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span>${canWrite ? `<button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button>` : ''}</div>`).join('')}</section>`).join('')
+      ? [...groups.entries()].map(([code, group]) => `<section class="tx-wallet"><div class="tx-wallet-name">${esc(walletTitle(code, group))}</div>${group.map((line) => `<div class="tx-line"><span class="tx-line-name">- ${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${qtyText(line.qty)} ${esc(line.bun)}</span>${canWrite ? `<button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button>` : ''}</div>`).join('')}</section>`).join('')
       : '<p class="sum-meta">ยังไม่มีรายการ</p>';
     $('edit-confirm-host').innerHTML = canWrite ? `<button class="btn btn-primary hold-btn" type="button" id="edit-confirm" title="กดค้าง 2 วินาที" ${lines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">ยืนยัน</span></button>` : '';
     $('edit-order').querySelectorAll('[data-drop]').forEach((node) => {
@@ -282,7 +285,7 @@ async function renderEdit(target) {
     const data = await api(`/api/stock?${params}`);
     if (!alive() || !$('edit-actions')) return;
     const rows = data.stock || [];
-    fillTable('edit-rows', [{ label: 'costcenter', key: 'costcenter' }, { label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'Min', key: 'minQty' }, { label: 'Current', key: 'currentQty' }, { label: 'Max', key: 'maxQty' }, 'สถานะ'], rows.map((row) => `<tr><td>${esc(row.costcenter)}</td><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${esc(row.bun)}</td><td>${row.minQty}</td><td>${row.currentQty}</td><td>${row.maxQty}</td><td>${stockBadge(row.minQty, row.currentQty, row.maxQty)}</td></tr>`).join(''), 'ยังไม่มียอดในขอบเขตของคุณ', columnHead());
+    fillTable('edit-rows', [{ label: 'costcenter', key: 'costcenter' }, { label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'Min', key: 'minQty', num: true }, { label: 'Current', key: 'currentQty', num: true }, { label: 'Max', key: 'maxQty', num: true }, 'สถานะ'], rows.map((row) => `<tr><td>${esc(row.costcenter)}</td><td>${esc(row.material)}</td><td>${esc(row.materialDescription)}</td><td>${esc(row.bun)}</td><td class="num">${qtyText(row.minQty)}</td><td class="num">${qtyText(row.currentQty)}</td><td class="num">${qtyText(row.maxQty)}</td><td>${stockBadge(row.minQty, row.currentQty, row.maxQty)}</td></tr>`).join(''), 'ยังไม่มียอดในขอบเขตของคุณ', columnHead());
     setFoot(rows.length, data.total || 0);
   };
   const loadList = async () => {
@@ -372,7 +375,7 @@ async function renderEdit(target) {
       button('edit-line-del', 'ลบ', 'danger', 'disabled'),
       `<button class="btn btn-primary hold-btn" type="button" id="edit-hold" ${allLines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">กดค้าง 2 วินาที</span></button>`
     ].join('') : button('edit-back', 'รายการ');
-    fillTable('edit-rows', [{ label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'จำนวน', key: 'qty' }, { label: 'costcenter', key: 'costcenter' }], page.map((line) => `<tr data-pick="${esc(line.id)}" data-qty="${Number(line.qty)}" data-material="${esc(line.material)}" data-name="${esc(line.materialDescription)}" data-bun="${esc(line.bun)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${esc(line.bun)}</td><td>${Number(line.qty)}</td><td>${esc(line.costcenter === '-' ? cart.costcenter : line.costcenter)}</td></tr>`).join(''), 'ยังไม่มีรายการ กดเพิ่ม', columnHead());
+    fillTable('edit-rows', [{ label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'จำนวน', key: 'qty', num: true }, { label: 'costcenter', key: 'costcenter' }], page.map((line) => `<tr data-pick="${esc(line.id)}" data-qty="${Number(line.qty)}" data-material="${esc(line.material)}" data-name="${esc(line.materialDescription)}" data-bun="${esc(line.bun)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${esc(line.bun)}</td><td class="num">${qtyText(line.qty)}</td><td>${esc(line.costcenter === '-' ? cart.costcenter : line.costcenter)}</td></tr>`).join(''), 'ยังไม่มีรายการ กดเพิ่ม', columnHead());
     setFoot(page.length, lines.length);
     $('edit-back').onclick = () => { $('edit-q').value = ''; state.offset = 0; showEdit('list'); };
     if (!canWrite) return;
@@ -384,10 +387,10 @@ async function renderEdit(target) {
         field('หมายเลขเลขรายการ', `<input value="${esc(picked.dataset.material)}" readonly>`),
         field('ชื่อรายการ', `<input value="${esc(picked.dataset.name)}" readonly>`),
         field('หน่วย', `<input value="${esc(picked.dataset.bun)}" readonly>`),
-        field('จำนวน', `<input id="line-qty" type="number" min="0.001" step="0.001" value="${esc(picked.dataset.qty)}">`)
+        field('จำนวน', `<input id="line-qty" type="number" min="1" step="1" inputmode="numeric" value="${esc(picked.dataset.qty)}">`)
       ].join(''), async () => {
         const qty = Number($('line-qty').value);
-        if (!(qty > 0)) throw new Error('ระบุจำนวน');
+        if (!Number.isInteger(qty) || qty < 1) throw new Error('ระบุจำนวนเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
         await api(`/api/requisitions/${cart.id}/lines/${picked.dataset.pick}`, { method: 'PATCH', body: { qty } });
         toast('แก้ไขแล้ว');
         closePopup();
@@ -539,11 +542,11 @@ async function openLedgerPopup(kind, onDone) {
     fields,
     searchBlock(searchSlot('รายการ', 'pick-q', 'pick-search', { placeholder: 'หมายเลขหรือชื่อ' }), 'pick-results'),
     field('รายการที่เลือก', '<input id="pick-name" readonly>'),
-    field('จำนวน', '<input id="led-qty" type="number" min="0.001" step="0.001" value="1">')
+    field('จำนวน', '<input id="led-qty" type="number" min="1" step="1" inputmode="numeric" value="1">')
   ].join(''), async () => {
     if (!picked) throw new Error('เลือกรายการ');
     const qty = Number($('led-qty').value);
-    if (!(qty > 0)) throw new Error('ระบุจำนวน');
+    if (!Number.isInteger(qty) || qty < 1) throw new Error('ระบุจำนวนเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
     const body = { month, material: picked.material, qty };
     if (kind === 'borrow') {
       body.borrowerCostcenter = $('led-from').value;
@@ -583,13 +586,13 @@ async function openCartPopup(item, onDone) {
     field('หมายเลขเลขรายการ', `<input value="${esc(item.material)}" readonly>`),
     field('ชื่อรายการ', `<input value="${esc(item.name)}" readonly>`),
     field('หน่วย', `<input value="${esc(item.bun)}" readonly>`),
-    field('จำนวน', '<input id="line-qty" type="number" min="0.001" step="0.001" value="1">'),
+    field('จำนวน', '<input id="line-qty" type="number" min="1" step="1" inputmode="numeric" value="1">'),
     field('แหล่งซื้อ', centerField),
     cartWhoFields(pay.department)
   ].join(''), async () => {
     const qty = Number($('line-qty').value);
     const costcenter = $('line-cc')?.value || '';
-    if (!(qty > 0)) throw new Error('ระบุจำนวน');
+    if (!Number.isInteger(qty) || qty < 1) throw new Error('ระบุจำนวนเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
     if (!costcenter) throw new Error('เลือกแหล่งซื้อ');
     await putInCart(item.material, qty, costcenter);
     toast('ใส่ตะกร้าแล้ว');
@@ -613,14 +616,14 @@ async function openAddPopup() {
     field('หมายเลขเลขรายการ', '<input id="line-code" readonly>'),
     field('ชื่อรายการ', '<input id="line-name" readonly>'),
     field('หน่วย', '<input id="line-bun" readonly>'),
-    field('จำนวน', '<input id="line-qty" type="number" min="0.001" step="0.001" value="1">'),
+    field('จำนวน', '<input id="line-qty" type="number" min="1" step="1" inputmode="numeric" value="1">'),
     `<label class="field d-none" id="line-cc-field">แหล่งซื้อ${centerField}</label>`,
     cartWhoFields(pay.department)
   ].join(''), async () => {
     if (!picked) throw new Error('เลือกรายการ');
     const qty = Number($('line-qty').value);
     const costcenter = $('line-cc')?.value || '';
-    if (!(qty > 0)) throw new Error('ระบุจำนวน');
+    if (!Number.isInteger(qty) || qty < 1) throw new Error('ระบุจำนวนเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
     if (!costcenter) throw new Error('เลือกแหล่งซื้อ');
     await putInCart(picked.material, qty, costcenter);
     toast('ใส่ตะกร้าแล้ว');

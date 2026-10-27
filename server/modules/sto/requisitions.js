@@ -257,7 +257,7 @@ export function mountRequisitions(app, mod) {
     const qty = qtyOf(req.body.qty);
     const header = await ownCart(req, id);
     if (!header) return fail(res, 400, 'แก้ได้เฉพาะตะกร้าของตนเอง');
-    if (!material || !qty) return fail(res, 400, 'เลือกรายการและจำนวน');
+    if (!material || !qty) return fail(res, 400, 'เลือกรายการ และจำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
     const costcenter = String(req.body.costcenter || header.costcenter).trim();
     if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
     const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
@@ -265,7 +265,7 @@ export function mountRequisitions(app, mod) {
     const existing = await mx.from('tx_sto_requisition_line').select('id,qty,costcenter').eq('requisition_id', id).eq('material', material).maybeSingle();
     if (existing.data) {
       const { error } = await mx.from('tx_sto_requisition_line').update({
-        qty: qtyOf(Number(existing.data.qty) + qty),
+        qty: Math.round(Number(existing.data.qty)) + qty, // older carts may hold a decimal: round it into a whole number
         costcenter
       }).eq('id', existing.data.id);
       if (error) return fail(res, 400, 'เพิ่มจำนวนไม่ได้');
@@ -287,7 +287,7 @@ export function mountRequisitions(app, mod) {
     const patch = {};
     if (req.body.qty != null) {
       const qty = qtyOf(req.body.qty);
-      if (!qty) return fail(res, 400, 'แก้จำนวนในตะกร้าไม่ได้');
+      if (!qty) return fail(res, 400, 'จำนวนต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป');
       patch.qty = qty;
     }
     if (req.body.costcenter != null) {

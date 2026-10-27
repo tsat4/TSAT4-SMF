@@ -11,10 +11,11 @@ export function wrap(fn) {
   return wrapped;
 }
 
+// Store quantities are whole numbers (ผู้ใช้กำหนด 2026-10-27): 1, 2, 3 … no decimals.
 export function qtyOf(value) {
   const n = Number(value);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 1000) / 1000;
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return n;
 }
 
 export function amountOf(value) {

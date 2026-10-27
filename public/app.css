@@ -166,6 +166,8 @@ table.mo-data-table tbody tr.row-pick.is-selected td:first-child{box-shadow:inse
 .badge-warning{background:var(--mo-warning-soft);color:#8a5a00}
 .badge-danger{background:var(--mo-danger-soft);color:var(--mo-danger)}
 .badge-primary{background:var(--mo-info-soft);color:var(--mo-primary)}
+.badge-over{background:#dbeafe;color:#1d4ed8}
+html[data-theme="dark"] .badge-over{background:#172554;color:#93c5fd}
 html[data-theme="dark"] .badge-warning{color:#fbbf24}
 .empty{text-align:center;color:var(--mo-text-muted);padding:36px}
 .view-body{flex:1;min-height:0;min-width:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
