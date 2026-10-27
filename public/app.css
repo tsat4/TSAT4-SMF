@@ -110,7 +110,7 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .popup.popup-wide{width:min(760px,100%)}
 .rsv-sheet{max-height:min(52vh,420px);overflow:auto;border:1px solid var(--mo-line);border-radius:var(--mo-radius)}
 .rsv-grid{width:100%;border-collapse:collapse;font-size:12px}
-.rsv-grid th{position:sticky;top:0;z-index:1;background:var(--mo-surface-2);color:var(--mo-text-muted);font-weight:500;text-align:left;height:32px;padding:0 8px}
+.rsv-grid th{position:sticky;top:0;z-index:1;background:var(--th-bg);color:var(--th-ink);font-weight:500;text-align:left;height:32px;padding:0 8px}
 .rsv-grid td{height:32px;padding:2px 6px;border-top:1px solid var(--mo-line);vertical-align:middle}
 .rsv-grid .rsv-no{width:28px;color:var(--mo-text-muted);text-align:right}
 .rsv-name.is-miss{color:var(--mo-danger)}
@@ -150,8 +150,11 @@ html[data-theme="dark"] .hold-btn .hold-fill{background:rgba(232,160,32,.4)}
 table{border-collapse:separate;border-spacing:0;width:100%;min-width:0}
 table.mo-data-table{width:max-content;min-width:100%}
 th,td{padding:0 8px;height:30px;border-bottom:1px solid var(--mo-line);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
-th{background:var(--mo-surface-2);color:var(--mo-text-muted);font-weight:500;font-size:11px}
-table.mo-data-table thead th{position:sticky;top:0;z-index:5;height:40px;background:var(--mo-surface-2);box-shadow:inset 0 -1px 0 var(--mo-line)}
+/* Table headers take the section tone (same as the active tab / menu item): --th-* set per body[data-zone] */
+:root{--th-bg:var(--mo-surface-2);--th-ink:var(--mo-text-muted);--th-line:var(--mo-line)}
+body[data-zone]{--th-bg:color-mix(in srgb,var(--zone) 18%,var(--mo-surface));--th-ink:var(--zone-ink);--th-line:color-mix(in srgb,var(--zone) 55%,var(--mo-surface))}
+th{background:var(--th-bg);color:var(--th-ink);font-weight:500;font-size:11px}
+table.mo-data-table thead th{position:sticky;top:0;z-index:5;height:40px;background:var(--th-bg);color:var(--th-ink);box-shadow:inset 0 -1px 0 var(--th-line)}
 table.mo-data-table thead th.has-menu{height:44px}
 .table-wrap.sheet{--table-head:44px}
 tbody tr:hover{background:var(--drive-hover)}
@@ -193,7 +196,7 @@ html[data-theme="dark"] .badge-warning{color:#fbbf24}
 .table-wrap::-webkit-scrollbar-corner,.apl-scroll::-webkit-scrollbar-corner-corner{background:var(--mo-surface)}
 .table-wrap::-webkit-scrollbar-track:vertical{margin-top:var(--table-head,40px)}
 /* The gap above the vertical bar keeps the header colour and its bottom line (painted on the box, does not scroll). */
-.table-wrap{background:linear-gradient(var(--mo-surface-2) calc(var(--table-head,40px) - 1px),var(--mo-line) 0) right top/12px var(--table-head,40px) no-repeat border-box,var(--mo-surface)}
+.table-wrap{background:linear-gradient(var(--th-bg) calc(var(--table-head,40px) - 1px),var(--th-line) 0) right top/12px var(--table-head,40px) no-repeat border-box,var(--mo-surface)}
 .apl-scroll::-webkit-scrollbar-track:vertical{margin-top:var(--apl-head,46px)}
 .apl-scroll::-webkit-scrollbar-track:horizontal{margin-left:var(--apl-left,384px)}
 html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="dark"] .apl-scroll::-webkit-scrollbar-thumb{background:#9aa0a6;border-color:var(--mo-surface)}
@@ -277,7 +280,7 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 .a5-sched-wrap{overflow:auto;border:1px solid var(--mo-border);border-radius:var(--mo-radius);max-height:70vh}
 .a5-sched{border-collapse:separate;border-spacing:0;font-size:11px;min-width:100%}
 .a5-sched th,.a5-sched td{border-bottom:1px solid var(--mo-border);padding:3px 2px;text-align:center;white-space:nowrap;background:var(--mo-surface)}
-.a5-sched thead th{position:sticky;top:0;z-index:2;background:var(--mo-surface-2);color:var(--mo-text-muted);font-weight:500}
+.a5-sched thead th{position:sticky;top:0;z-index:2;background:var(--th-bg);color:var(--th-ink);font-weight:500}
 .a5-sched thead tr:nth-child(2) th{top:22px}
 .a5-month{border-left:1px solid var(--mo-line)}
 .a5-cell:nth-child(4n+3){border-left:1px solid var(--mo-line)}
@@ -444,14 +447,14 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 /* Project Planner (act-planner.js): sticky left columns, week or day columns on the right */
 .apl-scroll{overflow:auto;max-height:calc(100vh - 190px);border:1px solid var(--mo-border);border-radius:var(--mo-radius)}
 /* Gaps beside the scroll bars: header colour above the vertical bar, left-column colour before the horizontal bar. */
-.apl-scroll{background:linear-gradient(var(--mo-surface-2) calc(var(--apl-head,46px) - 1px),var(--mo-border) 0) right top/12px var(--apl-head,46px) no-repeat border-box,linear-gradient(to right,var(--mo-surface) calc(var(--apl-left,384px) - 1px),var(--mo-border) 0) left bottom/var(--apl-left,384px) 12px no-repeat border-box,var(--mo-surface)}
+.apl-scroll{background:linear-gradient(var(--th-bg) calc(var(--apl-head,46px) - 1px),var(--th-line) 0) right top/12px var(--apl-head,46px) no-repeat border-box,linear-gradient(to right,var(--mo-surface) calc(var(--apl-left,384px) - 1px),var(--mo-border) 0) left bottom/var(--apl-left,384px) 12px no-repeat border-box,var(--mo-surface)}
 .apl-grid{min-width:calc(384px + var(--apl-tl))}
 .apl-row{display:grid;grid-template-columns:384px minmax(var(--apl-tl),1fr);border-bottom:1px solid var(--mo-border)}
 .apl-row:last-child{border-bottom:0}
 .apl-left{position:sticky;left:0;z-index:3;display:grid;grid-template-columns:40px 200px 104px 40px;align-items:center;background:var(--mo-surface);border-right:1px solid var(--mo-border)}
 .apl-left > div{padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .apl-head{position:sticky;top:0;z-index:4}
-.apl-head .apl-left,.apl-head .apl-track{background:var(--mo-surface-2);color:var(--mo-text-muted);font-size:11px}
+.apl-head .apl-left,.apl-head .apl-track{background:var(--th-bg);color:var(--th-ink);font-size:11px}
 .apl-head .apl-track{height:auto}
 .apl-months,.apl-ticks{display:grid}
 .apl-months{border-bottom:1px solid var(--mo-border)}
@@ -584,10 +587,10 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .fr01-more{display:grid;grid-template-columns:130px 1fr;gap:4px 8px;margin:4px 0 0;font-size:13px;border-top:1px solid var(--mo-line);padding-top:8px}.fr01-more dt{color:var(--mo-text-muted)}.fr01-more dd{margin:0}
 .fr01-scope{padding:0;overflow:hidden}
 .fr01-table{width:100%;border-collapse:collapse;font-size:13px}
-.fr01-table th,.fr01-table td{height:auto;padding:7px 10px;border:1px solid color-mix(in srgb,var(--ch-1) 35%,var(--mo-border));white-space:normal;overflow:visible;vertical-align:middle}
-.fr01-table thead th{background:var(--ch-1);color:#fff;font-size:14px;font-weight:600;text-align:left}
-.fr01-table tbody th{width:150px;font-size:13px;background:color-mix(in srgb,var(--ch-1) 85%,#000);color:#fff;font-weight:600;text-align:left}
-.fr01-table td{background:color-mix(in srgb,var(--ch-1) 7%,var(--mo-surface))}
+.fr01-table th,.fr01-table td{height:auto;padding:7px 10px;border:1px solid var(--th-line);white-space:normal;overflow:visible;vertical-align:middle}
+.fr01-table thead th{background:var(--th-bg);color:var(--th-ink);font-size:14px;font-weight:600;text-align:left}
+.fr01-table tbody th{width:150px;font-size:13px;background:var(--th-bg);color:var(--th-ink);font-weight:600;text-align:left}
+.fr01-table td{background:var(--mo-surface)}
 .fr01-table td b{display:block;font-weight:600}.fr01-table td span{color:var(--mo-text-muted);font-size:12px}
 .fr01-code{width:52px;text-align:center;font-variant-numeric:tabular-nums;color:var(--mo-text-muted)}.fr01-none{color:var(--mo-text-muted)}
 .fr01-tail td.num b{display:inline;font-size:15px}.fr01-center{text-align:center}
@@ -600,7 +603,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-inv{max-height:calc(100vh - 260px)}.cfo-inv table{font-size:12px}.cfo-inv td,.cfo-inv th{padding:0 6px}.cfo-inv td{height:26px}
 .cfo-inv thead tr:first-child th{height:30px;top:0}.cfo-inv thead tr:nth-child(2) th{height:28px;top:30px}.cfo-inv thead th{white-space:normal;line-height:1.25;font-size:11px}
 .cfo-inv tbody td:first-child,.cfo-inv thead tr:first-child th:first-child{position:sticky;left:0;z-index:2;background:var(--mo-surface);min-width:220px;max-width:280px;white-space:normal}
-.cfo-inv thead tr:first-child th:first-child{z-index:6;background:var(--mo-surface-2)}
+.cfo-inv thead tr:first-child th:first-child{z-index:6;background:var(--th-bg)}
 .cfo-inv .cfo-group td{background:var(--mo-surface-2);font-weight:600}.cfo-inv .cfo-sub-total td{font-weight:600;background:color-mix(in srgb,var(--mo-text-muted) 7%,var(--mo-surface))}
 .cfo-inv .cfo-total td{font-weight:600;background:color-mix(in srgb,var(--mo-text-muted) 14%,var(--mo-surface))}
 #cfo-rev-rows table{width:100%}.cfo-rev-detail{white-space:normal;min-width:260px;max-width:520px;line-height:1.35;padding-top:4px;padding-bottom:4px}
