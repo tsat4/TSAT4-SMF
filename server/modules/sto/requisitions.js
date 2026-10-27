@@ -269,12 +269,10 @@ export function mountRequisitions(app, mod) {
     const admin = isAdmin(req);
     try {
       if (status === 'submitted' && mine && header.status === 'cart') {
-        const { data: lines, error: lineError } = await mx.from('tx_sto_requisition_line').select('material,costcenter').eq('requisition_id', id);
+        const { data: lines, error: lineError } = await mx.from('tx_sto_requisition_line').select('costcenter').eq('requisition_id', id);
         if (lineError || !lines?.length) return fail(res, 400, 'ตะกร้าว่าง');
         for (const line of lines) {
           if (!(await ownCenter(req, line.costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
-          const stock = await mx.from('mt_sto_stock').select('material').eq('costcenter', line.costcenter).eq('material', line.material).maybeSingle();
-          if (!stock.data) return fail(res, 400, `${line.costcenter} ยังไม่มียอดของ ${line.material}`);
         }
         await move(id, 'cart', { status: 'submitted' });
       } else if (status === 'cancelled' && mine && ['cart', 'submitted', 'accepted', 'preparing', 'ready'].includes(header.status)) {
