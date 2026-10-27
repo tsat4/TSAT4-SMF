@@ -18,12 +18,19 @@ const CFO_S3_CRITERIA = [
   ['outsourcing', 'Outsourcing', 'เกิดจากการจ้างบุคคลหรือหน่วยงานภายนอกมาทำกิจกรรมที่เป็นกิจกรรมหลักขององค์กร'],
   ['engagement', 'Employee engagement', 'ส่งเสริมให้พนักงานมีส่วนร่วมลดการปล่อย (อนุรักษ์พลังงาน เดินทางร่วมกัน ราคาคาร์บอนภายในองค์กร)']
 ];
+// Quantity formulas (server CFO_CALCS): what the record form asks for and what it turns into.
+const CFO_CALCS = {
+  septic: { label: 'บ่อเกรอะ (คน × วัน → kg CH₄)', short: 'บ่อเกรอะ', out: 'kg CH₄', fields: [['people', 'จำนวนคน', 1], ['days', 'จำนวนวันทำงาน', 1]],
+    qty: (i, s) => i.people * i.days * Number(s.septic_bod || 0) * 0.001 * Number(s.septic_i || 0) * Number(s.septic_b0 || 0) * Number(s.septic_mcf || 0) },
+  tkm: { label: 'ขนส่ง (ตัน × กม. → tkm)', short: 'ตัน × กม.', out: 'tkm', fields: [['tons', 'น้ำหนักที่ขนส่ง (ตัน)', 'any'], ['km', 'ระยะทาง (กม.)', 'any']], qty: (i) => i.tons * i.km },
+  km_fuel: { label: 'ระยะทาง ÷ อัตราสิ้นเปลือง → ลิตร', short: 'กม. ÷ กม./ลิตร', out: 'ลิตร', fields: [['km', 'ระยะทาง (กม.)', 'any'], ['km_per_l', 'อัตราสิ้นเปลือง (กม./ลิตร)', 'any']], qty: (i) => (i.km_per_l ? i.km / i.km_per_l : 0) }
+};
 const CFO_SOURCE_TYPES = [['self', 'Self collect (1st)'], ['supplier', 'Supplier (1st)'], ['th_lci', 'TH LCI DB (2nd)'], ['tgo', 'TGO EF (2nd)'], ['thai_res', 'Thai Res. (2nd)'], ['int_db', 'Int. DB (2nd)'], ['other', 'Other']];
 const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['company_address', 'สถานที่ตั้ง'], ['company_area', 'พื้นที่โรงงาน'], ['company_business', 'ประเภทธุรกิจ'],
   ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
   ['base_year', 'ปีฐาน'], ['target_percent', 'เป้าลด (% จากปีฐาน)'], ['septic_bod', 'บ่อเกรอะ BOD (g/คน/วัน)'], ['septic_b0', 'บ่อเกรอะ B0'], ['septic_mcf', 'บ่อเกรอะ MCF'], ['septic_i', 'บ่อเกรอะ I']];
 const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6', 'SF₆'], ['nf3', 'NF₃'], ['hfc', 'HFCs'], ['hfc_gwp', 'GWP HFCs'], ['pfc', 'PFCs'], ['pfc_gwp', 'GWP PFCs'],
-  ['other', 'GHG นอกข้อกำหนด'], ['other_gwp', 'GWP นอกข้อกำหนด']];
+  ['other', 'GHG นอกข้อกำหนด'], ['other_gwp', 'GWP นอกข้อกำหนด'], ['co2_bio', 'CO₂ ชีวมวล (รายงานแยก)']];
 let cfoDashTab = 'summary';
 let cfoSetTab = 'plan';
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
@@ -586,15 +593,11 @@ async function cfoEntries(target) {
 // บันทึกกิจกรรม: quantity of one activity for a month (changing the month loads what that month has).
 // Septic tank: people × days → kg CH4 (same formula as the server).
 function cfoEntryForm(row, septic, month, reload) {
-  const isSeptic = row.calc === 'septic';
-  const kg = () => {
-    const n = (k) => Number(septic[k] || 0);
-    return Number($('cfo-people').value || 0) * Number($('cfo-days').value || 0) * n('septic_bod') * 0.001 * n('septic_i') * n('septic_b0') * n('septic_mcf');
-  };
+  const calc = CFO_CALCS[row.calc];
+  const inputs = () => Object.fromEntries(calc.fields.map(([k]) => [k, Number($(`cfo-in-${k}`).value || 0)]));
   const fields = `<p class="sum-meta">${esc(row.department)} · ${esc(row.name)} ${esc(row.detail || '')} · ${esc(row.source || '')} (${cfoT(row.kgco2e)} kgCO₂e/${esc(row.unit || '')})</p>
     ${field('เดือน', `<select id="cfo-e-month">${options(Array.from({ length: 12 }, (_, i) => i + 1), month, (v) => `${ACT_MONTHS[v - 1]} ${a5Year}${row.byMonth[v] ? ' · บันทึกแล้ว' : ''}`)}</select>`)}
-    ${isSeptic ? `${field('จำนวนคน', '<input id="cfo-people" type="number" min="0" step="1">')}
-      ${field('จำนวนวันทำงาน', '<input id="cfo-days" type="number" min="1" step="1">')}
+    ${calc ? `${calc.fields.map(([k, label, step]) => field(label, `<input id="cfo-in-${k}" type="number" min="0" step="${step}">`)).join('')}
       <p class="sum-meta" id="cfo-kg"></p>`
     : field(`ปริมาณ (${esc(row.unit || '')})`, '<input id="cfo-qty" type="number" min="0" step="any">')}
     ${field('ลิงก์เอกสาร / หลักฐาน', '<input id="cfo-doc" maxlength="500">')}
@@ -609,17 +612,22 @@ function cfoEntryForm(row, septic, month, reload) {
     if ($('cfo-q-act').value && $('cfo-q-ef').value) body.quality = { activity: $('cfo-q-act').value, ef: $('cfo-q-ef').value };
     const file = $('cfo-shot').files?.[0];
     if (file) body.image = await cfoJpeg(file);
-    if (isSeptic) body.inputs = { people: $('cfo-people').value, days: $('cfo-days').value };
+    if (calc) body.inputs = inputs();
     else body.qty = $('cfo-qty').value;
     await a5Api(CFO, 'cfo/entries', { method: 'PUT', body });
     toast('บันทึกแล้ว');
     closePopup();
     reload();
   });
-  const show = () => { if (isSeptic) $('cfo-kg').textContent = `= ${cfoT(kg())} kg CH₄ · ${cfoT((kg() * Number(row.kgco2e || 0)) / 1000)} tCO₂e`; };
+  const show = () => {
+    if (!calc) return;
+    const qty = calc.qty(inputs(), septic);
+    $('cfo-kg').textContent = `= ${cfoT(qty)} ${calc.out} · ${cfoT((qty * Number(row.kgco2e || 0)) / 1000)} tCO₂e`;
+  };
   const load = () => {
     const e = row.byMonth[Number($('cfo-e-month').value)] || {};
-    if (isSeptic) { $('cfo-people').value = e.inputs?.people ?? ''; $('cfo-days').value = e.inputs?.days ?? ''; } else $('cfo-qty').value = e.qty ?? '';
+    if (calc) calc.fields.forEach(([k]) => { $(`cfo-in-${k}`).value = e.inputs?.[k] ?? ''; });
+    else $('cfo-qty').value = e.qty ?? '';
     $('cfo-doc').value = e.doc || '';
     $('cfo-remark').value = e.remark || '';
     $('cfo-q-act').value = e.inputs?.quality?.activity || '';
@@ -637,7 +645,7 @@ function cfoEntryForm(row, septic, month, reload) {
   $('cfo-e-month').onchange = load;
   $('cfo-q-act').onchange = scoreNote;
   $('cfo-q-ef').onchange = scoreNote;
-  if (isSeptic) { $('cfo-people').oninput = show; $('cfo-days').oninput = show; }
+  if (calc) calc.fields.forEach(([k]) => { $(`cfo-in-${k}`).oninput = show; });
   load();
   $('cfo-del').onclick = () => {
     const e = row.byMonth[Number($('cfo-e-month').value)];
@@ -677,7 +685,7 @@ function cfoSetActivities(body, m, rerender) {
       && (!cfoFilter.scope || String(efById.get(a.ef_id)?.scope_code || '').startsWith(`${cfoFilter.scope}-`))
       && (!term || `${a.name} ${a.detail || ''}`.toLowerCase().includes(term))), cfoHeads.activities, (a, key) => (key === 'ef' ? cfoEfLabel(efById.get(a.ef_id)) : a[key] ?? ''));
     fillTable('cfo-rows', [{ label: 'หน่วยงาน', key: 'department' }, { label: 'กิจกรรม', key: 'name' }, { label: 'รายละเอียด', key: 'detail' }, { label: 'Emission factor', key: 'ef' }, { label: 'สูตร', key: 'calc' }, { label: 'สถานะ', key: 'status' }],
-      list.map((a) => `<tr data-pick="${a.id}"><td>${esc(a.department)}</td><td>${esc(a.name)}</td><td>${esc(a.detail || '')}</td><td>${esc(cfoEfLabel(efById.get(a.ef_id)))}</td><td>${a.calc === 'septic' ? 'บ่อเกรอะ' : ''}</td><td>${esc(a.status)}</td></tr>`).join(''), 'ยังไม่มีกิจกรรม', headFor(cfoHeads.activities, draw));
+      list.map((a) => `<tr data-pick="${a.id}"><td>${esc(a.department)}</td><td>${esc(a.name)}</td><td>${esc(a.detail || '')}</td><td>${esc(cfoEfLabel(efById.get(a.ef_id)))}</td><td>${esc(CFO_CALCS[a.calc]?.short || '')}</td><td>${esc(a.status)}</td></tr>`).join(''), 'ยังไม่มีกิจกรรม', headFor(cfoHeads.activities, draw));
     bindRowSelect($('cfo-rows'), (id) => { picked = m.activities.find((a) => String(a.id) === id); ['cfo-edit', 'cfo-del'].forEach((b) => { if ($(b)) $(b).disabled = !picked; }); });
   };
   let picked = null;
@@ -707,7 +715,7 @@ function cfoSetActivities(body, m, rerender) {
       ${field('รายละเอียด', `<input id="cfo-a-detail" maxlength="500" value="${esc(a?.detail || '')}">`)}
       ${field('Emission factor', `<select id="cfo-a-ef">${active.map((e) => `<option value="${e.id}"${e.id === a?.ef_id ? ' selected' : ''}>${esc(cfoEfLabel(e))}</option>`).join('')}</select>`)}
       ${field('GWP', `<select id="cfo-a-gwp">${options(m.gwp.map((g) => g.code), a?.gwp_code || m.gwp[0]?.code)}</select>`)}
-      ${field('สูตรปริมาณ', `<select id="cfo-a-calc">${options(['', 'septic'], a?.calc || '', (v) => (v ? 'บ่อเกรอะ (คน × วัน → kg CH₄)' : 'กรอกปริมาณเอง'))}</select>`)}
+      ${field('สูตรปริมาณ', `<select id="cfo-a-calc">${options(['', ...Object.keys(CFO_CALCS)], a?.calc || '', (v) => (v ? CFO_CALCS[v].label : 'กรอกปริมาณเอง'))}</select>`)}
       ${field('สถานะ', `<select id="cfo-a-status">${options(['Active', 'Inactive'], a?.status || 'Active')}</select>`)}`, async () => {
       const body2 = { department: $('cfo-a-dept').value, name: $('cfo-a-name').value, detail: $('cfo-a-detail').value, ef_id: $('cfo-a-ef').value, gwp_code: $('cfo-a-gwp').value, calc: $('cfo-a-calc').value, status: $('cfo-a-status').value };
       await a5Api(CFO, `cfo/activities${a ? `/${a.id}` : ''}`, { method: a ? 'PATCH' : 'POST', body: body2 });

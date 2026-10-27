@@ -95,6 +95,7 @@ html[data-theme="dark"] .nav-acc:has(.nav-btn.active) > .nav-parent,html[data-th
 .required:after{content:' *';color:var(--mo-danger)}
 input,select,textarea{width:100%;min-height:28px;border:1px solid var(--mo-line);border-radius:var(--mo-radius);padding:4px 8px;background:var(--mo-input);color:var(--mo-text);font-size:12px}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--mo-focus);border-color:var(--mo-primary)}
+.btn[hidden]{display:none}
 .btn{border:1px solid transparent;border-radius:var(--mo-radius);min-height:28px;padding:0 10px;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:4px;font-size:12px;background:transparent;color:var(--mo-text)}
 .btn-primary{background:var(--mo-primary);color:var(--mo-on-primary)}
 .btn-primary:hover{background:var(--mo-primary-dark)}

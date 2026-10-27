@@ -211,6 +211,16 @@ if (!fs.existsSync(cfoFile)) {
   ok(Math.abs(sep.s1 + sep.sep - 188.863) < 0.01 && sep.other > 0, `separately reported EF leaves Scope 1 (${sep.s1} + ${sep.sep}) and carries its non-Kyoto tCO2e`);
   ok(await throws(db, `insert into mt_cfo_s3_assess (year, scope_code) values (2026, '1-1')`), 'Fr-03.2 rows are Scope 3 categories only');
   ok(await throws(db, `insert into mt_cfo_ef (scope_code, name, unit, source_type) values ('1-1', 'x', 'L', 'web')`), 'EF data source is one of the Fr-04.1 types');
+  // B7 (EF TGO AR5 V2): Scope 1 total + biogenic CO2 reported apart, both per liter of the blend.
+  await db.exec(`begin; update mt_cfo_ef set co2_bio = 0.11507832 where id = (select ef_id from tx_cfo_entry where qty > 0 order by id limit 1)`);
+  const bio = await one(db, `select round(sum(tco2e_bio), 6)::float bio, (select round(sum(tco2e), 3)::float from v_cfo_month where scope = 1) s1,
+    round(sum(qty) * 0.11507832 / 1000, 6)::float want from v_cfo_entry where tco2e_bio > 0`);
+  await db.exec('rollback');
+  ok(Math.abs(bio.bio - bio.want) < 1e-5 && Math.abs(bio.s1 - 188.863) < 0.01, `biogenic CO2 = qty × co2_bio / 1000 (${bio.bio}) and stays out of Scope 1`);
+  ok(await throws(db, `update mt_cfo_activity set calc = 'other' where id = (select min(id) from mt_cfo_activity)`), 'activity formula is septic / tkm / km_fuel');
+  const { CFO_CALCS } = await import('../server/modules/act/cfo.js');
+  ok(CFO_CALCS.tkm.qty({ tons: 12.5, km: 80 }) === 1000 && CFO_CALCS.km_fuel.qty({ km: 450, km_per_l: 12 }) === 37.5 && !CFO_CALCS.km_fuel.ok({ km: 1, km_per_l: 0 }),
+    'transport tkm = ตัน × กม., km_fuel = กม. ÷ กม./ลิตร');
 }
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');

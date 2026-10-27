@@ -10,7 +10,7 @@ const SETTING_KEYS = ['company_name', 'company_address', 'company_area', 'compan
 // production_<year> = pieces produced that year (Carbon intensity = tCO2e / pieces)
 const settingKey = (k) => SETTING_KEYS.includes(k) || /^production_\d{4}$/.test(k);
 // Values an EF keeps once entries use it (Fr-04.1 gas columns included).
-const EF_NUMBERS = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'sf6', 'nf3', 'hfc', 'hfc_gwp', 'pfc', 'pfc_gwp', 'other', 'other_gwp'];
+const EF_NUMBERS = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'sf6', 'nf3', 'hfc', 'hfc_gwp', 'pfc', 'pfc_gwp', 'other', 'other_gwp', 'co2_bio'];
 const EF_VALUES = [...EF_NUMBERS, 'unit', 'scope_code', 'separate'];
 const EF_SOURCES = ['self', 'supplier', 'th_lci', 'tgo', 'thai_res', 'int_db', 'other'];
 // TGO Fr-03.2 criteria (✓ / ×): significant = has a source and meets at least one.
@@ -25,6 +25,13 @@ export function septicKg(inputs, s) {
   const n = (k) => Number(s[k] || 0);
   return Math.round(Number(inputs.people || 0) * Number(inputs.days || 0) * n('septic_bod') * 0.001 * n('septic_i') * n('septic_b0') * n('septic_mcf') * 1e6) / 1e6;
 }
+
+// Quantity formulas (activity.calc): the inputs the form asks for → qty in the EF unit.
+export const CFO_CALCS = {
+  septic: { fields: ['people', 'days'], ok: (i) => i.people >= 0 && i.days > 0, error: 'ระบุจำนวนคน (0 ขึ้นไป) และจำนวนวันทำงาน (มากกว่า 0)', qty: (i, s) => septicKg(i, s) },
+  tkm: { fields: ['tons', 'km'], ok: (i) => i.tons >= 0 && i.km >= 0, error: 'ระบุน้ำหนัก (ตัน) และระยะทาง (กม.) 0 ขึ้นไป', qty: (i) => Math.round(i.tons * i.km * 1e6) / 1e6 },
+  km_fuel: { fields: ['km', 'km_per_l'], ok: (i) => i.km >= 0 && i.km_per_l > 0, error: 'ระบุระยะทาง (กม.) และอัตราสิ้นเปลือง (กม./ลิตร มากกว่า 0)', qty: (i) => Math.round((i.km / i.km_per_l) * 1e6) / 1e6 }
+};
 
 export function mountCfo(app) {
   const route = actRoute(app, { only: CFO_ON });
@@ -92,7 +99,7 @@ export function mountCfo(app) {
         .sort((a, b) => a.scope - b.scope || Number(a.key.split('-')[1]) - Number(b.key.split('-')[1])),
       departments: group('department', (r) => r.department, tagged(false)),
       gases: [0, 1, 2, 3].map((scope) => ({ scope, ...gasOf(scope ? cur.filter((r) => r.scope === scope) : cur) })),
-      separate: { tco2e: sum(curAll.filter((r) => r.separate)), base: sum(baseAll.filter((r) => r.separate)) },
+      separate: [curAll, baseAll].reduce((o, list, i) => ({ ...o, [i ? 'base' : 'tco2e']: Math.round((sum(list.filter((r) => r.separate)) + list.reduce((s, r) => s + Number(r.tco2e_bio || 0), 0)) * 1000) / 1000 }), {}),
       settings
     });
   });
@@ -156,10 +163,11 @@ export function mountCfo(app) {
     if (current?.status === 'CONFIRMED' && !access.admin) return fail(res, 400, 'เดือนนี้ยืนยันแล้ว แก้ได้เฉพาะผู้จัดทำ');
     let inputs = null;
     let qty = numOrNull(req.body?.qty);
-    if (act.calc === 'septic') {
-      inputs = { people: Number(req.body?.inputs?.people), days: Number(req.body?.inputs?.days) };
-      if (!(inputs.people >= 0) || !(inputs.days > 0)) return fail(res, 400, 'ระบุจำนวนคน (0 ขึ้นไป) และจำนวนวันทำงาน (มากกว่า 0)');
-      qty = septicKg(inputs, await settingsOf(t));
+    const calc = CFO_CALCS[act.calc];
+    if (calc) {
+      inputs = Object.fromEntries(calc.fields.map((k) => [k, Number(req.body?.inputs?.[k])]));
+      if (!calc.ok(inputs)) return fail(res, 400, calc.error);
+      qty = calc.qty(inputs, act.calc === 'septic' ? await settingsOf(t) : {});
     }
     if (qty == null || Number.isNaN(qty) || qty < 0) return fail(res, 400, 'ปริมาณต้องเป็นตัวเลข 0 ขึ้นไป');
     const linked = must(await tx.from(t.ef).select('id,code,year,kgco2e,status').eq('id', act.ef_id).maybeSingle());
@@ -277,7 +285,7 @@ export function mountCfo(app) {
   });
 
   const activityInput = (b) => {
-    const row = { ef_id: Number(b.ef_id), gwp_code: text(b.gwp_code, 20) || 'AR5', department: text(b.department, 80), name: text(b.name, 200), detail: text(b.detail, 500), calc: b.calc === 'septic' ? 'septic' : null, status: b.status === 'Inactive' ? 'Inactive' : 'Active' };
+    const row = { ef_id: Number(b.ef_id), gwp_code: text(b.gwp_code, 20) || 'AR5', department: text(b.department, 80), name: text(b.name, 200), detail: text(b.detail, 500), calc: CFO_CALCS[b.calc] ? b.calc : null, status: b.status === 'Inactive' ? 'Inactive' : 'Active' };
     if (!row.ef_id || !row.department || !row.name) return { error: 'ระบุหน่วยงาน ชื่อกิจกรรม และ EF' };
     return { row };
   };
@@ -405,7 +413,7 @@ export function mountCfo(app) {
     }
     const n = (v) => Number(v || 0);
     const r6 = (v) => Math.round(v * 1e6) / 1e6;
-    const rows = [...lines.values()].filter((l) => l.f && l.g).map(({ a, f, g, qty }) => {
+    const rows = [...lines.values()].filter((l) => l.f && l.g).flatMap(({ a, f, g, qty }) => {
       // Septic: qty is kg CH4 (EF CH4 = 1 kg/kg), as v_cfo_entry.
       const septic = a.calc === 'septic';
       const efGas = { co2: septic ? 0 : n(f.co2), ch4_fossil: septic ? 0 : n(f.ch4_fossil), ch4: septic ? 1 : n(f.ch4), n2o: septic ? 0 : n(f.n2o), sf6: n(f.sf6), nf3: n(f.nf3) };
@@ -418,13 +426,19 @@ export function mountCfo(app) {
         hfc: r6((qty * n(f.hfc) * hfcGwp) / 1000), pfc: r6((qty * n(f.pfc) * pfcGwp) / 1000), other: r6((qty * n(f.other) * n(f.other_gwp)) / 1000)
       };
       const s = scope.get(f.scope_code) || {};
-      return {
+      const row = {
         group: f.separate ? 'separate' : `s${s.scope}`, scope: s.scope, scope_code: f.scope_code, scope_name: s.name,
         department: a.department, activity: a.name, detail: a.detail, source: f.name, unit: f.unit, qty: r6(qty),
         ef: { ...efGas, hfc: n(f.hfc), hfc_gwp: n(f.hfc) ? hfcGwp : null, pfc: n(f.pfc), pfc_gwp: n(f.pfc) ? pfcGwp : null, other: n(f.other), other_gwp: n(f.other_gwp) },
         total_ef: septic ? gw.ch4 : n(f.kgco2e), source_type: f.source_type, substitute: f.substitute, reference: f.reference,
         ton, tco2e, total: r6((qty * (septic ? gw.ch4 : n(f.kgco2e))) / 1000)
       };
+      // B7 / E10 / biomass: the biogenic CO2 is reported apart (EF TGO "Report in Biogenic CO2 emissions").
+      if (!n(f.co2_bio)) return [row];
+      const zero = (o) => Object.fromEntries(Object.keys(o).map((k) => [k, 0]));
+      const bio = r6((qty * n(f.co2_bio)) / 1000);
+      return [row, { ...row, group: 'separate', activity: `${a.name} (Biogenic CO₂)`, ef: { ...zero(row.ef), co2: n(f.co2_bio), hfc_gwp: null, pfc_gwp: null },
+        total_ef: n(f.co2_bio), ton: { ...zero(ton), co2: bio }, tco2e: { ...zero(row.tco2e), co2: bio }, total: bio }];
     }).sort((x, y) => x.scope_code.localeCompare(y.scope_code, 'en', { numeric: true }) || x.department.localeCompare(y.department) || x.activity.localeCompare(y.activity));
     res.json({ year, baseYear, department, gwp: gwps.find((g) => g.code === 'AR5') || gwps[0] || null, rows });
   });

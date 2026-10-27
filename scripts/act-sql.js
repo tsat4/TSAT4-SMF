@@ -141,7 +141,8 @@ alter table public.mt_${k}_ef
   add column if not exists hfc_gwp numeric, add column if not exists pfc_gwp numeric,
   add column if not exists other numeric, add column if not exists other_gwp numeric,
   add column if not exists separate boolean not null default false,
-  add column if not exists source_type text, add column if not exists substitute text;
+  add column if not exists source_type text, add column if not exists substitute text,
+  add column if not exists co2_bio numeric;              -- CO2 ชีวมวล kg/หน่วย (B7 / E10 / ฟืน ...) รายงานแยก ไม่รวมใน kgco2e (แบบ EF TGO AR5 V2)
 alter table public.mt_${k}_ef drop constraint if exists mt_${k}_ef_source_type;
 alter table public.mt_${k}_ef add constraint mt_${k}_ef_source_type
   check (source_type in ('self', 'supplier', 'th_lci', 'tgo', 'thai_res', 'int_db', 'other'));
@@ -155,9 +156,12 @@ create table if not exists public.mt_${k}_activity (
   department text not null,
   name text not null,
   detail text,
-  calc text check (calc in ('septic')),                   -- ปริมาณคำนวณจากสูตร (septic = บ่อเกรอะ ค่าตั้งต้นใน mt_${k}_setting)
+  calc text,                                              -- สูตรปริมาณ (server CFO_CALCS): septic / tkm / km_fuel · ว่าง = กรอกเอง
   status text not null default 'Active' check (status in ('Active', 'Inactive'))
 );
+-- septic = บ่อเกรอะ (คน × วัน → kg CH4) · tkm = ขนส่ง (ตัน × กม.) · km_fuel = ระยะทาง ÷ กม./ลิตร → ลิตร
+alter table public.mt_${k}_activity drop constraint if exists mt_${k}_activity_calc_check;
+alter table public.mt_${k}_activity add constraint mt_${k}_activity_calc_check check (calc in ('septic', 'tkm', 'km_fuel'));
 
 -- ข้อมูลรายเดือน 1 แถว = 1 กิจกรรม × 1 เดือน · ef_id / gwp_code = ค่าที่ใช้ตอนบันทึก (คัดลอกจากกิจกรรม)
 create table if not exists public.tx_${k}_entry (
@@ -227,7 +231,8 @@ select e.id, e.month, e.status, a.department, a.name as activity, a.detail, s.sc
   e.activity_id,                                          -- เพิ่มท้ายสุด: create or replace view เพิ่มคอลัมน์ได้แค่ต่อท้าย
   round(e.qty * (coalesce(f.sf6, 0) * g.sf6 + coalesce(f.nf3, 0) * g.nf3) / 1000, 6) as tco2e_sf6_nf3,
   round(e.qty * coalesce(f.other, 0) * coalesce(f.other_gwp, 0) / 1000, 6) as tco2e_other,
-  f.separate                                              -- รายงานแยก: ไม่รวมในยอด Scope
+  f.separate,                                             -- รายงานแยก: ไม่รวมในยอด Scope
+  round(e.qty * coalesce(f.co2_bio, 0) / 1000, 6) as tco2e_bio  -- CO2 ชีวมวล รายงานแยก
 from public.tx_${k}_entry e
 join public.mt_${k}_activity a on a.id = e.activity_id
 join public.mt_${k}_ef f on f.id = e.ef_id
