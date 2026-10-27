@@ -36,6 +36,7 @@ GET /api/me auth
 GET /api/pay-centers auth sto:1
 GET /api/requisitions auth sto:1
 GET /api/requisitions/:id auth
+GET /api/reserves auth sto:1
 GET /api/stock auth sto:1
 GET /api/summary auth sto:1
 GET /api/system/tables auth creator
@@ -76,6 +77,8 @@ POST /api/receipts auth sto:1
 POST /api/requisitions auth sto:1
 POST /api/requisitions/:id/lines auth sto:1
 POST /api/requisitions/:id/status auth
+POST /api/reserves auth sto:1
+POST /api/reserves/order auth sto:3
 POST /api/system/tables/:name auth creator
 POST /api/usage-materials auth sto:3
 POST /api/users auth sto:3

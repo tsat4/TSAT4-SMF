@@ -6,7 +6,7 @@ const STATUS = {
 const USAGE_ROLE = { viewer: 'Viewer', user: 'User', admin: 'Admin' };
 const USAGE = 'ระบบงาน > Store > Usage';
 const LINE_HEAD = ['หมายเลขเลขรายการ', 'ชื่อรายการ', 'หน่วย'];
-const TX_PAGE = { catalog: 'รายการ', issue: 'เบิกจ่าย', receive: 'รับเข้า', stock: 'Stock' };
+const TX_PAGE = { catalog: 'รายการ', issue: 'เบิกจ่าย', reserve: 'สั่งจอง', receive: 'รับเข้า', stock: 'Stock' };
 let editMode = 'list';
 let txPage = 'issue';
 let editTick = 0;
@@ -125,8 +125,9 @@ async function renderEdit(target) {
       if (!groups) groups = (await api('/api/materials?part=groups')).groups || [];
       if (!alive()) return;
       await loadCatalog();
-    } else if (txPage === 'stock') await loadStock();
+    }     else if (txPage === 'stock') await loadStock();
     else if (txPage === 'receive') await loadReceive();
+    else if (txPage === 'reserve') await loadReserve();
     else if (editMode === 'summary') await loadSummary();
     else await loadList();
   };
@@ -208,6 +209,35 @@ async function renderEdit(target) {
       node.onclick = () => openCartPopup({ material: node.dataset.add, name: node.dataset.name || '', bun: node.dataset.bun || '' }, loadOrder).catch(onErr);
     });
     await loadOrder();
+  };
+  const loadReserve = async () => {
+    if (!alive() || !$('edit-actions')) return;
+    $('edit-q').placeholder = 'หน่วยงานหรือรายการ';
+    const month = $('edit-month')?.value || monthNow();
+    $('edit-actions').innerHTML = `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${button('edit-reserve', 'สั่งจอง', 'primary')}`;
+    $('edit-month').onchange = () => { state.offset = 0; load().catch(onErr); };
+    $('edit-reserve').onclick = () => openReservePopup(() => load()).catch(onErr);
+    const data = await api(`/api/reserves?month=${encodeURIComponent($('edit-month').value)}`);
+    if (!alive() || !$('edit-rows')) return;
+    const term = $('edit-q').value.trim().toLowerCase();
+    if (admin) {
+      const filtered = listQuery(data.totals.filter((row) => !term || [row.material, row.materialDescription, ...row.parts.map((part) => `${part.department} ${part.costcenter}`)].join(' ').toLowerCase().includes(term)), head, (row, key) => row[key]);
+      const page = pageOf(filtered);
+      fillTable('edit-rows', [{ label: 'รายการ', key: 'materialDescription' }, { label: 'จำนวนรวม', key: 'qty' }, 'แยกตามหน่วยงาน', ''], page.map((row) => `<tr><td>${esc(row.materialDescription || row.material)}<div class="sum-meta">${esc(row.material)}</div></td><td>${qtyText(row.qty)} ${esc(row.bun)}</td><td>${row.parts.map((part) => `${esc(part.department)} · ${esc(part.costcenter)} ${qtyText(part.qty)}`).join('<br>')}</td><td><button class="btn" type="button" data-buy="${esc(row.material)}" data-name="${esc(row.materialDescription || row.material)}">สั่งซื้อแล้ว</button></td></tr>`).join(''), 'เดือนนี้ยังไม่มีรายการรอสั่งซื้อ', columnHead());
+      setFoot(page.length, filtered.length);
+      $('edit-rows').querySelectorAll('[data-buy]').forEach((node) => {
+        node.onclick = () => confirmPopup('สั่งซื้อ', `รวม ${esc(node.dataset.name)} ของทุกหน่วยงานในเดือนนี้`, async () => {
+          await api('/api/reserves/order', { method: 'POST', body: { month: $('edit-month').value, material: node.dataset.buy } });
+          toast('บันทึกว่าสั่งซื้อแล้ว');
+          await load();
+        }, 'สั่งซื้อแล้ว');
+      });
+      return;
+    }
+    const filtered = listQuery(data.lines.filter((row) => !term || [row.department, row.costcenter, row.material, row.materialDescription].join(' ').toLowerCase().includes(term)), head, (row, key) => key === 'status' ? (row.status === 'ordered' ? 'สั่งซื้อแล้ว' : 'รอสั่งซื้อ') : row[key]);
+    const page = pageOf(filtered);
+    fillTable('edit-rows', [{ label: 'costcenter', key: 'costcenter' }, { label: 'รายการ', key: 'materialDescription' }, { label: 'จำนวน', key: 'qty' }, { label: 'สถานะ', key: 'status' }], page.map((row) => `<tr><td>${esc(row.costcenter)} · ${esc(row.objectName)}</td><td>${esc(row.materialDescription || row.material)}<div class="sum-meta">${esc(row.material)}</div></td><td>${qtyText(row.qty)} ${esc(row.bun)}</td><td><span class="badge ${row.status === 'ordered' ? 'badge-success' : 'badge-warning'}">${row.status === 'ordered' ? 'สั่งซื้อแล้ว' : 'รอสั่งซื้อ'}</span></td></tr>`).join(''), 'เดือนนี้ยังไม่มีการสั่งจอง', columnHead());
+    setFoot(page.length, filtered.length);
   };
   const loadReceive = async () => {
     if (!alive() || !$('edit-actions')) return;
@@ -411,6 +441,37 @@ async function putInCart(material, qty, costcenter) {
   let id = cartHeader?.id;
   if (!id) id = (await api('/api/requisitions', { method: 'POST', body: { costcenter } })).id;
   await api(`/api/requisitions/${id}/lines`, { method: 'POST', body: { material, qty, costcenter } });
+}
+
+async function openReservePopup(onDone) {
+  const month = $('edit-month')?.value || monthNow();
+  const data = await api(`/api/reserves?month=${encodeURIComponent(month)}`);
+  if (!data.centers.length) return toast('ยังไม่มี costcenter ในหน่วยงาน', 'error');
+  let picked = null;
+  openPopup('สั่งจอง', [
+    field('costcenter', `<select id="rsv-cc">${centerOptions(data.centers)}</select>`),
+    searchBlock(searchSlot('รายการ', 'pick-q', 'pick-search', { placeholder: 'หมายเลขหรือชื่อ' }), 'pick-results'),
+    field('รายการที่เลือก', '<input id="pick-name" readonly>'),
+    field('จำนวน', '<input id="rsv-qty" type="number" min="0.001" step="0.001" value="1">')
+  ].join(''), async () => {
+    if (!picked) throw new Error('เลือกรายการ');
+    const qty = Number($('rsv-qty').value);
+    if (!(qty > 0)) throw new Error('ระบุจำนวน');
+    await api('/api/reserves', { method: 'POST', body: { month, costcenter: $('rsv-cc').value, material: picked.material, qty } });
+    toast('บันทึกการสั่งจองแล้ว');
+    closePopup();
+    if (onDone) await onDone();
+  }, 'บันทึก');
+  const search = async () => {
+    const materials = (await api(`/api/materials?q=${encodeURIComponent($('pick-q').value.trim())}`)).materials || [];
+    fillTable('pick-results', ['รหัส', 'ชื่อ', 'หน่วย'], materials.map((row) => `<tr data-pick="${esc(row.material)}" data-name="${esc(row.material_description)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join(''), 'ไม่พบรายการ');
+    bindRowSelect($('pick-results'), (id, row) => {
+      picked = { material: id };
+      $('pick-name').value = row.dataset.name || id;
+    });
+  };
+  $('pick-search').onclick = () => search().catch(onErr);
+  onEnter('pick-q', () => search().catch(onErr));
 }
 
 async function openLedgerPopup(kind, onDone) {
