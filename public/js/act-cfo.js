@@ -2,7 +2,7 @@
 // transaction (TSATP4-CFO Scope pages + บันทึกกิจกรรม), Setting (plan / activities / emission factors / team / company). Server: server/modules/act/cfo.js
 // spec: docs/specs/act-cfo.md · uses the shared year (a5Year), page bar slots and team tab of act-5s.js.
 const CFO = 'cfo';
-// Scope 1/2/3 colours = the shared chart palette (core.js CHART, cool tone here): this year teal shades, the base year slate.
+// Scope 1/2/3 colours = the shared chart palette (core.js CHART, green here): this year greens, the base year slate.
 const CFO_SCOPE_COLORS = CHART_THEMES.cool.series.slice(0, 3);
 const CFO_BASE_COLORS = CHART_THEMES.cool.base;
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };

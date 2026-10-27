@@ -566,7 +566,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 /* CFO Summary (carbon-form style, cool green). Marks: solid border, same colour inside 60% transparent. */
 /* Shared charts (core.js chartPlot / chartKpi / chartCard / chartPill): one frame and size everywhere.
    Tone by section (CHART_THEMES): ระบบงาน warm, ระบบกิจกรรม cool. Marks: solid edge + same colour inside 60% transparent. */
-:root{--ch-1:#0f766e}
+:root{--ch-1:#2E7D32}
 body[data-zone="work"]{--ch-1:#ea580c}
 .ch-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin-bottom:8px}
 .ch-kpi{display:flex;align-items:center;gap:10px;background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:8px;padding:10px 12px;min-width:0;min-height:76px}

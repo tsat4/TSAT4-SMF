@@ -148,11 +148,11 @@ function headFor(head, reload) {
 }
 
 // ---------- Charts: one look for every dashboard (CFO layout) ----------
-// Tone by section: ระบบงาน warm (red/orange/yellow/brown/pink), ระบบกิจกรรม and the rest cool (teal/blue/green).
-// Neighbouring series are different hues so slices and bars stay easy to tell apart. Marks: solid edge + the same
+// Tone by section: ระบบงาน warm (red/orange/yellow/brown/pink, neighbours different hues), ระบบกิจกรรม and the rest
+// green (user palette #1B5E20 #2E7D32 #43A047 #66BB6A, dark / mid / light so neighbours stay apart). Base year = slate. Marks: solid edge + the same
 // colour inside 60% transparent (AGENTS.md "หน้าจอ"). CSS: .ch-* in app.css.
 const CHART_THEMES = {
-  cool: { series: ['#0f766e', '#2563eb', '#65a30d', '#06b6d4', '#4f46e5', '#10b981', '#7dd3fc', '#64748b'], base: ['#334155', '#64748b', '#94a3b8'], line: '#0891b2', dark: '#1e293b', target: '#16a34a' },
+  cool: { series: ['#1B5E20', '#43A047', '#66BB6A', '#2E7D32', '#A5D6A7', '#0f766e', '#81C784', '#64748b'], base: ['#334155', '#64748b', '#94a3b8'], line: '#2E7D32', dark: '#1e293b', target: '#43A047' },
   warm: { series: ['#ea580c', '#dc2626', '#eab308', '#92400e', '#db2777', '#fb923c', '#a16207', '#78716c'], base: ['#44403c', '#78716c', '#a8a29e'], line: '#ea580c', dark: '#292524', target: '#b45309' }
 };
 // Read at render time, so the colours follow the page being drawn (openView sets body[data-zone]).
