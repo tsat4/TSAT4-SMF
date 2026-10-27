@@ -120,9 +120,10 @@ function fillTable(id, headers, rows, emptyText, head) {
   const cells = headers.map((header) => {
     const label = typeof header === 'string' ? header : header.label;
     const key = typeof header === 'string' ? '' : header.key;
-    if (!head || !key) return `<th>${esc(label)}</th>`;
+    const num = typeof header === 'object' && header.num ? ' num' : ''; // number column: header right-aligned like its values
+    if (!head || !key) return `<th${num ? ' class="num"' : ''}>${esc(label)}</th>`;
     const asc = head.sort === key && head.dir !== 'desc';
-    return `<th class="has-menu"><div class="th-line"><span class="th-label">${esc(label)}</span><button class="th-tool${asc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" aria-label="${asc ? 'เรียง Z ไป A' : 'เรียง A ไป Z'}"><span class="material-symbols-rounded">sort_by_alpha</span></button></div></th>`;
+    return `<th class="has-menu${num}"><div class="th-line"><span class="th-label">${esc(label)}</span><button class="th-tool${asc ? ' is-active' : ''}" type="button" data-col-sort="${esc(key)}" aria-label="${asc ? 'เรียง Z ไป A' : 'เรียง A ไป Z'}"><span class="material-symbols-rounded">sort_by_alpha</span></button></div></th>`;
   }).join('');
   const body = rows || `<tr><td class="empty" colspan="${Math.max(headers.length, 1)}">${emptyText}</td></tr>`;
   const node = $(id);

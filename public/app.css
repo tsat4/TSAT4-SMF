@@ -533,6 +533,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 }
 /* CFO (act-cfo.js) */
 .mo-data-table td.num,.mo-data-table th.num{text-align:right;font-variant-numeric:tabular-nums}
+.mo-data-table th.num .th-line{justify-content:flex-end}
 .mo-data-table tr.is-muted td{color:var(--mo-text-muted)}
 .cfo-gas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .cfo-company{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;max-width:1100px}
