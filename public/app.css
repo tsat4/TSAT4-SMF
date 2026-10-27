@@ -542,8 +542,9 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-months i.is-done{background:color-mix(in srgb,var(--ch-1) 40%,transparent);border-color:var(--ch-1)}
 .cfo-months i.is-missing{background:color-mix(in srgb,var(--mo-danger) 40%,transparent);border-color:var(--mo-danger)}
 .cfo-prog{display:flex;align-items:center;gap:6px;font-variant-numeric:tabular-nums}
-.cfo-prog span{width:60px;height:6px;border-radius:3px;background:var(--mo-surface-2);overflow:hidden}
-.cfo-prog i{display:block;height:100%;background:color-mix(in srgb,var(--ch-1) 40%,transparent);box-shadow:inset 0 0 0 1px var(--ch-1)}
+/* progress: visible empty track (outlined) + thicker bar in the section colour */
+.cfo-prog span{width:64px;height:10px;border-radius:5px;background:color-mix(in srgb,var(--mo-text-muted) 14%,var(--mo-surface));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--mo-text-muted) 45%,transparent);overflow:hidden}
+.cfo-prog i{display:block;height:100%;border-radius:5px;background:color-mix(in srgb,var(--ch-1) 40%,transparent);box-shadow:inset 0 0 0 1px var(--ch-1)}
 .cfo-org{display:flex;flex-direction:column;gap:6px}
 .cfo-org-line{display:grid;grid-template-columns:120px 1fr;gap:8px;font-size:12.5px}.cfo-org-line span{color:var(--mo-text-muted)}
 .cfo-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.cfo-photos img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--mo-radius);border:1px solid var(--mo-border)}
