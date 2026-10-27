@@ -7,6 +7,8 @@ import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, requireAdmin, y
 export const CFO_ON = ['cfo'];
 const SETTING_KEYS = ['company_name', 'company_address', 'company_area', 'company_business', 'company_customers', 'company_employees', 'company_updated',
   'company_photo1', 'company_photo2', 'base_year', 'target_percent', 'septic_bod', 'septic_b0', 'septic_mcf', 'septic_i'];
+// production_<year> = pieces produced that year (Carbon intensity = tCO2e / pieces)
+const settingKey = (k) => SETTING_KEYS.includes(k) || /^production_\d{4}$/.test(k);
 const EF_VALUES = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'hfc', 'pfc', 'unit', 'scope_code'];
 
 const text = (v, max = 500) => String(v ?? '').trim().slice(0, max) || null;
@@ -44,12 +46,14 @@ export function mountCfo(app) {
     const [cur, base] = await Promise.all([rowsOf(year), rowsOf(compareYear)]);
     const sum = (list) => Math.round(list.reduce((s, r) => s + Number(r.tco2e), 0) * 1000) / 1000;
     const inMonth = (list, m) => list.filter((r) => Number(r.month.slice(5, 7)) === m);
-    const group = (key, label) => Object.values(cur.reduce((acc, r) => {
+    // tco2e = this year, base = the compare year (categories: every category used in either year)
+    const group = (key, label, list) => Object.values(list.reduce((acc, [r, field]) => {
       const k = r[key];
-      acc[k] = acc[k] || { key: k, label: label(r), tco2e: 0 };
-      acc[k].tco2e += Number(r.tco2e);
+      acc[k] = acc[k] || { key: k, scope: r.scope, label: label(r), tco2e: 0, base: 0 };
+      acc[k][field] += Number(r.tco2e);
       return acc;
-    }, {})).map((g) => ({ ...g, tco2e: Math.round(g.tco2e * 1000) / 1000 })).sort((a, b) => b.tco2e - a.tco2e);
+    }, {})).map((g) => ({ ...g, tco2e: Math.round(g.tco2e * 1000) / 1000, base: Math.round(g.base * 1000) / 1000 })).sort((a, b) => b.tco2e - a.tco2e);
+    const tagged = (withBase) => [...cur.map((r) => [r, 'tco2e']), ...(withBase ? base.map((r) => [r, 'base']) : [])];
     res.json({
       year,
       department,
@@ -65,8 +69,9 @@ export function mountCfo(app) {
           base: was, baseScopes: [1, 2, 3].map((n) => sum(before.filter((r) => r.scope === n))), target: Math.round(was * (1 - target / 100) * 1000) / 1000
         };
       }),
-      categories: group('scope_code', (r) => `${r.scope_code} ${r.scope_name}`),
-      departments: group('department', (r) => r.department),
+      categories: group('scope_code', (r) => `${r.scope_code} ${r.scope_name}`, tagged(true))
+        .sort((a, b) => a.scope - b.scope || Number(a.key.split('-')[1]) - Number(b.key.split('-')[1])),
+      departments: group('department', (r) => r.department, tagged(false)),
       settings
     });
   });
@@ -263,7 +268,7 @@ export function mountCfo(app) {
 
   route('put', '/api/act/:activity/cfo/settings', async (req, res, activity, t) => {
     if (!(await requireAdmin(req, res, activity, thisYear()))) return;
-    const rows = Object.entries(req.body || {}).filter(([k]) => SETTING_KEYS.includes(k)).map(([key, value]) => ({ key, value: String(value ?? '').trim().slice(0, 1000) }));
+    const rows = Object.entries(req.body || {}).filter(([k]) => settingKey(k)).map(([key, value]) => ({ key, value: String(value ?? '').trim().slice(0, 1000) }));
     if (!rows.length) return fail(res, 400, 'ไม่มีข้อมูลให้บันทึก');
     must(await tx.from(t.setting).upsert(rows, { onConflict: 'key' }));
     res.json({ ok: true });

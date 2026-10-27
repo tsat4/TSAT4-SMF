@@ -6,7 +6,7 @@ const CFO = 'cfo';
 const CFO_SCOPE_COLORS = CHART_THEMES.cool.series.slice(0, 3);
 const CFO_BASE_COLORS = CHART_THEMES.cool.base;
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
-const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
+const CFO_DASH_TABS = { summary: 'Summary', report: 'Summary 2', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
 const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', team: 'ทีม', company: 'บริษัท' };
 const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['company_address', 'สถานที่ตั้ง'], ['company_area', 'พื้นที่โรงงาน'], ['company_business', 'ประเภทธุรกิจ'],
   ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
@@ -43,6 +43,7 @@ async function cfoDashboard(target) {
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   if (cfoDashTab === 'schedule') return aplRender(body, CFO, { inPage: true, readOnly: true });
   if (cfoDashTab === 'scope') return cfoDrawProgress(body);
+  if (cfoDashTab === 'report') return cfoDrawReport(body);
   if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
   if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
   return cfoDrawSummary(body);
@@ -66,7 +67,6 @@ async function cfoDrawSummary(body) {
   const cumulative = (list, upto = 11) => { let t = 0; return list.map((v, i) => (i > upto ? null : (t += v))); };
   const cumNow = cumulative(cur, lastMonth);
   const cumBase = hasBase ? cumulative(was) : [];
-  const share = (list) => list.map((g) => `<tr><td>${esc(g.label)}</td><td class="num">${cfoT(g.tco2e)}</td><td class="num">${cfoPct(g.tco2e, d.total)}</td></tr>`).join('') || '<tr><td colspan="3" class="empty">ยังไม่มีข้อมูล</td></tr>';
   const departments = [...new Set([...d.departments.map((x) => x.key), cfoDash.department].filter(Boolean))].sort();
   // Two axes: left = monthly bars, right = cumulative lines (a year adds up to ~12 bars, one axis would flatten them).
   const chart = chartPlot({
@@ -100,11 +100,7 @@ async function cfoDrawSummary(body) {
     </div>
     ${chartCard(`Accumulation CO₂ Emission${pick ? ` · Scope ${pick}` : ''}`, chart)}
     <div class="table-wrap cfo-month-table"><table class="mo-data-table"><thead><tr><th>เดือน</th>${hasBase ? `<th class="num">${esc(baseName)}</th>` : ''}<th class="num">ปี ${a5Year}</th>${hasBase ? '<th class="num">เป้า</th>' : ''}<th class="num">Scope 1</th><th class="num">Scope 2</th><th class="num">Scope 3</th></tr></thead>
-      <tbody>${d.months.map((m) => `<tr><td>${ACT_MONTHS[m.month - 1]}</td>${hasBase ? `<td class="num">${cfoT(m.base)}</td>` : ''}<td class="num">${cfoT(m.total)}</td>${hasBase ? `<td class="num">${cfoT(m.target)}</td>` : ''}${m.scopes.map((x) => `<td class="num">${cfoT(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
-    <div class="a5-two">
-      <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>หมวด</th><th class="num">tCO₂e</th><th class="num">สัดส่วน</th></tr></thead><tbody>${share(d.categories)}</tbody></table></div>
-      <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>หน่วยงาน</th><th class="num">tCO₂e</th><th class="num">สัดส่วน</th></tr></thead><tbody>${share(d.departments)}</tbody></table></div>
-    </div>`;
+      <tbody>${d.months.map((m) => `<tr><td>${ACT_MONTHS[m.month - 1]}</td>${hasBase ? `<td class="num">${cfoT(m.base)}</td>` : ''}<td class="num">${cfoT(m.total)}</td>${hasBase ? `<td class="num">${cfoT(m.target)}</td>` : ''}${m.scopes.map((x) => `<td class="num">${cfoT(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   a5Lift(body);
   $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawSummary(body).catch(onErr); };
   $('cfo-d-scope').onchange = () => { cfoDash.chartScope = $('cfo-d-scope').value; cfoDrawSummary(body).catch(onErr); };
@@ -117,6 +113,50 @@ async function cfoDrawSummary(body) {
       ${cur[i] ? `${chartPill(cur[i], target, ' เทียบกับค่าเป้าหมาย')}<div class="ch-tip-note">${chartPill(cur[i], was[i], ` เทียบกับ${c.isBase ? 'ค่าปีฐาน' : `ปี ${c.year}`}`)}</div>` : ''}` : ''}
       <div class="ch-tip-row"><span>สะสมถึงเดือนนี้</span><b>${cfoT(cumNow[i] ?? 0)}</b></div>`;
   });
+}
+
+// Dashboard > Summary 2 (TGO CFO summary sheet): base year next to this year — each Scope and its categories with
+// tCO2e, share within the Scope, share of Scope 1+2 and of Scope 1+2+3, then Carbon intensity per piece produced
+// (production_<year> in Setting > บริษัท). Filter: department.
+async function cfoDrawReport(body) {
+  const d = await a5Api(CFO, `cfo/summary?year=${a5Year}&department=${encodeURIComponent(cfoDash.department)}`);
+  const c = d.compare;
+  const departments = [...new Set([...d.departments.map((x) => x.key), cfoDash.department].filter(Boolean))].sort();
+  const years = [{ key: 'base', year: c.year, title: c.isBase ? `ปีฐาน ${c.year}` : `ปี ${c.year} (ยังไม่ตั้งปีฐาน)` }, { key: 'tco2e', year: a5Year, title: `ปีปัจจุบัน ${a5Year}` }];
+  const pct = (part, total) => (total ? (Math.round((part / total) * 10000) / 100).toFixed(2) : '-');
+  const table = ({ key, year, title }) => {
+    const byScope = [1, 2, 3].map((n) => d.categories.filter((g) => g.scope === n).reduce((t, g) => t + g[key], 0));
+    const s12 = byScope[0] + byScope[1];
+    const s123 = s12 + byScope[2];
+    const pieces = Number(d.settings[`production_${year}`]) || 0;
+    const row = (cls, label, v, inScope, scope) => `<tr class="${cls}"><td>${label}</td><td class="num">${cfoT(v)}</td><td class="num">${inScope}</td>
+      <td class="num">${scope < 3 ? pct(v, s12) : ''}</td><td class="num">${pct(v, s123)}</td></tr>`;
+    const rows = [1, 2, 3].map((n) => row('cfo-group', `Scope ${n}`, byScope[n - 1], byScope[n - 1] ? '100.00' : '-', n)
+      + d.categories.filter((g) => g.scope === n).map((g) => row('cfo-sub', esc(g.label), g[key], pct(g[key], byScope[n - 1]), n)).join('')).join('');
+    const intensity = (label, v) => `<tr><td>Carbon intensity (${label})</td><td class="num">${pieces ? (v / pieces).toFixed(4) : '-'}</td><td colspan="3" class="sum-meta">tCO₂e / ชิ้น · ${pieces ? `ผลิต ${cfoT(pieces)} ชิ้น` : 'ยังไม่มีปริมาณผลิต (Setting > บริษัท)'}</td></tr>`;
+    return chartCard(title, `<div class="table-wrap cfo-report"><table class="mo-data-table"><thead><tr><th>ขอบเขต</th><th class="num">tCO₂e</th><th class="num">สัดส่วน (%)</th><th class="num">สัดส่วน (%)<br>Scope 1+2</th><th class="num">สัดส่วน (%)<br>Scope 1+2+3</th></tr></thead>
+      <tbody>${rows}
+        <tr class="cfo-total"><td>รวม Scope 1 + 2</td><td class="num">${cfoT(s12)}</td><td></td><td class="num">${s12 ? '100.00' : '-'}</td><td></td></tr>
+        <tr class="cfo-total"><td>รวม Scope 1 + 2 + 3</td><td class="num">${cfoT(s123)}</td><td></td><td></td><td class="num">${s123 ? '100.00' : '-'}</td></tr>
+        ${intensity('Scope 1+2', s12)}${intensity('Scope 1+2+3', s123)}</tbody></table></div>`, 'ม.ค. – ธ.ค.');
+  };
+  const scopeSum = (key) => [1, 2, 3].map((n) => d.categories.filter((g) => g.scope === n).reduce((t, g) => t + g[key], 0));
+  const [was, now] = [scopeSum('base'), scopeSum('tco2e')];
+  const chart = chartPlot({
+    id: 'cfo-cmp', labels: ['Scope 1', 'Scope 2', 'Scope 3'], left: 'tCO₂e',
+    bars: [{ values: was, colors: [CFO_BASE_COLORS[1]] }, { values: now, colors: [CFO_SCOPE_COLORS[0]] }],
+    legend: [{ box: CFO_BASE_COLORS[1], label: years[0].title }, { box: CFO_SCOPE_COLORS[0], label: years[1].title }]
+  });
+  body.innerHTML = `
+    <div class="toolbar a5-filters">${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}</div>
+    ${chartCard('เปรียบเทียบตาม Scope', chart, 'tCO₂e ทั้งปี')}
+    <div class="a5-two">${years.map(table).join('')}</div>`;
+  a5Lift(body);
+  $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawReport(body).catch(onErr); };
+  chartTip('cfo-cmp', (i) => `<strong>Scope ${i + 1}</strong>
+    <div class="ch-tip-row"><span>${esc(years[0].title)}</span><b>${cfoT(was[i])} tCO₂e</b></div>
+    <div class="ch-tip-row"><span>${esc(years[1].title)}</span><b>${cfoT(now[i])} tCO₂e</b></div>
+    ${now[i] && was[i] ? chartPill(now[i], was[i], ` เทียบ${esc(years[0].title)}`) : ''}`);
 }
 
 // Dashboard > Scope: how complete each activity is this year — 12 month cells (recorded / due but missing),
@@ -518,13 +558,16 @@ function cfoSetEf(body, m, rerender) {
 }
 
 function cfoSetCompany(body, m, rerender) {
+  // + pieces produced in the base year and this year (Summary 2 Carbon intensity)
+  const years = [...new Set([Number(m.settings.base_year) || 0, a5Year].filter(Boolean))];
+  const keys = [...CFO_COMPANY, ...years.map((y) => [`production_${y}`, `ปริมาณผลิต ปี ${y} (ชิ้น)`])];
   body.innerHTML = `
     ${m.admin ? `<div class="action-bar a5-actions">${button('cfo-save', 'บันทึก', 'primary')}</div>` : ''}
-    <div class="cfo-company">${CFO_COMPANY.map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(m.settings[key] ?? '')}"${key === 'company_updated' ? ' type="date"' : ''}${m.admin ? '' : ' readonly'}>`)).join('')}</div>`;
+    <div class="cfo-company">${keys.map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(m.settings[key] ?? '')}"${key === 'company_updated' ? ' type="date"' : ''}${m.admin ? '' : ' readonly'}>`)).join('')}</div>`;
   a5Lift(body);
   if (!m.admin) return;
   $('cfo-save').onclick = () => {
-    const values = Object.fromEntries(CFO_COMPANY.map(([key]) => [key, $(`cfo-s-${key}`).value]));
+    const values = Object.fromEntries(keys.map(([key]) => [key, $(`cfo-s-${key}`).value]));
     a5Api(CFO, 'cfo/settings', { method: 'PUT', body: values }).then(() => { toast('บันทึกแล้ว'); rerender(); }).catch(onErr);
   };
 }
