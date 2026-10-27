@@ -6,7 +6,7 @@ const CFO = 'cfo';
 const CFO_SCOPE_COLORS = CHART_THEMES.cool.series.slice(0, 3);
 const CFO_BASE_COLORS = CHART_THEMES.cool.base;
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
-const CFO_DASH_TABS = { summary: 'Summary', report: 'Summary 2', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
+const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
 const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', team: 'ทีม', company: 'บริษัท' };
 const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['company_address', 'สถานที่ตั้ง'], ['company_area', 'พื้นที่โรงงาน'], ['company_business', 'ประเภทธุรกิจ'],
   ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
@@ -15,7 +15,8 @@ const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'C
 let cfoDashTab = 'summary';
 let cfoSetTab = 'plan';
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
-const cfoDash = { department: '', chartScope: '', scope: '1' };
+// page: Summary หน้า 1 (monthly accumulation) / หน้า 2 (summary by Scope), picked in the dropdown before the year
+const cfoDash = { department: '', chartScope: '', scope: '1', page: '1' };
 // transaction filters: Scope → month (one month, or '' = the year) → category (main) → activity (sub)
 const cfoTx = { scope: '1', month: String(new Date().getMonth() + 1), category: '', activity: '' };
 const cfoHeads = { entries: { sort: '', dir: 'asc', filters: {} }, activities: { sort: '', dir: 'asc', filters: {} }, ef: { sort: '', dir: 'asc', filters: {} } };
@@ -43,10 +44,11 @@ async function cfoDashboard(target) {
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   if (cfoDashTab === 'schedule') return aplRender(body, CFO, { inPage: true, readOnly: true });
   if (cfoDashTab === 'scope') return cfoDrawProgress(body);
-  if (cfoDashTab === 'report') return cfoDrawReport(body);
   if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
   if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
-  return cfoDrawSummary(body);
+  document.querySelector('.a5-year').insertAdjacentHTML('beforebegin', field('หน้า', `<select id="cfo-d-page">${options(['1', '2'], cfoDash.page, (v) => (v === '1' ? 'หน้า 1 · รายเดือน' : 'หน้า 2 · ตาม Scope'))}</select>`));
+  $('cfo-d-page').onchange = () => { cfoDash.page = $('cfo-d-page').value; rerender(); };
+  return cfoDash.page === '2' ? cfoDrawReport(body) : cfoDrawSummary(body);
 }
 
 // Change against the compared year (base year, or last year without one): +x% / −x%.
@@ -115,7 +117,7 @@ async function cfoDrawSummary(body) {
   });
 }
 
-// Dashboard > Summary 2 (TGO CFO summary sheet): base year next to this year — each Scope and its categories with
+// Dashboard > Summary หน้า 2 (TGO CFO summary sheet, fits one screen): base year next to this year — each Scope and its categories with
 // tCO2e, share within the Scope, share of Scope 1+2 and of Scope 1+2+3, then Carbon intensity per piece produced
 // (production_<year> in Setting > บริษัท). Filter: department.
 async function cfoDrawReport(body) {
@@ -133,7 +135,7 @@ async function cfoDrawReport(body) {
       <td class="num">${scope < 3 ? pct(v, s12) : ''}</td><td class="num">${pct(v, s123)}</td></tr>`;
     const rows = [1, 2, 3].map((n) => row('cfo-group', `Scope ${n}`, byScope[n - 1], byScope[n - 1] ? '100.00' : '-', n)
       + d.categories.filter((g) => g.scope === n).map((g) => row('cfo-sub', esc(g.label), g[key], pct(g[key], byScope[n - 1]), n)).join('')).join('');
-    const intensity = (label, v) => `<tr><td>Carbon intensity (${label})</td><td class="num">${pieces ? (v / pieces).toFixed(4) : '-'}</td><td colspan="3" class="sum-meta">tCO₂e / ชิ้น · ${pieces ? `ผลิต ${cfoT(pieces)} ชิ้น` : 'ยังไม่มีปริมาณผลิต (Setting > บริษัท)'}</td></tr>`;
+    const intensity = (label, v) => `<tr><td>Carbon intensity (${label})</td><td class="num">${pieces ? (v / pieces).toFixed(4) : '-'}</td><td colspan="3" class="sum-meta">tCO₂e / ชิ้น · ${pieces ? `ผลิต ${cfoT(pieces)} ชิ้น` : 'ใส่ปริมาณผลิตที่ Setting > บริษัท'}</td></tr>`;
     return chartCard(title, `<div class="table-wrap cfo-report"><table class="mo-data-table"><thead><tr><th>ขอบเขต</th><th class="num">tCO₂e</th><th class="num">สัดส่วน (%)</th><th class="num">สัดส่วน (%)<br>Scope 1+2</th><th class="num">สัดส่วน (%)<br>Scope 1+2+3</th></tr></thead>
       <tbody>${rows}
         <tr class="cfo-total"><td>รวม Scope 1 + 2</td><td class="num">${cfoT(s12)}</td><td></td><td class="num">${s12 ? '100.00' : '-'}</td><td></td></tr>
@@ -149,8 +151,8 @@ async function cfoDrawReport(body) {
   });
   body.innerHTML = `
     <div class="toolbar a5-filters">${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}</div>
-    ${chartCard('เปรียบเทียบตาม Scope', chart, 'tCO₂e ทั้งปี')}
-    <div class="a5-two">${years.map(table).join('')}</div>`;
+    <div class="cfo-report-page">${chartCard('เปรียบเทียบตาม Scope', chart, 'tCO₂e ทั้งปี')}
+    <div class="a5-two">${years.map(table).join('')}</div></div>`;
   a5Lift(body);
   $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawReport(body).catch(onErr); };
   chartTip('cfo-cmp', (i) => `<strong>Scope ${i + 1}</strong>
