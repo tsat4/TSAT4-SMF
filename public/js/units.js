@@ -22,7 +22,7 @@ const ACTIVITIES = [
 ];
 const PLANT_PAGES = [
   ['home', 'monitoring', 'Dashboard', 'ภาพรวม'],
-  ['edit', 'edit_note', 'transaction', 'รายการ'],
+  ['edit', 'edit_note', 'Transaction', 'รายการ'],
   ['setting', 'settings', 'Setting', 'ข้อมูลตั้งต้น']
 ];
 for (const [id, label] of PLANTS) {
@@ -60,7 +60,7 @@ function plantRender(name) {
 async function renderWork(target) {
   modulePage(target, 'ระบบงาน', 'Work System', [
     ['store', 'warehouse', 'Store', 'คลังและรายการใช้งาน'],
-    ...PLANTS.map(([id, label, icon]) => [id, icon, label, 'Dashboard, transaction, Setting'])
+    ...PLANTS.map(([id, label, icon]) => [id, icon, label, 'Dashboard, Transaction, Setting'])
   ]);
 }
 
@@ -79,7 +79,7 @@ function renderPlantPage(target, id, page) {
 }
 
 async function renderActivity(target) {
-  modulePage(target, 'ระบบกิจกรรม', 'Activity', ACTIVITIES.map(([id, label, icon]) => [id, icon, label, 'Dashboard, transaction, Setting']));
+  modulePage(target, 'ระบบกิจกรรม', 'Activity', ACTIVITIES.map(([id, label, icon]) => [id, icon, label, 'Dashboard, Transaction, Setting']));
 }
 
 function unitNav(rows) {

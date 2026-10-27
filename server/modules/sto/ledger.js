@@ -182,7 +182,7 @@ export function mountLedger(app, mod) {
     });
   }));
 
-  app.post('/api/receipts', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+  app.post('/api/receipts', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     try {
       const month = monthOf(req.body?.month);
       const qty = qtyOf(req.body?.qty);
@@ -228,7 +228,7 @@ export function mountLedger(app, mod) {
     }
   }));
 
-  app.post('/api/borrows', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+  app.post('/api/borrows', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     try {
       const month = monthOf(req.body?.month);
       const qty = qtyOf(req.body?.qty);

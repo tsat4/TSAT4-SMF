@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { mx } from '../../core/db.js';
 import { fail, wrap, cleanTerm } from '../../core/http.js';
 import { CREATOR_ID, ROLE_RANK, atLeast } from '../../core/access.js';
@@ -43,7 +42,6 @@ export function mountMembers(app, mod) {
 
   app.post('/api/users', wrap(requireUser), atLeast(mod, 3), wrap(async (req, res) => {
     const employeeId = String(req.body.employeeId || '').trim();
-    const password = String(req.body.password || '');
     const role = ROLE_RANK[req.body.role] ? req.body.role : '';
     if (!employeeId || !role) return fail(res, 400, 'ระบุพนักงานและบทบาท');
     if (employeeId === CREATOR_ID && role !== 'admin') return fail(res, 400, 'ผู้สร้างระบบเป็น Admin เสมอ');
@@ -54,17 +52,7 @@ export function mountMembers(app, mod) {
     if (!department) return fail(res, 400, 'พนักงานนี้ยังไม่มีหน่วยงาน');
     const existing = await mx.from('mt_main_user').select('employee_id').eq('employee_id', employeeId).maybeSingle();
     if (existing.error) return fail(res, 400, 'ตรวจบัญชีไม่ได้');
-    if (!existing.data) {
-      if (password.length < 8) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
-      const created = await mx.from('mt_main_user').insert({
-        employee_id: employeeId,
-        password_hash: await bcrypt.hash(password, 10),
-        role: 'employee',
-        creator: employeeId === CREATOR_ID,
-        password_changed_at: new Date().toISOString()
-      });
-      if (created.error) return fail(res, 400, 'เพิ่มบัญชีเข้าสู่ระบบไม่ได้');
-    }
+    if (!existing.data) return fail(res, 400, 'พนักงานนี้ยังไม่ได้เข้าสู่ระบบครั้งแรก');
     const status = ['Active', 'Inactive'].includes(req.body.status) ? req.body.status : 'Active';
     const { error } = await mx.from('mt_sto_user').upsert({
       employee_id: employeeId,
@@ -89,15 +77,7 @@ export function mountMembers(app, mod) {
       if (employeeId === CREATOR_ID && req.body.status !== 'Active') return fail(res, 400, 'ปิดสิทธิ์ผู้สร้างระบบไม่ได้');
       patch.status = req.body.status;
     }
-    if (req.body.password) {
-      if (String(req.body.password).length < 8) return fail(res, 400, 'รหัสผ่านต้องมีอย่างน้อย 8 ตัว');
-      const login = await mx.from('mt_main_user').update({
-        password_hash: await bcrypt.hash(String(req.body.password), 10),
-        password_changed_at: new Date().toISOString()
-      }).eq('employee_id', employeeId).select('employee_id');
-      if (login.error || !login.data?.length) return fail(res, 400, 'เปลี่ยนรหัสผ่านไม่ได้');
-    }
-    if (!Object.keys(patch).length && !req.body.password) return fail(res, 400, 'ไม่มีข้อมูลให้แก้ไข');
+    if (!Object.keys(patch).length) return fail(res, 400, 'ไม่มีข้อมูลให้แก้ไข');
     if (Object.keys(patch).length) {
       const { data, error } = await mx.from('mt_sto_user').update(patch).eq('employee_id', employeeId).select('employee_id');
       if (error || !data?.length) return fail(res, 400, 'แก้ไขผู้ใช้ไม่ได้');

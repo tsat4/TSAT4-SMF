@@ -14,7 +14,7 @@ Object.assign(TITLES, {
   store: ['Store', 'ระบบงาน > Store'],
   locked: ['Usage', USAGE],
   home: ['Dashboard', USAGE],
-  edit: ['transaction', USAGE],
+  edit: ['Transaction', USAGE],
   setting: ['Setting', USAGE]
 });
 Object.assign(ACCESS, { home: ['sto', 1], edit: ['sto', 1], setting: ['sto', 3] });
@@ -53,7 +53,7 @@ function badge(status) {
 }
 
 async function renderStore(target) {
-  modulePage(target, 'Store', 'ระบบงาน > Store', [['home', 'inventory_2', 'Usage', 'Dashboard, transaction, Setting']]);
+  modulePage(target, 'Store', 'ระบบงาน > Store', [['home', 'inventory_2', 'Usage', 'Dashboard, Transaction, Setting']]);
 }
 
 async function renderLocked(target) {
@@ -84,7 +84,8 @@ async function renderEdit(target) {
   const alive = () => gen === editTick;
   const state = { offset: 0, group: '' };
   const admin = rankOf('sto') >= 3;
-  const seg = `<div class="seg" role="group" aria-label="หน้า transaction">${Object.entries(TX_PAGE).map(([id, label]) => `<button class="seg-btn${id === txPage ? ' is-active' : ''}" type="button" data-tx="${id}">${label}</button>`).join('')}</div>`;
+  const canWrite = rankOf('sto') >= 2;
+  const seg = `<div class="seg" role="group" aria-label="หน้า Transaction">${Object.entries(TX_PAGE).map(([id, label]) => `<button class="seg-btn${id === txPage ? ' is-active' : ''}" type="button" data-tx="${id}">${label}</button>`).join('')}</div>`;
   const catalog = txPage === 'catalog';
   target.innerHTML = catalog ? `<div class="view-body">
     ${pageBar(seg, '', 'edit')}
@@ -171,16 +172,16 @@ async function renderEdit(target) {
     }
     const walletTitle = (code, group) => (code === '-' ? 'ยังไม่เลือก' : `${code}${group[0].costcenterName ? ` · ${group[0].costcenterName}` : ''}`);
     $('edit-order').innerHTML = lines.length
-      ? [...groups.entries()].map(([code, group]) => `<section class="tx-wallet"><div class="tx-wallet-name">${esc(walletTitle(code, group))}</div>${group.map((line) => `<div class="tx-line"><span class="tx-line-name">- ${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span><button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button></div>`).join('')}</section>`).join('')
+      ? [...groups.entries()].map(([code, group]) => `<section class="tx-wallet"><div class="tx-wallet-name">${esc(walletTitle(code, group))}</div>${group.map((line) => `<div class="tx-line"><span class="tx-line-name">- ${esc(line.materialDescription || line.material)}</span><span class="tx-line-qty">${Number(line.qty)} ${esc(line.bun)}</span>${canWrite ? `<button class="tx-line-drop" type="button" data-drop="${esc(line.id)}" data-name="${esc(line.materialDescription || line.material)}">เอาออก</button>` : ''}</div>`).join('')}</section>`).join('')
       : '<p class="sum-meta">ยังไม่มีรายการ</p>';
-    $('edit-confirm-host').innerHTML = `<button class="btn btn-primary hold-btn" type="button" id="edit-confirm" title="กดค้าง 2 วินาที" ${lines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">ยืนยัน</span></button>`;
+    $('edit-confirm-host').innerHTML = canWrite ? `<button class="btn btn-primary hold-btn" type="button" id="edit-confirm" title="กดค้าง 2 วินาที" ${lines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">ยืนยัน</span></button>` : '';
     $('edit-order').querySelectorAll('[data-drop]').forEach((node) => {
       node.onclick = () => confirmPopup('เอาออกจากสรุป', `ตรวจ ${esc(node.dataset.name)} อีกครั้งก่อนเอาออก`, async () => {
         await api(`/api/requisitions/${cart.id}/lines/${node.dataset.drop}`, { method: 'DELETE' });
         await loadOrder();
       });
     });
-    if (lines.length) {
+    if (lines.length && canWrite) {
       bindHold($('edit-confirm'), async () => {
         try {
           await postStatus(cart.id, 'submitted');
@@ -202,7 +203,7 @@ async function renderEdit(target) {
       const img = row.img
         ? `<img class="tx-card-img" src="${esc(row.img)}" alt="">`
         : '<div class="tx-card-img is-empty" aria-hidden="true"><span class="material-symbols-rounded">image</span></div>';
-      return `<article class="tx-card">${img}<div class="tx-card-body"><div class="tx-card-title">${esc(row.material_description)}</div><div class="tx-card-sub">${esc(row.material)}</div></div><div class="tx-card-sum"><span>ราคา</span><strong>${moneyText(row.price)} ${esc(row.crcy || '')}</strong></div><div class="tx-card-sum"><span>คงเหลือ</span><strong>${qtyText(row.currentQty)} ${esc(row.bun || '')}</strong></div><button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}" aria-label="เพิ่มลงตะกร้า">+</button></article>`;
+      return `<article class="tx-card">${img}<div class="tx-card-body"><div class="tx-card-title">${esc(row.material_description)}</div><div class="tx-card-sub">${esc(row.material)}</div></div><div class="tx-card-sum"><span>ราคา</span><strong>${moneyText(row.price)} ${esc(row.crcy || '')}</strong></div><div class="tx-card-sum"><span>คงเหลือ</span><strong>${qtyText(row.currentQty)} ${esc(row.bun || '')}</strong></div>${canWrite ? `<button class="btn btn-primary" type="button" data-add="${esc(row.material)}" data-name="${esc(row.material_description)}" data-bun="${esc(row.bun)}" aria-label="เพิ่มลงตะกร้า">+</button>` : ''}</article>`;
     }).join('') : '<p class="empty">ไม่พบรายการ</p>';
     setFoot(rows.length, data.total || 0);
     $('edit-rows').querySelectorAll('[data-add]').forEach((node) => {
@@ -214,9 +215,9 @@ async function renderEdit(target) {
     if (!alive() || !$('edit-actions')) return;
     $('edit-q').placeholder = 'หน่วยงานหรือรายการ';
     const month = $('edit-month')?.value || monthNow();
-    $('edit-actions').innerHTML = `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${button('edit-reserve', 'สั่งจอง', 'primary')}`;
+    $('edit-actions').innerHTML = canWrite ? `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${button('edit-reserve', 'สั่งจอง', 'primary')}` : `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>`;
     $('edit-month').onchange = () => { state.offset = 0; load().catch(onErr); };
-    $('edit-reserve').onclick = () => openReservePopup(() => load()).catch(onErr);
+    if ($('edit-reserve')) $('edit-reserve').onclick = () => openReservePopup(() => load()).catch(onErr);
     const data = await api(`/api/reserves?month=${encodeURIComponent($('edit-month').value)}`);
     if (!alive() || !$('edit-rows')) return;
     const term = $('edit-q').value.trim().toLowerCase();
@@ -243,19 +244,19 @@ async function renderEdit(target) {
     if (!alive() || !$('edit-actions')) return;
     $('edit-q').placeholder = 'หน่วยงานหรือรายการ';
     const month = $('edit-month')?.value || monthNow();
-    $('edit-actions').innerHTML = `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${button('edit-receipt', 'รับเข้า', 'primary')}${button('edit-borrow', 'ยืม')}`;
+    $('edit-actions').innerHTML = `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${canWrite ? button('edit-receipt', 'รับเข้า', 'primary') + button('edit-borrow', 'ยืม') : ''}`;
     $('edit-month').onchange = () => { state.offset = 0; load().catch(onErr); };
-    $('edit-receipt').onclick = () => openLedgerPopup('receipt', () => load()).catch(onErr);
-    $('edit-borrow').onclick = () => openLedgerPopup('borrow', () => load()).catch(onErr);
+    if ($('edit-receipt')) $('edit-receipt').onclick = () => openLedgerPopup('receipt', () => load()).catch(onErr);
+    if ($('edit-borrow')) $('edit-borrow').onclick = () => openLedgerPopup('borrow', () => load()).catch(onErr);
     const data = await api(`/api/ledger?month=${encodeURIComponent($('edit-month').value)}`);
     if (!alive() || !$('edit-rows')) return;
     const term = $('edit-q').value.trim().toLowerCase();
     const filtered = listQuery(data.rows.filter((row) => !term || [row.department, row.material, row.materialDescription].join(' ').toLowerCase().includes(term)), head, (row, key) => row[key]);
     const page = pageOf(filtered);
-    const replaceOf = (row) => data.borrows
+    const replaceOf = (row) => canWrite ? data.borrows
       .filter((item) => item.material === row.material && item.borrowerDepartment === row.department && (admin || item.borrowerDepartment === me.department))
       .map((item) => `<button class="tx-line-drop" type="button" data-replace="${esc(item.id)}" data-qty="${esc(item.qty)}" data-lender="${esc(item.lenderDepartment)}">ซื้อทดแทน</button>`)
-      .join('');
+      .join('') : '';
     fillTable('edit-rows', [{ label: 'หน่วยงาน', key: 'department' }, { label: 'รายการ', key: 'materialDescription' }, { label: 'ซื้อ', key: 'bought' }, { label: 'เบิก', key: 'used' }, { label: 'ยืม', key: 'borrowed' }, { label: 'ให้ยืม', key: 'lent' }, { label: 'เหลือ', key: 'left' }, 'สถานะ'], page.map((row) => `<tr><td>${esc(row.department)}</td><td>${esc(row.materialDescription || row.material)}<div class="sum-meta">${esc(row.material)}</div></td><td>${qtyText(row.bought)} ${esc(row.bun)}</td><td>${qtyText(row.used)}</td><td>${qtyText(row.borrowed)}</td><td>${qtyText(row.lent)}</td><td>${qtyText(row.left)}</td><td>${ledgerBadge(row.status)} ${replaceOf(row)}</td></tr>`).join(''), 'เดือนนี้ยังไม่มีการซื้อเข้า', columnHead());
     setFoot(page.length, filtered.length);
     $('edit-rows').querySelectorAll('[data-replace]').forEach((node) => {
@@ -293,15 +294,16 @@ async function renderEdit(target) {
     rows = rows.filter((row) => !term || `${row.id} ${row.requested_by} ${row.costcenter} ${row.costcenterName} ${STATUS[row.status] || ''}`.toLowerCase().includes(term));
     rows = listQuery(rows, head, (row, key) => (key === 'status' ? STATUS[row.status] || row.status : key === 'costcenter' ? (row.costcenter === '-' ? '' : `${row.costcenter} ${row.costcenterName || ''}`) : row[key]));
     const page = pageOf(rows);
-    $('edit-actions').innerHTML = [
+    $('edit-actions').innerHTML = canWrite ? [
       button('edit-withdraw', 'เบิก', 'primary'),
       button('edit-fix', 'แก้ไข', 'secondary', 'disabled'),
       button('edit-del', 'ลบ', 'danger', 'disabled'),
       admin ? button('edit-prepare', 'จัดเตรียม', 'secondary', 'disabled') + button('edit-issue', 'จ่าย', 'secondary', 'disabled') : '',
       button('edit-receive', 'รับ', 'primary', 'disabled')
-    ].join('');
+    ].join('') : '';
     fillTable('edit-rows', [{ label: 'เลขที่', key: 'id' }, { label: 'ผู้เบิก', key: 'requested_by' }, { label: 'costcenter', key: 'costcenter' }, { label: 'สถานะ', key: 'status' }], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.sources?.length > 1 ? esc(row.sources.join(', ')) : row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก', columnHead());
     setFoot(page.length, rows.length);
+    if (!canWrite) return;
     bindRowSelect($('edit-rows'), (_id, row) => {
       const own = row.dataset.own === '1';
       const status = row.dataset.status;
@@ -362,17 +364,18 @@ async function renderEdit(target) {
     const page = pageOf(lines);
     let picked = null;
     $('edit-q').placeholder = 'รหัสหรือชื่อในสรุป';
-    $('edit-actions').innerHTML = [
+    $('edit-actions').innerHTML = canWrite ? [
       button('edit-back', 'รายการ'),
       button('edit-add', 'เพิ่ม', 'primary'),
       button('edit-line', 'แก้ไข', 'secondary', 'disabled'),
       button('edit-line-del', 'ลบ', 'danger', 'disabled'),
       `<button class="btn btn-primary hold-btn" type="button" id="edit-hold" ${allLines.length ? '' : 'disabled'}><span class="hold-fill"></span><span class="hold-label">กดค้าง 2 วินาที</span></button>`
-    ].join('');
+    ].join('') : button('edit-back', 'รายการ');
     fillTable('edit-rows', [{ label: 'หมายเลขเลขรายการ', key: 'material' }, { label: 'ชื่อรายการ', key: 'materialDescription' }, { label: 'หน่วย', key: 'bun' }, { label: 'จำนวน', key: 'qty' }, { label: 'costcenter', key: 'costcenter' }], page.map((line) => `<tr data-pick="${esc(line.id)}" data-qty="${Number(line.qty)}" data-material="${esc(line.material)}" data-name="${esc(line.materialDescription)}" data-bun="${esc(line.bun)}"><td>${esc(line.material)}</td><td>${esc(line.materialDescription)}</td><td>${esc(line.bun)}</td><td>${Number(line.qty)}</td><td>${esc(line.costcenter === '-' ? cart.costcenter : line.costcenter)}</td></tr>`).join(''), 'ยังไม่มีรายการ กดเพิ่ม', columnHead());
     setFoot(page.length, lines.length);
-    bindRowSelect($('edit-rows'), (_id, row) => { picked = row; $('edit-line').disabled = false; $('edit-line-del').disabled = false; });
     $('edit-back').onclick = () => { $('edit-q').value = ''; state.offset = 0; showEdit('list'); };
+    if (!canWrite) return;
+    bindRowSelect($('edit-rows'), (_id, row) => { picked = row; $('edit-line').disabled = false; $('edit-line-del').disabled = false; });
     $('edit-add').onclick = () => openAddPopup().catch(onErr);
     $('edit-line').onclick = () => {
       if (!picked) return toast('เลือกแถวก่อน', 'error');
@@ -643,7 +646,6 @@ async function renderUsers(target) {
       row ? '' : searchBlock(searchSlot('ค้นพนักงาน', 'emp-q', 'emp-search', { placeholder: 'รหัสหรือชื่อจาก mt_main_employee' }), 'emp-results'),
       field('รหัสพนักงาน', `<input id="user-id" readonly value="${esc(row?.employeeId || '')}" placeholder="เลือกจากรายชื่อพนักงาน">`),
       field('หน่วยงาน', `<input id="user-dept" readonly value="${esc(row?.department || '')}">`),
-      field('รหัสผ่าน', '<input id="user-password" type="password" minlength="8" autocomplete="new-password">'),
       field('บทบาท', `<select id="user-role">${options(['viewer', 'user', 'admin'], row?.role || 'viewer', (value) => USAGE_ROLE[value])}</select>`),
       statusField('user-status', row?.status)
     ].join(''), saveRow);
@@ -694,10 +696,10 @@ async function renderUsers(target) {
       if (state.formMode === 'edit' && state.selected) await api(`/api/usage-materials/${encodeURIComponent(state.selected.material)}`, { method: 'PATCH', body });
       else await api('/api/usage-materials', { method: 'POST', body });
     } else if (state.formMode === 'edit' && state.selected) {
-      await api(`/api/users/${encodeURIComponent(state.selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value, password: $('user-password').value } });
+      await api(`/api/users/${encodeURIComponent(state.selected.employeeId)}`, { method: 'PATCH', body: { role: $('user-role').value, status: $('user-status').value } });
     } else {
       if (!$('user-id').value.trim()) throw new Error('เลือกพนักงานจากรายชื่อก่อน');
-      await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), password: $('user-password').value, role: $('user-role').value, status: $('user-status').value } });
+      await api('/api/users', { method: 'POST', body: { employeeId: $('user-id').value.trim(), role: $('user-role').value, status: $('user-status').value } });
     }
     toast('บันทึกแล้ว');
     closePopup();

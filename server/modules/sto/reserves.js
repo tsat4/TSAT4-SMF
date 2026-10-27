@@ -99,7 +99,7 @@ export function mountReserves(app, mod) {
     });
   }));
 
-  app.post('/api/reserves', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+  app.post('/api/reserves', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     const month = monthOf(req.body?.month);
     const qty = qtyOf(req.body?.qty);
     const material = String(req.body?.material || '').trim();

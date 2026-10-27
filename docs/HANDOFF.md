@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-27 · Cursor · สมาชิก mt_xxx_user ไม่ใส่รหัสผ่าน · Viewer เห็น Dashboard และ Transaction อย่างเดียว · user เพิ่มแก้ไขลบได้ · admin เห็น Setting · เมนูทุกหน่วยเขียน Transaction
 - 2026-10-27 · Cursor · หน้างานสั่งจอง Usage ตาม cost center ของหน่วยงาน สินค้าเดียวกันถูกรวมให้เจ้าหน้าที่ Usage สั่งซื้อ
 - 2026-10-27 · Cursor · Usage เทียบสิทธิ์รายเดือนที่หน่วยงาน: รับเข้าเพิ่มยอดซื้อและคลัง, เบิกเกินสิทธิ์ไม่ได้, ยืมตัดคลังผู้ให้และปิดหนี้ด้วยการซื้อทดแทน
 - 2026-10-27 · Claude · CFO Dashboard: Summary ตัด 2 ตารางล่าง (หมวด / หน่วยงาน) · แท็บใหม่ Summary 2 = ตารางสรุปแบบ TGO (ปีฐาน / ปีปัจจุบัน: Scope + หมวดย่อย, tCO₂e, สัดส่วนใน Scope, % Scope 1+2, % Scope 1+2+3, Carbon intensity) + กราฟเทียบตาม Scope · ปริมาณผลิตต่อปีเก็บใน setting `production_<ปี>` (Setting > บริษัท) · summary API: categories มี scope + base

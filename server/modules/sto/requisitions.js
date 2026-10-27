@@ -186,7 +186,7 @@ export function mountRequisitions(app, mod) {
     res.json({ requisition: row });
   }));
 
-  app.post('/api/requisitions', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+  app.post('/api/requisitions', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     let costcenter = String(req.body.costcenter || '').trim();
     if (costcenter) {
       if (!(await ownCenter(req, costcenter))) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
@@ -199,7 +199,7 @@ export function mountRequisitions(app, mod) {
     res.status(201).json({ id: data.id });
   }));
 
-  app.post('/api/requisitions/:id/lines', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+  app.post('/api/requisitions/:id/lines', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     const id = Number(req.params.id);
     const material = String(req.body.material || '').trim();
     const qty = qtyOf(req.body.qty);
@@ -229,7 +229,7 @@ export function mountRequisitions(app, mod) {
     res.json({ ok: true });
   }));
 
-  app.patch('/api/requisitions/:id/lines/:lineId', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+  app.patch('/api/requisitions/:id/lines/:lineId', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     const header = await ownCart(req, Number(req.params.id));
     if (!header) return fail(res, 400, 'แก้ตะกร้าไม่ได้');
     const patch = {};
@@ -250,7 +250,7 @@ export function mountRequisitions(app, mod) {
     res.json({ ok: true });
   }));
 
-  app.delete('/api/requisitions/:id/lines/:lineId', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+  app.delete('/api/requisitions/:id/lines/:lineId', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     const header = await ownCart(req, Number(req.params.id));
     if (!header) return fail(res, 400, 'เอาออกจากตะกร้าไม่ได้');
     const { error } = await mx.from('tx_sto_requisition_line').delete()
@@ -260,7 +260,7 @@ export function mountRequisitions(app, mod) {
   }));
 
   // Status flow: cart -> submitted -> accepted -> preparing -> ready -> received (owner may cancel before received).
-  app.post('/api/requisitions/:id/status', wrap(requireUser), wrap(async (req, res) => {
+  app.post('/api/requisitions/:id/status', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     const id = Number(req.params.id);
     const status = String(req.body.status || '');
     const { data: header, error } = await mx.from('tx_sto_requisition').select('*').eq('id', id).maybeSingle();
