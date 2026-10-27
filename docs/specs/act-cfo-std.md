@@ -84,6 +84,10 @@
 
 ## Dashboard ตามแบบฟอร์ม TGO (ผู้ใช้สั่ง 2026-10-27 · ที่มา `SMF/inbox/Verify sheet TGO.xlsx` TCFO_R_01 Version 07)
 
+**ทำแล้ว 2026-10-27 (Claude):** แท็บ Fr-03.2 / Fr-04.1 (+ Fr-04.2 ปีฐาน) / บันทึกการปรับปรุง · Setting > Scope 3 (Fr-03.2) · EF เพิ่มคอลัมน์ตามฟอร์ม
+(sf6, nf3, hfc_gwp, pfc_gwp, other, other_gwp, separate, source_type, substitute) แทน `mt_cfo_ef_part` ในขั้นนี้ — ตรงกับคอลัมน์ฟอร์ม TGO และยอดเดิมไม่เปลี่ยน ·
+รายการ EF `separate` ไม่รวมในยอด Scope (`v_cfo_month`, summary) แสดงเป็นแถว "อื่นๆ (รายงานแยก)" ใน Summary หน้า 2 · เกณฑ์ Fr-03.2 เป็น ✓ / × มีนัยสำคัญ = มีแหล่งปล่อย + เข้าเกณฑ์ ≥ 1 ข้อ
+
 ฟอร์มที่มีแล้วในระบบ: Fr-01 รายละเอียดองค์กร ≈ Company Overview · Fr-03.1 โครงสร้างและหน้าที่ ≈ Team · Fr-05 สรุปการปล่อย ≈ Summary หน้า 2
 
 แท็บใหม่ใน Dashboard (ดูอย่างเดียว · แก้ข้อมูลใน Setting ตามกติกาเดิม):

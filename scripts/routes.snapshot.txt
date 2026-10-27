@@ -15,8 +15,11 @@ GET /api/act/:activity/audit-form auth
 GET /api/act/:activity/audit-plan auth
 GET /api/act/:activity/audits auth
 GET /api/act/:activity/audits/:id auth
+GET /api/act/:activity/cfo/inventory auth
 GET /api/act/:activity/cfo/master auth
 GET /api/act/:activity/cfo/progress auth
+GET /api/act/:activity/cfo/revisions auth
+GET /api/act/:activity/cfo/s3 auth
 GET /api/act/:activity/cfo/summary auth
 GET /api/act/:activity/checklist auth
 GET /api/act/:activity/dashboard/ranking auth
@@ -62,6 +65,7 @@ POST /api/act/:activity/cfo/activities auth
 POST /api/act/:activity/cfo/confirm auth
 POST /api/act/:activity/cfo/ef auth
 POST /api/act/:activity/cfo/photo auth
+POST /api/act/:activity/cfo/revisions auth
 POST /api/act/:activity/checklist auth
 POST /api/act/:activity/checklist/copy auth
 POST /api/act/:activity/issues/:id/action auth
@@ -85,4 +89,5 @@ POST /api/users auth sto:3
 PUT /api/act/:activity/areas/:id/owner auth
 PUT /api/act/:activity/audit-plan auth
 PUT /api/act/:activity/cfo/entries auth
+PUT /api/act/:activity/cfo/s3 auth
 PUT /api/act/:activity/cfo/settings auth

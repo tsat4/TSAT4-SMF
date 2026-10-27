@@ -31,7 +31,9 @@ export function tablesOf(activity) {
     ef: `mt_${k}_ef`,
     activity: `mt_${k}_activity`,
     entry: `tx_${k}_entry`,
-    entryView: `v_${k}_entry`
+    entryView: `v_${k}_entry`,
+    s3Assess: `mt_${k}_s3_assess`,
+    revision: `tx_${k}_revision`
   };
 }
 

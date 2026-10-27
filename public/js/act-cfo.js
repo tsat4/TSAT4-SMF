@@ -1,4 +1,5 @@
-// ระบบกิจกรรม > CFO (Carbon Footprint for Organization): Dashboard (Summary / Scope / Company / Team / Schedule),
+// ระบบกิจกรรม > CFO (Carbon Footprint for Organization): Dashboard (Summary / Scope / Company / Team / Schedule /
+// TGO forms Fr-03.2, Fr-04.1 + บันทึกการปรับปรุง),
 // transaction (TSATP4-CFO Scope pages + บันทึกกิจกรรม), Setting (plan / activities / emission factors / team / company). Server: server/modules/act/cfo.js
 // spec: docs/specs/act-cfo.md · uses the shared year (a5Year), page bar slots and team tab of act-5s.js.
 const CFO = 'cfo';
@@ -6,12 +7,23 @@ const CFO = 'cfo';
 const CFO_SCOPE_COLORS = CHART_THEMES.cool.series.slice(0, 3);
 const CFO_BASE_COLORS = CHART_THEMES.cool.base;
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
-const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule' };
-const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', team: 'ทีม', company: 'บริษัท' };
+const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule', fr032: 'Fr-03.2', fr041: 'Fr-04.1', revision: 'บันทึกการปรับปรุง' };
+const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', s3: 'Scope 3 (Fr-03.2)', team: 'ทีม', company: 'บริษัท' };
+// TGO Fr-03.2 criteria (server S3_CRITERIA) and their explanation from the form (หัวข้อ 12 ข้อกำหนด CFO)
+const CFO_S3_CRITERIA = [
+  ['magnitude', 'Magnitude', 'ขนาด: สันนิษฐานว่ามีปริมาณการปล่อยหรือดูดกลับในปริมาณมากอย่างมีนัยสำคัญ'],
+  ['influence', 'Level of influence', 'ระดับของแรงจูงใจ: องค์กรตรวจติดตามและลดการปล่อยจากกิจกรรมนั้นได้ (ประสิทธิภาพพลังงาน การออกแบบเชิงนิเวศ ข้อตกลงกับลูกค้า ข้อกำหนดจากผู้ว่าจ้าง)'],
+  ['risk', 'Risk or opportunity', 'ทำให้องค์กรได้รับความเสี่ยง (การเงิน กฎระเบียบ ห่วงโซ่อุปทาน สินค้าและลูกค้า คดีความ ชื่อเสียง) หรือโอกาสทางธุรกิจ (ตลาดใหม่ ธุรกิจรูปแบบใหม่)'],
+  ['sector', 'Sector guidance', 'ถือว่ามีนัยสำคัญสำหรับอุตสาหกรรมนั้น ตามคู่มือหรือแนวทางเฉพาะของอุตสาหกรรม'],
+  ['outsourcing', 'Outsourcing', 'เกิดจากการจ้างบุคคลหรือหน่วยงานภายนอกมาทำกิจกรรมที่เป็นกิจกรรมหลักขององค์กร'],
+  ['engagement', 'Employee engagement', 'ส่งเสริมให้พนักงานมีส่วนร่วมลดการปล่อย (อนุรักษ์พลังงาน เดินทางร่วมกัน ราคาคาร์บอนภายในองค์กร)']
+];
+const CFO_SOURCE_TYPES = [['self', 'Self collect (1st)'], ['supplier', 'Supplier (1st)'], ['th_lci', 'TH LCI DB (2nd)'], ['tgo', 'TGO EF (2nd)'], ['thai_res', 'Thai Res. (2nd)'], ['int_db', 'Int. DB (2nd)'], ['other', 'Other']];
 const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['company_address', 'สถานที่ตั้ง'], ['company_area', 'พื้นที่โรงงาน'], ['company_business', 'ประเภทธุรกิจ'],
   ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
   ['base_year', 'ปีฐาน'], ['target_percent', 'เป้าลด (% จากปีฐาน)'], ['septic_bod', 'บ่อเกรอะ BOD (g/คน/วัน)'], ['septic_b0', 'บ่อเกรอะ B0'], ['septic_mcf', 'บ่อเกรอะ MCF'], ['septic_i', 'บ่อเกรอะ I']];
-const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['hfc', 'HFCs'], ['pfc', 'PFCs']];
+const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6', 'SF₆'], ['nf3', 'NF₃'], ['hfc', 'HFCs'], ['hfc_gwp', 'GWP HFCs'], ['pfc', 'PFCs'], ['pfc_gwp', 'GWP PFCs'],
+  ['other', 'GHG นอกข้อกำหนด'], ['other_gwp', 'GWP นอกข้อกำหนด']];
 let cfoDashTab = 'summary';
 let cfoSetTab = 'plan';
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
@@ -46,6 +58,9 @@ async function cfoDashboard(target) {
   if (cfoDashTab === 'scope') return cfoDrawProgress(body);
   if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
   if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
+  if (cfoDashTab === 'fr032') return cfoDrawS3(body);
+  if (cfoDashTab === 'fr041') return cfoDrawInventory(body);
+  if (cfoDashTab === 'revision') return cfoDrawRevisions(body);
   document.querySelector('.a5-year').insertAdjacentHTML('beforebegin', field('หน้า', `<select id="cfo-d-page">${options(['1', '2', '3'], cfoDash.page, (v) => (v === '3' ? 'หน้า 3 · ตามก๊าซ' : v === '2' ? 'หน้า 2 · ตาม Scope' : 'หน้า 1 · รายเดือน'))}</select>`));
   $('cfo-d-page').onchange = () => { cfoDash.page = $('cfo-d-page').value; rerender(); };
   if (cfoDash.page === '3') return cfoDrawGases(body);
@@ -146,6 +161,7 @@ async function cfoDrawReport(body) {
       <tbody>${rows}
         <tr class="cfo-total"><td>รวม Scope 1 + 2</td><td class="num">${cfoT(s12)}</td><td></td><td class="num">${s12 ? '100.00' : '-'}</td><td></td></tr>
         <tr class="cfo-total"><td>รวม Scope 1 + 2 + 3</td><td class="num">${cfoT(s123)}</td><td></td><td></td><td class="num">${s123 ? '100.00' : '-'}</td></tr>
+        <tr><td>อื่นๆ (รายงานแยก)</td><td class="num">${cfoT(d.separate?.[key] || 0)}</td><td colspan="3" class="sum-meta">ไม่รวมในยอด Scope</td></tr>
         ${intensity('Scope 1+2', s12)}${intensity('Scope 1+2+3', s123)}</tbody></table></div>`, 'ม.ค. – ธ.ค.');
   };
   const scopeSum = (key) => [1, 2, 3].map((n) => d.categories.filter((g) => g.scope === n).reduce((t, g) => t + g[key], 0));
@@ -176,12 +192,12 @@ async function cfoDrawReport(body) {
 async function cfoDrawGases(body) {
   const d = await a5Api(CFO, `cfo/summary?year=${a5Year}&department=${encodeURIComponent(cfoDash.department)}`);
   const departments = [...new Set([...d.departments.map((x) => x.key), cfoDash.department].filter(Boolean))].sort();
-  const names = [['co2', 'CO₂'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['fgas', 'HFCs + PFCs']];
+  const names = [['co2', 'CO₂'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6nf3', 'SF₆ + NF₃'], ['fgas', 'HFCs + PFCs']];
   const rows = (d.gases || []).map((g) => `<tr class="${g.scope ? '' : 'cfo-total'}"><td>${g.scope ? `Scope ${g.scope}` : 'รวม'}</td>${names.map(([key]) => `<td class="num">${cfoT(g[key])}</td>`).join('')}</tr>`).join('');
   body.innerHTML = `
     <div class="toolbar a5-filters">${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}</div>
-    ${chartCard(`สรุปตามก๊าซ ปี ${a5Year}`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>ขอบเขต</th>${names.map(([, label]) => `<th class="num">${label}</th>`).join('')}</tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">ยังไม่มีรายการ</td></tr>'}</tbody></table></div>`, 'tCO₂e · ก๊าซฟลูออรีนรวมกัน เพราะฐานเก็กรวมไว้')}
-    <p class="sum-meta">แถวก๊าซนอกพิธีสารเกียวโตยังไม่แสดง จนกว่าจะกำหนดว่าจะนับอะไร</p>`;
+    ${chartCard(`สรุปตามก๊าซ ปี ${a5Year}`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>ขอบเขต</th>${names.map(([, label]) => `<th class="num">${label}</th>`).join('')}</tr></thead><tbody>${rows || '<tr><td colspan="6" class="empty">ยังไม่มีรายการ</td></tr>'}</tbody></table></div>`, 'tCO₂e · ไม่รวมรายการที่รายงานแยก')}
+    <p class="sum-meta">แยกรายก๊าซครบทุกคอลัมน์ และก๊าซนอกข้อกำหนด ดูที่แท็บ Fr-04.1</p>`;
   a5Lift(body);
   $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawGases(body).catch(onErr); }
 }
@@ -193,6 +209,158 @@ function cfoDownload(name, rows) {
   link.download = name;
   link.click();
   URL.revokeObjectURL(link.href);
+}
+
+// ---------- TGO forms ----------
+
+const cfoMark = (v) => (v ? '✓' : '×');
+const cfoS3Name = (r) => `${esc(r.name)}${r.name_th ? `<div class="sum-meta">${esc(r.name_th)}</div>` : ''}`;
+const cfoS3Explain = () => `<details class="cfo-explain"><summary>อธิบายหลักเกณฑ์ในการประเมินความมีนัยสำคัญ</summary><dl>
+  <dt>Source of GHG</dt><dd>องค์กรมีแหล่งปล่อยก๊าซเรือนกระจกนี้หรือไม่</dd>
+  ${CFO_S3_CRITERIA.map(([, label, text]) => `<dt>${label}</dt><dd>${text}</dd>`).join('')}</dl>
+  <p class="sum-meta">มีนัยสำคัญ = มีแหล่งปล่อย และเข้าเกณฑ์อย่างน้อย 1 ข้อ → นำไปคำนวณ · ที่มา: หัวข้อที่ 12 ข้อกำหนดในการคำนวณและรายงานคาร์บอนฟุตพริ้นท์ขององค์กร</p></details>`;
+const cfoS3Head = `<tr><th>No</th><th>Category</th><th class="cfo-c">Source of GHG</th>${CFO_S3_CRITERIA.map(([, label]) => `<th class="cfo-c">${label}</th>`).join('')}<th class="cfo-c">มีนัยสำคัญ</th><th>Remark</th></tr>`;
+
+// Dashboard > Fr-03.2 ประเมินความมีนัยสำคัญ Scope 3 (read only; Setting > Scope 3 edits).
+async function cfoDrawS3(body) {
+  const d = await a5Api(CFO, `cfo/s3?year=${a5Year}`);
+  const note = d.fromYear === d.year ? '' : d.fromYear ? `ยังไม่ได้ประเมินปี ${d.year} · แสดงผลของปี ${d.fromYear}` : `ยังไม่ได้ประเมินปี ${d.year}`;
+  body.innerHTML = chartCard(`ประเมินความมีนัยสำคัญของการปล่อยก๊าซเรือนกระจกทางอ้อม (Scope 3) ปี ${d.year}`, `${cfoS3Explain()}
+    <div class="table-wrap cfo-s3"><table class="mo-data-table"><thead>${cfoS3Head}</thead><tbody>${d.rows.map((r, i) => `<tr class="${r.significant ? 'is-significant' : 'is-muted'}">
+      <td>${i + 1}</td><td>${cfoS3Name(r)}</td><td class="cfo-c">${r.has_source ? 'P' : '×'}</td>${CFO_S3_CRITERIA.map(([k]) => `<td class="cfo-c">${r.has_source ? cfoMark(r[k]) : ''}</td>`).join('')}
+      <td class="cfo-c"><b>${r.significant ? 'มี' : '-'}</b></td><td>${esc(r.remark)}</td></tr>`).join('')}</tbody></table></div>`,
+    `${note ? `${note} · ` : ''}มีนัยสำคัญ ${d.rows.filter((r) => r.significant).length} / ${d.rows.length} หมวด`);
+}
+
+// Setting > Scope 3 (Fr-03.2): tick the criteria per category, then save the year.
+async function cfoSetS3(body, rerender) {
+  const d = await a5Api(CFO, `cfo/s3?year=${a5Year}`);
+  const box = (i, k, on, disabled = false) => `<input type="checkbox" data-s3="${i}" data-k="${k}"${on ? ' checked' : ''}${d.admin && !disabled ? '' : ' disabled'}>`;
+  body.innerHTML = `
+    ${d.admin ? `<div class="action-bar a5-actions">${button('cfo-s3-save', 'บันทึก', 'primary')}</div>` : ''}
+    ${d.fromYear !== d.year ? `<p class="sum-meta">${d.fromYear ? `ยังไม่ได้ประเมินปี ${d.year} · ตั้งต้นจากปี ${d.fromYear} กดบันทึกเพื่อใช้เป็นของปีนี้` : `ยังไม่ได้ประเมินปี ${d.year}`}</p>` : ''}
+    ${cfoS3Explain()}
+    <div class="table-wrap cfo-s3"><table class="mo-data-table"><thead>${cfoS3Head}</thead><tbody>${d.rows.map((r, i) => `<tr>
+      <td>${i + 1}</td><td>${cfoS3Name(r)}</td><td class="cfo-c">${box(i, 'has_source', r.has_source)}</td>
+      ${CFO_S3_CRITERIA.map(([k]) => `<td class="cfo-c">${box(i, k, r[k], !r.has_source)}</td>`).join('')}
+      <td class="cfo-c" id="cfo-s3-sig-${i}"></td><td><input data-s3-remark="${i}" maxlength="1000" value="${esc(r.remark)}"${d.admin ? '' : ' readonly'}></td></tr>`).join('')}</tbody></table></div>`;
+  a5Lift(body);
+  const read = (i) => ({ ...d.rows[i], has_source: body.querySelector(`[data-s3="${i}"][data-k="has_source"]`).checked,
+    ...Object.fromEntries(CFO_S3_CRITERIA.map(([k]) => [k, body.querySelector(`[data-s3="${i}"][data-k="${k}"]`).checked])),
+    remark: body.querySelector(`[data-s3-remark="${i}"]`).value });
+  const mark = (i) => {
+    const r = read(i);
+    CFO_S3_CRITERIA.forEach(([k]) => { body.querySelector(`[data-s3="${i}"][data-k="${k}"]`).disabled = !d.admin || !r.has_source; });
+    $(`cfo-s3-sig-${i}`).innerHTML = r.has_source && CFO_S3_CRITERIA.some(([k]) => r[k]) ? '<b>มี</b>' : '-';
+  };
+  d.rows.forEach((_, i) => mark(i));
+  body.querySelectorAll('[data-s3]').forEach((node) => { node.onchange = () => mark(Number(node.dataset.s3)); });
+  if (!d.admin) return;
+  $('cfo-s3-save').onclick = async () => {
+    await a5Api(CFO, 'cfo/s3', { method: 'PUT', body: { year: a5Year, rows: d.rows.map((_, i) => read(i)) } });
+    toast('บันทึกแล้ว');
+    rerender();
+  };
+}
+
+// Dashboard > Fr-04.1 บัญชีรายการก๊าซเรือนกระจก (Fr-04.2 = the same form for the base year): the TGO sheet's
+// columns per activity for the whole year. Groups Scope 1 / รายงานแยก / Scope 2 / Scope 3 with their totals.
+const CFO_INV_GROUPS = [['s1', 'ขอบเขต 1'], ['separate', 'การปล่อย GHG โดยตรงที่ทำการรายงานแยก'], ['s2', 'ขอบเขต 2'], ['s3', 'ขอบเขต 3']];
+const CFO_INV_EF = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6', 'SF₆'], ['nf3', 'NF₃'], ['hfc', 'HFCs'], ['pfc', 'PFCs'], ['hfc_gwp', 'GWP HFCs'], ['pfc_gwp', 'GWP PFCs']];
+const CFO_INV_TON = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6', 'SF₆'], ['nf3', 'NF₃']];
+const CFO_INV_CO2E = [['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6', 'SF₆'], ['nf3', 'NF₃'], ['hfc', 'HFCs'], ['pfc', 'PFCs'], ['other', 'Other']];
+let cfoInvBase = false;
+
+async function cfoDrawInventory(body) {
+  const d = await a5Api(CFO, `cfo/inventory?year=${a5Year}${cfoInvBase ? '&base=1' : ''}&department=${encodeURIComponent(cfoDash.department)}`);
+  const num = (v, digits = 6) => (v ? Number(v).toLocaleString('en-US', { maximumFractionDigits: digits }) : '');
+  const sumOf = (list, pick) => list.reduce((t, r) => t + (pick(r) || 0), 0);
+  const groups = Object.fromEntries(CFO_INV_GROUPS.map(([g]) => [g, d.rows.filter((r) => r.group === g)]));
+  const total = Object.fromEntries(CFO_INV_GROUPS.map(([g]) => [g, sumOf(groups[g], (r) => r.total)]));
+  const s12 = total.s1 + total.s2;
+  const s123 = s12 + total.s3;
+  const pct = (v, all) => (all && v ? ((v / all) * 100).toFixed(2) : '');
+  const source = (k) => (CFO_SOURCE_TYPES.find(([key]) => key === k) || [, ''])[1];
+  const span = 3 + CFO_INV_EF.length + 2 + 1 + 3;
+  const line = (r) => `<tr><td title="${esc(r.department)} · ${esc(r.source)}">${esc(r.activity)}<div class="sum-meta">${esc(r.department)} · ${esc(r.scope_code)}</div></td><td>${esc(r.unit)}</td><td class="num">${num(r.qty, 3) || '0'}</td>
+    ${CFO_INV_EF.map(([k]) => `<td class="num">${num(r.ef[k])}</td>`).join('')}<td class="num">${num(r.ef.other)}</td><td class="num">${num(r.ef.other_gwp)}</td>
+    <td class="num"><b>${num(r.total_ef)}</b></td><td>${esc(source(r.source_type))}</td><td>${esc(r.substitute || '')}</td><td title="${esc(r.reference || '')}">${esc(r.reference || '')}</td>
+    ${CFO_INV_TON.map(([k]) => `<td class="num">${num(r.ton[k])}</td>`).join('')}${CFO_INV_CO2E.map(([k]) => `<td class="num">${num(r.tco2e[k])}</td>`).join('')}
+    <td class="num"><b>${num(r.total)}</b></td><td class="num">${pct(r.total, total[r.group])}</td><td class="num">${['s1', 's2'].includes(r.group) ? pct(r.total, s12) : ''}</td><td class="num">${r.group === 'separate' ? '' : pct(r.total, s123)}</td></tr>`;
+  const sums = (label, list, value, cls = 'cfo-total') => `<tr class="${cls}"><td colspan="${span}">${label}</td>
+    ${CFO_INV_TON.map(([k]) => `<td class="num">${num(sumOf(list, (r) => r.ton[k]))}</td>`).join('')}${CFO_INV_CO2E.map(([k]) => `<td class="num">${num(sumOf(list, (r) => r.tco2e[k]))}</td>`).join('')}
+    <td class="num"><b>${num(value)}</b></td><td colspan="3"></td></tr>`;
+  const bodyRows = CFO_INV_GROUPS.map(([g, label]) => `<tr class="cfo-group"><td colspan="${span + CFO_INV_TON.length + CFO_INV_CO2E.length + 4}">${label}</td></tr>
+    ${groups[g].map(line).join('') || `<tr><td colspan="${span + CFO_INV_TON.length + CFO_INV_CO2E.length + 4}" class="empty">ไม่มีรายการ</td></tr>`}
+    ${sums(`รวม ${label}`, groups[g], total[g], 'cfo-sub-total')}`).join('')
+    + sums('รวม Scope 1 + 2', [...groups.s1, ...groups.s2], s12) + sums('รวม Scope 1 + 2 + 3', [...groups.s1, ...groups.s2, ...groups.s3], s123);
+  const head = `<tr><th rowspan="2">รายการ</th><th rowspan="2">หน่วย</th><th rowspan="2" class="num">ปริมาณ</th>
+      <th colspan="${CFO_INV_EF.length}" class="cfo-c">GHG ที่ต้องรายงานตามข้อกำหนด · ค่า EF (kg GHG/หน่วย)</th><th colspan="2" class="cfo-c">GHG นอกข้อกำหนด</th>
+      <th rowspan="2" class="num">Total<br>(kgCO₂e/หน่วย)</th><th rowspan="2">ที่มา</th><th rowspan="2">Substitute</th><th rowspan="2">แหล่งอ้างอิง</th>
+      <th colspan="${CFO_INV_TON.length}" class="cfo-c">ผลคูณ (ton GHG)</th><th colspan="${CFO_INV_CO2E.length}" class="cfo-c">ผลคูณ (tCO₂e)</th>
+      <th rowspan="2" class="num">Total GHG<br>(tCO₂e)</th><th rowspan="2" class="num">สัดส่วน<br>(%)</th><th rowspan="2" class="num">สัดส่วน (%)<br>Scope 1+2</th><th rowspan="2" class="num">สัดส่วน (%)<br>Scope 1+2+3</th></tr>
+    <tr>${CFO_INV_EF.map(([, l]) => `<th class="num">${l}</th>`).join('')}<th class="num">EF</th><th class="num">GWP</th>
+      ${CFO_INV_TON.map(([, l]) => `<th class="num">${l}</th>`).join('')}${CFO_INV_CO2E.map(([, l]) => `<th class="num">${l}</th>`).join('')}</tr>`;
+  const g = d.gwp || {};
+  const departments = [...new Set([...d.rows.map((r) => r.department), cfoDash.department].filter(Boolean))].sort();
+  body.innerHTML = `
+    <div class="toolbar a5-filters">
+      ${field('ฟอร์ม', `<select id="cfo-inv-form">${options(['0', '1'], cfoInvBase ? '1' : '0', (v) => (v === '1' ? `Fr-04.2 · ปีฐาน${d.baseYear ? ` ${d.baseYear}` : ''}` : `Fr-04.1 · ปี ${a5Year}`))}</select>`)}
+      ${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}
+      ${button('cfo-export', 'ดาวน์โหลด Excel', 'secondary')}
+    </div>
+    ${chartCard(`บัญชีรายการก๊าซเรือนกระจก${cfoInvBase ? ' ปีฐาน' : ''} ปี ${d.year}`, `<div class="table-wrap cfo-inv"><table class="mo-data-table"><thead>${head}</thead><tbody>${bodyRows}</tbody></table></div>
+      <p class="sum-meta">GWP100 ${esc(g.code || '')}: CO₂ ${num(g.co2)} · Fossil CH₄ ${num(g.ch4_fossil)} · CH₄ ${num(g.ch4)} · N₂O ${num(g.n2o)} · SF₆ ${num(g.sf6)} · NF₃ ${num(g.nf3)} · Total = Σ EF × GWP · ผลคูณ = ปริมาณ × EF (× GWP) / 1000</p>`,
+      `${d.rows.length} รายการ · รวม Scope 1+2+3 ${cfoT(s123)} tCO₂e`)}`;
+  a5Lift(body);
+  $('cfo-inv-form').onchange = () => { cfoInvBase = $('cfo-inv-form').value === '1'; cfoDrawInventory(body).catch(onErr); };
+  $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawInventory(body).catch(onErr); };
+  $('cfo-export').onclick = () => cfoDownload(`cfo-fr04-${d.year}.csv`, [
+    ['ขอบเขต', 'รายการ', 'หน่วยงาน', 'หน่วย', 'ปริมาณ', ...CFO_INV_EF.map(([, l]) => `EF ${l}`), 'EF นอกข้อกำหนด', 'GWP นอกข้อกำหนด', 'Total (kgCO2e/หน่วย)', 'ที่มา', 'Substitute', 'แหล่งอ้างอิง',
+      ...CFO_INV_TON.map(([, l]) => `ton ${l}`), ...CFO_INV_CO2E.map(([, l]) => `tCO2e ${l}`), 'Total GHG (tCO2e)'],
+    ...d.rows.map((r) => [CFO_INV_GROUPS.find(([k]) => k === r.group)?.[1] || r.group, r.activity, r.department, r.unit, r.qty, ...CFO_INV_EF.map(([k]) => r.ef[k] ?? ''), r.ef.other, r.ef.other_gwp,
+      r.total_ef, source(r.source_type), r.substitute || '', r.reference || '', ...CFO_INV_TON.map(([k]) => r.ton[k]), ...CFO_INV_CO2E.map(([k]) => r.tco2e[k]), r.total])
+  ]);
+}
+
+// Dashboard > บันทึกการปรับปรุง: what changed in master data, settings and confirmations (written by the server),
+// plus notes the admin adds. Search + area filter.
+const cfoRev = { q: '', area: '' };
+async function cfoDrawRevisions(body) {
+  const d = await a5Api(CFO, 'cfo/revisions');
+  const areas = [...new Set(d.rows.map((r) => r.area))].sort();
+  const draw = () => {
+    const term = cfoRev.q.trim().toLowerCase();
+    const list = d.rows.filter((r) => (!cfoRev.area || r.area === cfoRev.area) && (!term || `${r.ref || ''} ${r.detail} ${r.by} ${r.by_name}`.toLowerCase().includes(term)));
+    $('cfo-rev-rows').innerHTML = `<table class="mo-data-table"><thead><tr><th>วันที่</th><th class="num">ลำดับ</th><th>ส่วนที่แก้</th><th>ตำแหน่ง</th><th>รายละเอียด</th><th>ผู้ทำการแก้ไข</th></tr></thead>
+      <tbody>${list.map((r) => `<tr><td>${new Date(r.at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</td><td class="num">${r.no}</td><td>${esc(r.area)}</td><td>${esc(r.ref || '')}</td>
+        <td class="cfo-rev-detail" title="${esc(r.detail)}">${esc(r.detail)}</td><td>${esc(r.by_name || r.by)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">ยังไม่มีบันทึก</td></tr>'}</tbody></table>`;
+  };
+  body.innerHTML = `
+    <div class="toolbar a5-filters">
+      ${field('ส่วนที่แก้', `<select id="cfo-rev-area">${options(['', ...areas], cfoRev.area, (v) => v || 'ทั้งหมด')}</select>`)}
+      ${searchSlot('ค้นหา', 'cfo-rev-q', 'cfo-rev-search', { placeholder: 'รายการ รายละเอียด หรือผู้แก้ไข' })}
+      ${d.admin ? `<div class="action-bar">${button('cfo-rev-add', 'เพิ่มบันทึก', 'primary')}</div>` : ''}
+    </div>
+    <div class="table-wrap" id="cfo-rev-rows"></div>
+    <p class="sum-meta">${d.rows.length} รายการ · ระบบบันทึกให้เองเมื่อผู้จัดทำแก้ EF กิจกรรม ตั้งค่า Fr-03.2 และยืนยัน/เปิดข้อมูล · ลบไม่ได้</p>`;
+  $('cfo-rev-q').value = cfoRev.q;
+  draw();
+  a5Lift(body);
+  $('cfo-rev-area').onchange = () => { cfoRev.area = $('cfo-rev-area').value; draw(); };
+  const search = () => { cfoRev.q = $('cfo-rev-q').value; draw(); };
+  $('cfo-rev-search').onclick = search;
+  onEnter('cfo-rev-q', search);
+  if (!d.admin) return;
+  $('cfo-rev-add').onclick = () => openPopup('เพิ่มบันทึกการปรับปรุง', `
+    ${field('ส่วนที่แก้', `<input id="cfo-rev-f-area" maxlength="120" placeholder="เช่น Fr-05, EF TGO AR5, สูตรคำนวณ">`)}
+    ${field('ตำแหน่ง', `<input id="cfo-rev-f-ref" maxlength="300" placeholder="รายการ / รหัส (ถ้ามี)">`)}
+    ${field('รายละเอียด', '<textarea id="cfo-rev-f-detail" rows="3" maxlength="2000"></textarea>')}`, async () => {
+    await a5Api(CFO, 'cfo/revisions', { method: 'POST', body: { area: $('cfo-rev-f-area').value, ref: $('cfo-rev-f-ref').value, detail: $('cfo-rev-f-detail').value } });
+    toast('บันทึกแล้ว');
+    closePopup();
+    cfoDrawRevisions(body).catch(onErr);
+  });
 }
 
 // Dashboard > Scope: how complete each activity is this year — 12 month cells (recorded / due but missing),
@@ -490,6 +658,7 @@ async function cfoSetting(target) {
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   if (cfoSetTab === 'plan') return aplRender(body, CFO, { inPage: true });
   if (cfoSetTab === 'team') return a5SetTeam(body, CFO, me.access.admin, rerender, CFO_ROLE_LABEL);
+  if (cfoSetTab === 's3') return cfoSetS3(body, rerender);
   const m = await a5Api(CFO, 'cfo/master');
   const draw = { activities: cfoSetActivities, ef: cfoSetEf, company: cfoSetCompany }[cfoSetTab] || cfoSetActivities;
   draw(body, m, rerender);
@@ -587,19 +756,24 @@ function cfoSetEf(body, m, rerender) {
   const form = (e) => {
     const lock = e?.used ? ' disabled' : '';
     openPopup(e ? 'แก้ไข Emission factor' : 'เพิ่ม Emission factor', `
-      ${e?.used ? '<p class="sum-meta">EF นี้ถูกใช้แล้ว แก้ได้เฉพาะชื่อ รายละเอียด อ้างอิง และสถานะ</p>' : ''}
+      ${e?.used ? '<p class="sum-meta">EF นี้ถูกใช้แล้ว แก้ได้เฉพาะชื่อ รายละเอียด ที่มา อ้างอิง และสถานะ</p>' : ''}
       ${field('หมวด', `<select id="cfo-e-scope"${lock}>${m.scopes.map((s) => `<option value="${esc(s.code)}"${s.code === e?.scope_code ? ' selected' : ''}>${esc(s.code)} ${esc(s.name)}</option>`).join('')}</select>`)}
       ${field('กลุ่ม', `<input id="cfo-e-kind" maxlength="120" value="${esc(e?.kind || '')}">`)}
       ${field('ชื่อ', `<input id="cfo-e-name" maxlength="300" value="${esc(e?.name || '')}">`)}
       ${field('รายละเอียด', `<textarea id="cfo-e-detail" rows="2" maxlength="1000">${esc(e?.detail || '')}</textarea>`)}
       ${field('หน่วย', `<input id="cfo-e-unit" maxlength="30" value="${esc(e?.unit || '')}"${lock}>`)}
       ${field('kgCO₂e ต่อหน่วย (รวม)', `<input id="cfo-e-kgco2e" type="number" step="any" value="${esc(e?.kgco2e ?? '')}"${lock}>`)}
-      <div class="cfo-gas">${CFO_EF_GAS.map(([k, label]) => field(`${label} (Scope 1)`, `<input id="cfo-e-${k}" type="number" step="any" value="${esc(e?.[k] ?? '')}"${lock}>`)).join('')}</div>
+      <p class="sum-meta">ค่าแยกก๊าซ (kg GHG ต่อหน่วย) ใช้ใน Fr-04.1 · HFCs / PFCs ไม่ใส่ GWP = ค่าเป็น kgCO₂e อยู่แล้ว</p>
+      <div class="cfo-gas">${CFO_EF_GAS.map(([k, label]) => field(label, `<input id="cfo-e-${k}" type="number" step="any" value="${esc(e?.[k] ?? '')}"${lock}>`)).join('')}</div>
+      <label class="check"><input id="cfo-e-separate" type="checkbox"${e?.separate ? ' checked' : ''}${lock}> การปล่อย GHG โดยตรงที่ทำการรายงานแยก (ไม่รวมในยอด Scope)</label>
+      ${field('ที่มาข้อมูล', `<select id="cfo-e-source">${options(['', ...CFO_SOURCE_TYPES.map(([k]) => k)], e?.source_type || '', (v) => (CFO_SOURCE_TYPES.find(([k]) => k === v) || [, 'ไม่ระบุ'])[1])}</select>`)}
+      ${field('Substitute', `<input id="cfo-e-substitute" maxlength="300" value="${esc(e?.substitute || '')}">`)}
       ${field('อ้างอิง', `<input id="cfo-e-ref" maxlength="500" value="${esc(e?.reference || '')}">`)}
       ${field('ปี', `<input id="cfo-e-year" type="number" value="${esc(e?.year ?? a5Year)}">`)}
       ${field('สถานะ', `<select id="cfo-e-status">${options(['Active', 'Inactive'], e?.status || 'Active')}</select>`)}`, async () => {
       const body2 = { scope_code: $('cfo-e-scope').value, kind: $('cfo-e-kind').value, name: $('cfo-e-name').value, detail: $('cfo-e-detail').value, unit: $('cfo-e-unit').value,
-        kgco2e: $('cfo-e-kgco2e').value, reference: $('cfo-e-ref').value, year: $('cfo-e-year').value, status: $('cfo-e-status').value };
+        kgco2e: $('cfo-e-kgco2e').value, reference: $('cfo-e-ref').value, year: $('cfo-e-year').value, status: $('cfo-e-status').value,
+        separate: $('cfo-e-separate').checked, source_type: $('cfo-e-source').value, substitute: $('cfo-e-substitute').value };
       CFO_EF_GAS.forEach(([k]) => { body2[k] = $(`cfo-e-${k}`).value; });
       await a5Api(CFO, `cfo/ef${e ? `/${e.id}` : ''}`, { method: e ? 'PATCH' : 'POST', body: body2 });
       toast('บันทึกแล้ว');

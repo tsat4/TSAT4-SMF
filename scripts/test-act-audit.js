@@ -203,6 +203,14 @@ if (!fs.existsSync(cfoFile)) {
   ok(c.scopes === 23 && c.ef === 302 && c.activities === 34 && c.entries === 187, 'CFO rows imported once (23 scopes, 302 EF, 34 activities, 167 + 20 entries)');
   ok(Math.abs(c.s1 - 188.863) < 0.01 && Math.abs(c.s2 - 6642.52) < 0.01, `tCO2e = Excel (scope 1 188.863 / scope 2 6642.52, got ${c.s1} / ${c.s2})`);
   ok(c.septic === 32.844, `septic 1,173 kg CH4 x 28 = 32.844 tCO2e (got ${c.septic})`);
+  // Fr-04.1 รายงานแยก: an EF marked separate leaves the Scope totals (v_cfo_month) and shows its non-Kyoto part.
+  await db.exec(`begin; update mt_cfo_ef set separate = true, other = 1, other_gwp = 1760 where id = (select ef_id from tx_cfo_entry where qty > 0 order by id limit 1)`);
+  const sep = await one(db, `select (select round(sum(tco2e), 3)::float from v_cfo_month where scope = 1) s1, (select round(sum(tco2e), 3)::float from v_cfo_entry where separate) sep,
+    (select sum(tco2e_other)::float from v_cfo_entry where separate) other`);
+  await db.exec('rollback');
+  ok(Math.abs(sep.s1 + sep.sep - 188.863) < 0.01 && sep.other > 0, `separately reported EF leaves Scope 1 (${sep.s1} + ${sep.sep}) and carries its non-Kyoto tCO2e`);
+  ok(await throws(db, `insert into mt_cfo_s3_assess (year, scope_code) values (2026, '1-1')`), 'Fr-03.2 rows are Scope 3 categories only');
+  ok(await throws(db, `insert into mt_cfo_ef (scope_code, name, unit, source_type) values ('1-1', 'x', 'L', 'web')`), 'EF data source is one of the Fr-04.1 types');
 }
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');

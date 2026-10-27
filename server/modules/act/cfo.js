@@ -1,6 +1,6 @@
 import { tx } from '../../core/db.js';
 import { fail } from '../../core/http.js';
-import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, requireAdmin, yearOf } from './common.js';
+import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, namesOf, requireAdmin, yearOf } from './common.js';
 
 // CFO (Carbon Footprint for Organization): Dashboard totals, monthly entry, and master data (EF, activities, company).
 // Tables: db/act/cfo.sql (scripts/act-sql.js cfoSql) · spec: docs/specs/act-cfo.md
@@ -9,7 +9,12 @@ const SETTING_KEYS = ['company_name', 'company_address', 'company_area', 'compan
   'company_photo1', 'company_photo2', 'base_year', 'target_percent', 'septic_bod', 'septic_b0', 'septic_mcf', 'septic_i'];
 // production_<year> = pieces produced that year (Carbon intensity = tCO2e / pieces)
 const settingKey = (k) => SETTING_KEYS.includes(k) || /^production_\d{4}$/.test(k);
-const EF_VALUES = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'hfc', 'pfc', 'unit', 'scope_code'];
+// Values an EF keeps once entries use it (Fr-04.1 gas columns included).
+const EF_NUMBERS = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'sf6', 'nf3', 'hfc', 'hfc_gwp', 'pfc', 'pfc_gwp', 'other', 'other_gwp'];
+const EF_VALUES = [...EF_NUMBERS, 'unit', 'scope_code', 'separate'];
+const EF_SOURCES = ['self', 'supplier', 'th_lci', 'tgo', 'thai_res', 'int_db', 'other'];
+// TGO Fr-03.2 criteria (✓ / ×): significant = has a source and meets at least one.
+export const S3_CRITERIA = ['magnitude', 'influence', 'risk', 'sector', 'outsourcing', 'engagement'];
 
 const text = (v, max = 500) => String(v ?? '').trim().slice(0, max) || null;
 const numOrNull = (v) => (v === '' || v == null ? null : Number.isFinite(Number(v)) ? Number(v) : NaN);
@@ -25,6 +30,14 @@ export function mountCfo(app) {
   const route = actRoute(app, { only: CFO_ON });
   const settingsOf = async (t) => Object.fromEntries((must(await tx.from(t.setting).select('key,value'))).map((r) => [r.key, r.value]));
   const thisYear = () => new Date().getFullYear();
+  // บันทึกการปรับปรุง: written next to an admin change. A missing table (SQL not run yet) never blocks the change.
+  const logRev = async (t, req, area, ref, detail) => {
+    if (!detail) return;
+    const { error } = await tx.from(t.revision).insert({ area, ref: ref == null ? null : String(ref).slice(0, 300), detail: String(detail).slice(0, 2000), by: req.user.employeeId });
+    if (error) console.warn(`cfo revision log: ${error.message}`);
+  };
+  const changes = (before, after, keys) => keys.filter((k) => String(before?.[k] ?? '') !== String(after[k] ?? ''))
+    .map((k) => `${k}: ${before?.[k] ?? '-'} → ${after[k] ?? '-'}`).join(' · ');
 
   // ---------- Dashboard ----------
   // Year totals by month / scope / category / department, compared with the base year (setting base_year) and
@@ -39,11 +52,13 @@ export function mountCfo(app) {
     const compareYear = baseYear && baseYear !== year ? baseYear : year - 1;
     const target = Number(settings.target_percent ?? 5) || 0;
     const rowsOf = (y) => fetchAll(() => {
-      let q = tx.from(t.entryView).select('month,scope,scope_code,scope_name,department,tco2e,tco2e_co2,tco2e_ch4,tco2e_n2o,tco2e_fgas').gte('month', `${y}-01-01`).lte('month', `${y}-12-01`).order('id');
+      let q = tx.from(t.entryView).select('*').gte('month', `${y}-01-01`).lte('month', `${y}-12-01`).order('id');
       if (department) q = q.eq('department', department);
       return q;
     });
-    const [cur, base] = await Promise.all([rowsOf(year), rowsOf(compareYear)]);
+    // รายงานแยก (EF separate) stays out of every Scope total and is reported on its own (Fr-05 "อื่นๆ").
+    const [curAll, baseAll] = await Promise.all([rowsOf(year), rowsOf(compareYear)]);
+    const [cur, base] = [curAll, baseAll].map((list) => list.filter((r) => !r.separate));
     const sum = (list) => Math.round(list.reduce((s, r) => s + Number(r.tco2e), 0) * 1000) / 1000;
     const inMonth = (list, m) => list.filter((r) => Number(r.month.slice(5, 7)) === m);
     // tco2e = this year, base = the compare year (categories: every category used in either year)
@@ -56,7 +71,7 @@ export function mountCfo(app) {
     const tagged = (withBase) => [...cur.map((r) => [r, 'tco2e']), ...(withBase ? base.map((r) => [r, 'base']) : [])];
     const gasOf = (list) => {
       const add = (key) => Math.round(list.reduce((s, r) => s + Number(r[key] || 0), 0) * 1000) / 1000;
-      return { co2: add('tco2e_co2'), ch4: add('tco2e_ch4'), n2o: add('tco2e_n2o'), fgas: add('tco2e_fgas') };
+      return { co2: add('tco2e_co2'), ch4: add('tco2e_ch4'), n2o: add('tco2e_n2o'), fgas: add('tco2e_fgas'), sf6nf3: add('tco2e_sf6_nf3') };
     };
     res.json({
       year,
@@ -77,6 +92,7 @@ export function mountCfo(app) {
         .sort((a, b) => a.scope - b.scope || Number(a.key.split('-')[1]) - Number(b.key.split('-')[1])),
       departments: group('department', (r) => r.department, tagged(false)),
       gases: [0, 1, 2, 3].map((scope) => ({ scope, ...gasOf(scope ? cur.filter((r) => r.scope === scope) : cur) })),
+      separate: { tco2e: sum(curAll.filter((r) => r.separate)), base: sum(baseAll.filter((r) => r.separate)) },
       settings
     });
   });
@@ -195,6 +211,7 @@ export function mountCfo(app) {
     let query = tx.from(t.entry).update({ status, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }).select('id');
     query = month ? query.eq('month', month) : query.gte('month', `${year}-01-01`).lte('month', `${year}-12-01`);
     const done = must(await query);
+    await logRev(t, req, status === 'CONFIRMED' ? 'ยืนยันข้อมูล' : 'เปิดให้แก้', month ? month.slice(0, 7) : `ปี ${year}`, `${status === 'CONFIRMED' ? 'ยืนยัน' : 'เปิดให้แก้'} ${done.length} รายการ`);
     res.json({ ok: true, count: done.length });
   });
 
@@ -219,10 +236,11 @@ export function mountCfo(app) {
   });
 
   const efInput = (b) => {
-    const row = { scope_code: text(b.scope_code, 10), kind: text(b.kind, 120), name: text(b.name, 300), detail: text(b.detail, 1000), unit: text(b.unit, 30), reference: text(b.reference, 500), year: numOrNull(b.year), status: b.status === 'Inactive' ? 'Inactive' : 'Active' };
-    for (const k of ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'hfc', 'pfc']) row[k] = numOrNull(b[k]);
+    const row = { scope_code: text(b.scope_code, 10), kind: text(b.kind, 120), name: text(b.name, 300), detail: text(b.detail, 1000), unit: text(b.unit, 30), reference: text(b.reference, 500), year: numOrNull(b.year), status: b.status === 'Inactive' ? 'Inactive' : 'Active',
+      separate: b.separate === true || b.separate === 'true', source_type: EF_SOURCES.includes(b.source_type) ? b.source_type : null, substitute: text(b.substitute, 300) };
+    for (const k of EF_NUMBERS) row[k] = numOrNull(b[k]);
     if (!row.scope_code || !row.name || !row.unit) return { error: 'ระบุหมวด ชื่อ และหน่วย' };
-    if (['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'hfc', 'pfc', 'year'].some((k) => Number.isNaN(row[k]))) return { error: 'ค่าตัวเลขไม่ถูกต้อง' };
+    if ([...EF_NUMBERS, 'year'].some((k) => Number.isNaN(row[k]))) return { error: 'ค่าตัวเลขไม่ถูกต้อง' };
     if (row.status === 'Active' && row.kgco2e == null) return { error: 'EF ที่ใช้งานต้องมีค่า kgCO2e ต่อหน่วย' };
     return { row };
   };
@@ -231,6 +249,7 @@ export function mountCfo(app) {
     const { row, error } = efInput(req.body || {});
     if (error) return fail(res, 400, error);
     must(await tx.from(t.ef).insert(row));
+    await logRev(t, req, 'Emission Factor', `${row.scope_code} ${row.name}`, `เพิ่ม EF ${row.kgco2e ?? '-'} kgCO2e/${row.unit}`);
     res.status(201).json({ ok: true });
   });
   // An EF that entries already use keeps its values: add a new row and set the old one Inactive.
@@ -244,6 +263,7 @@ export function mountCfo(app) {
     const used = must(await tx.from(t.entry).select('id').eq('ef_id', id).limit(1)).length > 0;
     if (used && EF_VALUES.some((k) => String(row[k] ?? '') !== String(current[k] ?? ''))) return fail(res, 400, 'EF นี้ถูกใช้แล้ว แก้ค่าไม่ได้ ให้เพิ่ม EF ใหม่แล้วปิดตัวเดิม');
     must(await tx.from(t.ef).update(row).eq('id', id));
+    await logRev(t, req, 'Emission Factor', current.code || `${current.scope_code} ${current.name}`, changes(current, row, Object.keys(row)));
     res.json({ ok: true });
   });
   route('delete', '/api/act/:activity/cfo/ef/:id', async (req, res, activity, t) => {
@@ -251,7 +271,8 @@ export function mountCfo(app) {
     const id = Number(req.params.id);
     const usedBy = must(await tx.from(t.activity).select('id').eq('ef_id', id).limit(1)).length + must(await tx.from(t.entry).select('id').eq('ef_id', id).limit(1)).length;
     if (usedBy) return fail(res, 400, 'EF นี้ถูกใช้แล้ว ลบไม่ได้ ให้ตั้งเป็น Inactive');
-    must(await tx.from(t.ef).delete().eq('id', id));
+    const gone = must(await tx.from(t.ef).delete().eq('id', id).select('code,scope_code,name'));
+    if (gone[0]) await logRev(t, req, 'Emission Factor', gone[0].code || `${gone[0].scope_code} ${gone[0].name}`, 'ลบ EF');
     res.json({ ok: true });
   });
 
@@ -265,20 +286,25 @@ export function mountCfo(app) {
     const { row, error } = activityInput(req.body || {});
     if (error) return fail(res, 400, error);
     must(await tx.from(t.activity).insert(row));
+    await logRev(t, req, 'กิจกรรม', `${row.department} · ${row.name}`, 'เพิ่มกิจกรรม');
     res.status(201).json({ ok: true });
   });
   route('patch', '/api/act/:activity/cfo/activities/:id', async (req, res, activity, t) => {
     if (!(await requireAdmin(req, res, activity, thisYear()))) return;
     const { row, error } = activityInput(req.body || {});
     if (error) return fail(res, 400, error);
-    must(await tx.from(t.activity).update(row).eq('id', Number(req.params.id)));
+    const current = must(await tx.from(t.activity).select('*').eq('id', Number(req.params.id)).maybeSingle());
+    if (!current) return fail(res, 404, 'ไม่พบกิจกรรม');
+    must(await tx.from(t.activity).update(row).eq('id', current.id));
+    await logRev(t, req, 'กิจกรรม', `${current.department} · ${current.name}`, changes(current, row, Object.keys(row)));
     res.json({ ok: true });
   });
   route('delete', '/api/act/:activity/cfo/activities/:id', async (req, res, activity, t) => {
     if (!(await requireAdmin(req, res, activity, thisYear()))) return;
     const id = Number(req.params.id);
     if (must(await tx.from(t.entry).select('id').eq('activity_id', id).limit(1)).length) return fail(res, 400, 'กิจกรรมนี้มีข้อมูลแล้ว ลบไม่ได้ ให้ตั้งเป็น Inactive');
-    must(await tx.from(t.activity).delete().eq('id', id));
+    const gone = must(await tx.from(t.activity).delete().eq('id', id).select('department,name'));
+    if (gone[0]) await logRev(t, req, 'กิจกรรม', `${gone[0].department} · ${gone[0].name}`, 'ลบกิจกรรม');
     res.json({ ok: true });
   });
 
@@ -299,7 +325,125 @@ export function mountCfo(app) {
     if (!(await requireAdmin(req, res, activity, thisYear()))) return;
     const rows = Object.entries(req.body || {}).filter(([k]) => settingKey(k)).map(([key, value]) => ({ key, value: String(value ?? '').trim().slice(0, 1000) }));
     if (!rows.length) return fail(res, 400, 'ไม่มีข้อมูลให้บันทึก');
+    const before = await settingsOf(t);
     must(await tx.from(t.setting).upsert(rows, { onConflict: 'key' }));
+    const after = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+    await logRev(t, req, 'ตั้งค่า', null, changes(before, after, Object.keys(after).filter((k) => !k.startsWith('company_photo'))));
     res.json({ ok: true });
+  });
+
+  // ---------- TGO forms ----------
+  // Fr-03.2: the 15 Scope 3 categories of a year with the 6 criteria. A year not assessed yet shows the latest
+  // earlier year (fromYear) so the admin starts from it.
+  route('get', '/api/act/:activity/cfo/s3', async (req, res, activity, t) => {
+    const year = yearOf(req.query.year);
+    if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
+    const [scopes, rows, access] = await Promise.all([
+      fetchAll(() => tx.from(t.cfoScope).select('code,name,name_th').eq('scope', 3)),
+      fetchAll(() => tx.from(t.s3Assess).select('*').lte('year', year).order('year', { ascending: false })),
+      accessOf(req, activity, year)
+    ]);
+    const fromYear = rows.some((r) => r.year === year) ? year : rows[0]?.year || null;
+    const byCode = new Map(rows.filter((r) => r.year === fromYear).map((r) => [r.scope_code, r]));
+    const sorted = scopes.sort((a, b) => Number(a.code.split('-')[1]) - Number(b.code.split('-')[1]));
+    res.json({
+      year, fromYear, admin: access.admin, criteria: S3_CRITERIA,
+      rows: sorted.map((s) => {
+        const r = byCode.get(s.code) || { has_source: true };
+        const marks = Object.fromEntries(S3_CRITERIA.map((k) => [k, Boolean(r[k])]));
+        return { scope_code: s.code, name: s.name, name_th: s.name_th, has_source: r.has_source !== false, ...marks, remark: r.remark || '',
+          significant: r.has_source !== false && S3_CRITERIA.some((k) => marks[k]), updated_by: r.updated_by || null, updated_at: r.updated_at || null };
+      })
+    });
+  });
+  route('put', '/api/act/:activity/cfo/s3', async (req, res, activity, t) => {
+    const year = yearOf(req.body?.year, 0);
+    if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
+    if (!(await requireAdmin(req, res, activity, year))) return;
+    const list = Array.isArray(req.body?.rows) ? req.body.rows : [];
+    const rows = list.filter((r) => /^3-\d{1,2}$/.test(String(r?.scope_code))).map((r) => ({
+      year, scope_code: r.scope_code, has_source: r.has_source !== false, remark: text(r.remark, 1000),
+      ...Object.fromEntries(S3_CRITERIA.map((k) => [k, r[k] === true])), updated_by: req.user.employeeId, updated_at: new Date().toISOString()
+    }));
+    if (!rows.length) return fail(res, 400, 'ไม่มีข้อมูลให้บันทึก');
+    const before = new Map((await fetchAll(() => tx.from(t.s3Assess).select('*').eq('year', year))).map((r) => [r.scope_code, r]));
+    must(await tx.from(t.s3Assess).upsert(rows, { onConflict: 'year,scope_code' }));
+    const changed = rows.map((r) => {
+      const d = changes(before.get(r.scope_code), r, ['has_source', ...S3_CRITERIA, 'remark']);
+      return d && `${r.scope_code} ${d}`;
+    }).filter(Boolean);
+    await logRev(t, req, 'Fr-03.2', `ปี ${year}`, before.size ? changed.join(' | ') : 'ประเมินครั้งแรกของปี');
+    res.json({ ok: true });
+  });
+
+  // Fr-04.1 (Fr-04.2 = the base year): one row per activity × EF for the whole year with the form's columns —
+  // EF per gas, ton GHG and tCO2e per gas, total. Groups: Scope 1, รายงานแยก, Scope 2, Scope 3.
+  route('get', '/api/act/:activity/cfo/inventory', async (req, res, activity, t) => {
+    const baseYear = yearOf((await settingsOf(t)).base_year, 0) || null;
+    const year = req.query.base === '1' ? baseYear : yearOf(req.query.year);
+    if (!year) return fail(res, 400, req.query.base === '1' ? 'ยังไม่ได้ตั้งปีฐาน (Setting > บริษัท)' : 'ปีไม่ถูกต้อง');
+    const department = text(req.query.department, 80);
+    const [entries, activities, efs, gwps, scopes] = await Promise.all([
+      fetchAll(() => tx.from(t.entry).select('activity_id,ef_id,gwp_code,qty').gte('month', `${year}-01-01`).lte('month', `${year}-12-01`).order('id')),
+      fetchAll(() => tx.from(t.activity).select('id,department,name,detail,calc').order('id')),
+      fetchAll(() => tx.from(t.ef).select('*').order('id')),
+      fetchAll(() => tx.from(t.gwp).select('*')),
+      fetchAll(() => tx.from(t.cfoScope).select('code,scope,name'))
+    ]);
+    const act = new Map(activities.map((a) => [a.id, a]));
+    const ef = new Map(efs.map((e) => [e.id, e]));
+    const gwp = new Map(gwps.map((g) => [g.code, g]));
+    const scope = new Map(scopes.map((s) => [s.code, s]));
+    const lines = new Map();
+    for (const e of entries) {
+      const a = act.get(e.activity_id);
+      if (!a || (department && a.department !== department)) continue;
+      const key = `${e.activity_id}|${e.ef_id}|${e.gwp_code}`;
+      const line = lines.get(key) || { a, f: ef.get(e.ef_id), g: gwp.get(e.gwp_code), qty: 0 };
+      line.qty += Number(e.qty);
+      lines.set(key, line);
+    }
+    const n = (v) => Number(v || 0);
+    const r6 = (v) => Math.round(v * 1e6) / 1e6;
+    const rows = [...lines.values()].filter((l) => l.f && l.g).map(({ a, f, g, qty }) => {
+      // Septic: qty is kg CH4 (EF CH4 = 1 kg/kg), as v_cfo_entry.
+      const septic = a.calc === 'septic';
+      const efGas = { co2: septic ? 0 : n(f.co2), ch4_fossil: septic ? 0 : n(f.ch4_fossil), ch4: septic ? 1 : n(f.ch4), n2o: septic ? 0 : n(f.n2o), sf6: n(f.sf6), nf3: n(f.nf3) };
+      const gw = { co2: n(g.co2) || 1, ch4_fossil: n(g.ch4_fossil), ch4: n(g.ch4), n2o: n(g.n2o), sf6: n(g.sf6), nf3: n(g.nf3) };
+      const hfcGwp = f.hfc_gwp == null ? 1 : n(f.hfc_gwp);
+      const pfcGwp = f.pfc_gwp == null ? 1 : n(f.pfc_gwp);
+      const ton = Object.fromEntries(Object.keys(efGas).map((k) => [k, r6((qty * efGas[k]) / 1000)]));
+      const tco2e = {
+        ...Object.fromEntries(Object.keys(efGas).map((k) => [k, r6((qty * efGas[k] * gw[k]) / 1000)])),
+        hfc: r6((qty * n(f.hfc) * hfcGwp) / 1000), pfc: r6((qty * n(f.pfc) * pfcGwp) / 1000), other: r6((qty * n(f.other) * n(f.other_gwp)) / 1000)
+      };
+      const s = scope.get(f.scope_code) || {};
+      return {
+        group: f.separate ? 'separate' : `s${s.scope}`, scope: s.scope, scope_code: f.scope_code, scope_name: s.name,
+        department: a.department, activity: a.name, detail: a.detail, source: f.name, unit: f.unit, qty: r6(qty),
+        ef: { ...efGas, hfc: n(f.hfc), hfc_gwp: n(f.hfc) ? hfcGwp : null, pfc: n(f.pfc), pfc_gwp: n(f.pfc) ? pfcGwp : null, other: n(f.other), other_gwp: n(f.other_gwp) },
+        total_ef: septic ? gw.ch4 : n(f.kgco2e), source_type: f.source_type, substitute: f.substitute, reference: f.reference,
+        ton, tco2e, total: r6((qty * (septic ? gw.ch4 : n(f.kgco2e))) / 1000)
+      };
+    }).sort((x, y) => x.scope_code.localeCompare(y.scope_code, 'en', { numeric: true }) || x.department.localeCompare(y.department) || x.activity.localeCompare(y.activity));
+    res.json({ year, baseYear, department, gwp: gwps.find((g) => g.code === 'AR5') || gwps[0] || null, rows });
+  });
+
+  // บันทึกการปรับปรุง: newest first; admins add a note by hand. No delete.
+  route('get', '/api/act/:activity/cfo/revisions', async (req, res, activity, t) => {
+    const rows = await fetchAll(() => tx.from(t.revision).select('*').order('at', { ascending: false }).order('id', { ascending: false }));
+    const names = await namesOf([...new Set(rows.map((r) => r.by))]);
+    res.json({
+      admin: (await accessOf(req, activity, thisYear())).admin,
+      rows: rows.map((r, i) => ({ ...r, no: rows.length - i, by_name: names.get(String(r.by))?.name || '' }))
+    });
+  });
+  route('post', '/api/act/:activity/cfo/revisions', async (req, res, activity, t) => {
+    if (!(await requireAdmin(req, res, activity, thisYear()))) return;
+    const area = text(req.body?.area, 120);
+    const detail = text(req.body?.detail, 2000);
+    if (!area || !detail) return fail(res, 400, 'ระบุส่วนที่แก้และรายละเอียด');
+    must(await tx.from(t.revision).insert({ area, ref: text(req.body?.ref, 300), detail, by: req.user.employeeId }));
+    res.status(201).json({ ok: true });
   });
 }
