@@ -6,6 +6,7 @@ import { mountAudit } from './audit.js';
 import { mountTransaction } from './transaction.js';
 import { PLANNER_ON, mountPlanner, plannerEvents } from './planner.js';
 import { CFO_ON, mountCfo } from './cfo.js';
+import { mountKaizen } from './kaizen.js';
 
 // ระบบกิจกรรม (Tx Data): calendar here, Project Planner in planner.js, checklist audit Dashboard/Setting in audit.js,
 // audits and Issues in transaction.js. Each activity has its own tables (db/act/<activity>.sql, scripts/act-sql.js).
@@ -55,5 +56,6 @@ export default defineModule({
     mountAudit(app);
     mountTransaction(app);
     mountCfo(app);
+    mountKaizen(app);
   }
 });

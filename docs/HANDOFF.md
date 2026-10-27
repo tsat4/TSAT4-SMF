@@ -14,7 +14,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
-- ไม่มี
+- `db/act/kaizen.sql` ใน Tx Data (KAIZEN ใหม่)
 
 ## ข้อควรระวัง
 
@@ -23,6 +23,7 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-27 · Claude · **KAIZEN** (ผู้ใช้สั่ง จาก inbox/Kaizen.xlsx): ตาราง `db/act/kaizen.sql` (ทีม + แผนงาน Planner + `tx_kaizen_entry` + bucket `img_kaizen`) · server `kaizen.js` · หน้าจอ `act-kaizen.js` (Dashboard Summary / Schedule / Team · Transaction ใบ Kaizen ตามด้านหน้า รูป 16:9 เงินที่ใช้ = ค่าแรง + ค่าอุปกรณ์ คืนทุน = เงินที่ใช้ ÷ ผลตอบแทนต่อเดือน · Setting แผนงาน / ทีม) · spec `docs/specs/act-kaizen.md` · **ผู้ใช้ต้องรัน `db/act/kaizen.sql` ใน Tx Data**
 - 2026-10-27 · Claude · Usage (ผู้ใช้สั่ง ตอน Cursor ติด limit): สถานะ Stock = Short (คงเหลือ 0) / Risk (< Min) / Normal (Min–Max) / Over (> Max) · จำนวนที่กรอกเป็นจำนวนเต็มเท่านั้น (ช่องกรอก step 1 + `qtyOf` ใน `server/core/http.js` รับเฉพาะจำนวนเต็ม) · ตัวเลขบนจอมีคั่นหลักพัน (`qtyText` / `moneyText`, ตัวนับหน้า/แถวใน core.js) · หัวคอลัมน์ตัวเลขชิดขวา (`fillTable` `num: true`)
 - 2026-10-27 · Claude · CFO (ผู้ใช้สั่ง): Company Overview → **Fr-01** (หน้าตามฟอร์ม TGO + ตารางขอบเขตขององค์กร + กราฟตาม Scope, setting ใหม่ `company_register`) · Team → **Fr-03.1** · ตัด Schedule + Setting > แผนงาน ของ CFO (`PLANNER_ON` ไม่มี cfo, `db/act/cfo.sql` สร้างด้วย `--no-planner`) · ตาราง `mt_cfo_task` ใน Tx Data ยังอยู่ ลบได้เมื่อผู้ใช้ยืนยัน
 - 2026-10-27 · Claude · CFO สูตรปริมาณ `tkm` (ตัน × กม.) / `km_fuel` (กม. ÷ กม./ลิตร) + บ่อเกรอะ ใช้ `CFO_CALCS` ตัวเดียว · EF `co2_bio` (CO₂ ชีวมวล B7/E10/ชีวมวล ตาม EF TGO AR5 V2) รายงานแยก · ปุ่มที่ตั้ง `hidden` ซ่อนจริงแล้ว (`.btn[hidden]`) · **ต้องรัน `db/act/cfo.sql` ใน Tx Data อีกรอบ** (ผู้ใช้รันเองใน SQL Editor)
