@@ -33,10 +33,12 @@ GET /api/act/:activity/team auth
 GET /api/act/calendar auth
 GET /api/employees auth sto:3
 GET /api/health
+GET /api/issues auth sto:1
 GET /api/ledger auth sto:1
 GET /api/materials auth sto:1
 GET /api/me auth
 GET /api/pay-centers auth sto:1
+GET /api/receipts auth sto:1
 GET /api/requisitions auth sto:1
 GET /api/requisitions/:id auth
 GET /api/reserves auth sto:1

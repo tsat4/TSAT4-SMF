@@ -9,6 +9,8 @@ const LINE_HEAD = ['หมายเลขเลขรายการ', 'ชื�
 const TX_PAGE = { catalog: 'รายการ', issue: 'เบิกจ่าย', reserve: 'สั่งจอง', receive: 'รับเข้า', stock: 'Stock' };
 let editMode = 'list';
 let txPage = 'issue';
+let txYear = yearNow();
+let txMonth = monthNow();
 let editTick = 0;
 Object.assign(TITLES, {
   store: ['Store', 'ระบบงาน > Store'],
@@ -38,9 +40,19 @@ function monthNow() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
 }
 
-function ledgerBadge(status) {
-  const kind = status === 'ใช้เกิน' ? 'badge-danger' : status === 'เหลือ' ? 'badge-success' : 'badge-primary';
-  return `<span class="badge ${kind}">${esc(status)}</span>`;
+function yearNow() {
+  return Number(monthNow().slice(0, 4));
+}
+
+function whenText(value) {
+  if (!value) return '';
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? '' : at.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function yearField(id, current) {
+  const y = yearNow();
+  return field('ปี', `<select id="${id}">${options([y, y - 1, y - 2].map(String), String(current))}</select>`);
 }
 
 function centerOptions(rows) {
@@ -87,6 +99,12 @@ async function renderEdit(target) {
   const canWrite = rankOf('sto') >= 2;
   const seg = `<div class="seg" role="group" aria-label="หน้า Transaction">${Object.entries(TX_PAGE).map(([id, label]) => `<button class="seg-btn${id === txPage ? ' is-active' : ''}" type="button" data-tx="${id}">${label}</button>`).join('')}</div>`;
   const catalog = txPage === 'catalog';
+  const tools = [
+    txPage === 'issue' || txPage === 'receive' ? yearField('edit-year', txYear) : '',
+    txPage === 'reserve' ? field('เดือน', `<input id="edit-month" type="month" value="${esc(txMonth)}">`) : '',
+    searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'ค้นหา' }),
+    '<div class="action-bar" id="edit-actions"></div>'
+  ].join('');
   target.innerHTML = catalog ? `<div class="view-body">
     ${pageBar(seg, '', 'edit')}
     <div class="tx-board">
@@ -110,7 +128,7 @@ async function renderEdit(target) {
       </aside>
     </div>
   </div>` : `<div class="view-body">
-    ${pageBar(seg, `${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'ค้นหา' })}<div class="action-bar" id="edit-actions"></div>`, 'edit')}
+    ${pageBar(seg, tools, 'edit')}
     <div class="table-wrap sheet" id="edit-rows"></div>
     ${tableFoot('edit')}
   </div>`;
@@ -209,11 +227,9 @@ async function renderEdit(target) {
   const loadReserve = async () => {
     if (!alive() || !$('edit-actions')) return;
     $('edit-q').placeholder = 'หน่วยงานหรือรายการ';
-    const month = $('edit-month')?.value || monthNow();
-    $('edit-actions').innerHTML = canWrite ? `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${button('edit-reserve', 'สั่งจอง', 'primary')}` : `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>`;
-    $('edit-month').onchange = () => { state.offset = 0; load().catch(onErr); };
+    $('edit-actions').innerHTML = canWrite ? button('edit-reserve', 'สั่งจอง', 'primary') : '';
     if ($('edit-reserve')) $('edit-reserve').onclick = () => openReservePopup(() => load()).catch(onErr);
-    const data = await api(`/api/reserves?month=${encodeURIComponent($('edit-month').value)}`);
+    const data = await api(`/api/reserves?month=${encodeURIComponent(txMonth)}`);
     if (!alive() || !$('edit-rows')) return;
     const term = $('edit-q').value.trim().toLowerCase();
     if (admin) {
@@ -238,25 +254,21 @@ async function renderEdit(target) {
   const loadReceive = async () => {
     if (!alive() || !$('edit-actions')) return;
     $('edit-q').placeholder = 'หน่วยงานหรือรายการ';
-    const month = $('edit-month')?.value || monthNow();
-    $('edit-actions').innerHTML = `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${canWrite ? button('edit-receipt', 'รับเข้า', 'primary') + button('edit-borrow', 'ยืม') : ''}`;
-    $('edit-month').onchange = () => { state.offset = 0; load().catch(onErr); };
+    $('edit-actions').innerHTML = canWrite ? button('edit-receipt', 'รับเข้า', 'primary') + button('edit-borrow', 'ยืม') : '';
     if ($('edit-receipt')) $('edit-receipt').onclick = () => openLedgerPopup('receipt', () => load()).catch(onErr);
     if ($('edit-borrow')) $('edit-borrow').onclick = () => openLedgerPopup('borrow', () => load()).catch(onErr);
-    const data = await api(`/api/ledger?month=${encodeURIComponent($('edit-month').value)}`);
+    const data = await api(`/api/receipts?year=${encodeURIComponent(txYear)}`);
     if (!alive() || !$('edit-rows')) return;
     const term = $('edit-q').value.trim().toLowerCase();
-    const filtered = listQuery(data.rows.filter((row) => !term || [row.department, row.material, row.materialDescription].join(' ').toLowerCase().includes(term)), head, (row, key) => row[key]);
+    const kindOf = (row) => (row.kind === 'borrow' ? 'ยืม' : row.kind === 'replacement' ? 'ซื้อทดแทน' : 'รับเข้า');
+    const filtered = listQuery((data.events || []).filter((row) => !term || [row.department, row.material, row.materialDescription, row.by, kindOf(row)].join(' ').toLowerCase().includes(term)), head, (row, key) => (key === 'kind' ? kindOf(row) : key === 'at' ? row.at : row[key]));
     const page = pageOf(filtered);
-    const replaceOf = (row) => canWrite ? data.borrows
-      .filter((item) => item.material === row.material && item.borrowerDepartment === row.department && (admin || item.borrowerDepartment === me.department))
-      .map((item) => `<button class="tx-line-drop" type="button" data-replace="${esc(item.id)}" data-qty="${esc(item.qty)}" data-lender="${esc(item.lenderDepartment)}">ซื้อทดแทน</button>`)
-      .join('') : '';
-    fillTable('edit-rows', [{ label: 'หน่วยงาน', key: 'department' }, { label: 'รายการ', key: 'materialDescription' }, { label: 'ซื้อ', key: 'bought' }, { label: 'เบิก', key: 'used' }, { label: 'ยืม', key: 'borrowed' }, { label: 'ให้ยืม', key: 'lent' }, { label: 'เหลือ', key: 'left' }, 'สถานะ'], page.map((row) => `<tr><td>${esc(row.department)}</td><td>${esc(row.materialDescription || row.material)}<div class="sum-meta">${esc(row.material)}</div></td><td>${qtyText(row.bought)} ${esc(row.bun)}</td><td>${qtyText(row.used)}</td><td>${qtyText(row.borrowed)}</td><td>${qtyText(row.lent)}</td><td>${qtyText(row.left)}</td><td>${ledgerBadge(row.status)} ${replaceOf(row)}</td></tr>`).join(''), 'เดือนนี้ยังไม่มีการซื้อเข้า', columnHead());
+    const replaceOf = (row) => (canWrite && row.kind === 'borrow' && row.open ? `<button class="tx-line-drop" type="button" data-replace="${esc(row.borrowId)}" data-qty="${esc(row.qty)}" data-lender="${esc(row.lenderDepartment)}">ซื้อทดแทน</button>` : '');
+    fillTable('edit-rows', [{ label: 'วันเวลา', key: 'at' }, { label: 'ประเภท', key: 'kind' }, { label: 'หน่วยงาน', key: 'department' }, { label: 'รายการ', key: 'materialDescription' }, { label: 'จำนวน', key: 'qty' }, { label: 'ผู้บันทึก', key: 'by' }, 'สถานะ'], page.map((row) => `<tr><td>${esc(whenText(row.at))}</td><td>${esc(kindOf(row))}</td><td>${esc(row.department)}${row.costcenter ? `<div class="sum-meta">${esc(row.costcenter)}</div>` : ''}</td><td>${esc(row.materialDescription || row.material)}<div class="sum-meta">${esc(row.material)}</div></td><td>${qtyText(row.qty)} ${esc(row.bun)}</td><td>${esc(row.by || '')}</td><td>${esc(row.status || '')} ${replaceOf(row)}</td></tr>`).join(''), 'ปีนี้ยังไม่มีประวัติรับเข้า', columnHead());
     setFoot(page.length, filtered.length);
     $('edit-rows').querySelectorAll('[data-replace]').forEach((node) => {
       node.onclick = () => confirmPopup('ซื้อทดแทน', `ซื้อ ${esc(node.dataset.qty)} คืนให้ ${esc(node.dataset.lender)}`, async () => {
-        await api('/api/receipts', { method: 'POST', body: { month: $('edit-month').value, borrowId: Number(node.dataset.replace), qty: Number(node.dataset.qty) } });
+        await api('/api/receipts', { method: 'POST', body: { month: monthNow(), borrowId: Number(node.dataset.replace), qty: Number(node.dataset.qty) } });
         toast('ซื้อทดแทนแล้ว');
         await load();
       }, 'ซื้อทดแทน');
@@ -275,19 +287,13 @@ async function renderEdit(target) {
   };
   const loadList = async () => {
     if (!alive()) return;
+    $('edit-q').placeholder = 'ผู้เบิก รายการ หรือเลขที่';
     const term = $('edit-q').value.trim().toLowerCase();
-    const mine = await api('/api/requisitions?scope=mine');
-    if (!alive()) return;
-    let rows = mine.requisitions;
-    if (admin) {
-      const queue = await api('/api/requisitions?scope=queue');
-      const seen = new Set(rows.map((row) => row.id));
-      rows = rows.concat(queue.requisitions.filter((row) => !seen.has(row.id)));
-    }
+    const data = await api(`/api/issues?year=${encodeURIComponent(txYear)}`);
     if (!alive() || !$('edit-actions')) return;
-    rows.sort((a, b) => Number(b.id) - Number(a.id));
-    rows = rows.filter((row) => !term || `${row.id} ${row.requested_by} ${row.costcenter} ${row.costcenterName} ${STATUS[row.status] || ''}`.toLowerCase().includes(term));
-    rows = listQuery(rows, head, (row, key) => (key === 'status' ? STATUS[row.status] || row.status : key === 'costcenter' ? (row.costcenter === '-' ? '' : `${row.costcenter} ${row.costcenterName || ''}`) : row[key]));
+    let rows = data.rows || [];
+    rows = rows.filter((row) => !term || `${row.requisitionId} ${row.requestedBy} ${row.requesterName} ${row.costcenter} ${row.costcenterName} ${row.material} ${row.materialDescription} ${STATUS[row.status] || ''}`.toLowerCase().includes(term));
+    rows = listQuery(rows, head, (row, key) => (key === 'status' ? STATUS[row.status] || row.status : key === 'at' ? row.at : key === 'qty' ? row.qty : row[key]));
     const page = pageOf(rows);
     $('edit-actions').innerHTML = canWrite ? [
       button('edit-withdraw', 'เบิก', 'primary'),
@@ -296,7 +302,7 @@ async function renderEdit(target) {
       admin ? button('edit-prepare', 'จัดเตรียม', 'secondary', 'disabled') + button('edit-issue', 'จ่าย', 'secondary', 'disabled') : '',
       button('edit-receive', 'รับ', 'primary', 'disabled')
     ].join('') : '';
-    fillTable('edit-rows', [{ label: 'เลขที่', key: 'id' }, { label: 'ผู้เบิก', key: 'requested_by' }, { label: 'costcenter', key: 'costcenter' }, { label: 'สถานะ', key: 'status' }], page.map((row) => `<tr data-pick="${esc(row.id)}" data-status="${esc(row.status)}" data-own="${row.requested_by === me.employeeId ? '1' : '0'}"><td>#${row.id}</td><td>${esc(row.requested_by)}</td><td>${row.sources?.length > 1 ? esc(row.sources.join(', ')) : row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)} · ${esc(row.costcenterName)}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ไม่มีใบเบิก', columnHead());
+    fillTable('edit-rows', [{ label: 'วันเวลา', key: 'at' }, { label: 'เลขที่', key: 'requisitionId' }, { label: 'ผู้เบิก', key: 'requestedBy' }, { label: 'รายการ', key: 'materialDescription' }, { label: 'จำนวน', key: 'qty' }, { label: 'costcenter', key: 'costcenter' }, { label: 'สถานะ', key: 'status' }], page.map((row) => `<tr data-pick="${esc(row.requisitionId)}" data-status="${esc(row.status)}" data-own="${row.requestedBy === me.employeeId ? '1' : '0'}"><td>${esc(whenText(row.at))}</td><td>#${row.requisitionId}</td><td>${esc(row.requestedBy)}${row.requesterName ? `<div class="sum-meta">${esc(row.requesterName)}</div>` : ''}</td><td>${esc(row.materialDescription || row.material)}<div class="sum-meta">${esc(row.material)}</div></td><td>${qtyText(row.qty)} ${esc(row.bun)}</td><td>${row.costcenter === '-' ? 'ยังไม่เลือก' : `${esc(row.costcenter)}${row.costcenterName ? ` · ${esc(row.costcenterName)}` : ''}`}</td><td>${badge(row.status)}</td></tr>`).join(''), 'ปีนี้ยังไม่มีประวัติเบิก', columnHead());
     setFoot(page.length, rows.length);
     if (!canWrite) return;
     bindRowSelect($('edit-rows'), (_id, row) => {
@@ -416,6 +422,8 @@ async function renderEdit(target) {
   });
   $('edit-search').onclick = () => { state.offset = 0; load().catch(onErr); };
   onEnter('edit-q', () => { state.offset = 0; load().catch(onErr); });
+  if ($('edit-year')) $('edit-year').onchange = () => { txYear = Number($('edit-year').value); state.offset = 0; load().catch(onErr); };
+  if ($('edit-month')) $('edit-month').onchange = () => { txMonth = $('edit-month').value; state.offset = 0; load().catch(onErr); };
   if ($('edit-group')) $('edit-group').onchange = () => { state.group = $('edit-group').value; state.offset = 0; load().catch(onErr); };
   $('edit-prev').onclick = () => { state.offset = Math.max(0, state.offset - PAGE); load().catch(onErr); };
   $('edit-next').onclick = () => { state.offset += PAGE; load().catch(onErr); };
@@ -519,7 +527,7 @@ async function openReservePopup(onDone) {
 }
 
 async function openLedgerPopup(kind, onDone) {
-  const month = $('edit-month')?.value || monthNow();
+  const month = monthNow();
   const data = await api(`/api/ledger?month=${encodeURIComponent(month)}`);
   if (kind === 'receipt' && !data.centers.length) return toast('ยังไม่มี costcenter ในหน่วยงาน', 'error');
   if (kind === 'borrow' && !data.lenders.length) return toast('ไม่มีหน่วยงานอื่นให้ยืม', 'error');

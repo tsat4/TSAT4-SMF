@@ -18,8 +18,14 @@ function monthBounds(month) {
   };
 }
 
-function stamp(month) {
-  return new Date(`${month}-15T12:00:00+07:00`).toISOString();
+export function yearBounds(year) {
+  const n = Number(year);
+  const y = Number.isInteger(n) && n >= 2000 && n <= 2100 ? n : Number(currentMonth().slice(0, 4));
+  return {
+    year: y,
+    start: new Date(`${y}-01-01T00:00:00+07:00`).toISOString(),
+    end: new Date(`${y + 1}-01-01T00:00:00+07:00`).toISOString()
+  };
 }
 
 function round(value) {
@@ -182,6 +188,57 @@ export function mountLedger(app, mod) {
     });
   }));
 
+  app.get('/api/receipts', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+    const { start, end } = yearBounds(req.query.year);
+    const [centerRows, receipts, borrows] = await Promise.all([
+      centers(),
+      mx.from('tx_sto_receipt').select('*').gte('received_at', start).lt('received_at', end).order('received_at', { ascending: false }).limit(500),
+      mx.from('tx_sto_borrow').select('*').gte('borrowed_at', start).lt('borrowed_at', end).order('borrowed_at', { ascending: false }).limit(500)
+    ]);
+    for (const result of [receipts, borrows]) if (result.error) return fail(res, 400, 'อ่านประวัติรับเข้าไม่ได้');
+    const dept = new Map(centerRows.map((row) => [row.costcenter, row]));
+    const names = await materialNames([
+      ...(receipts.data || []).map((row) => row.material),
+      ...(borrows.data || []).map((row) => row.material)
+    ]);
+    const describe = (material) => names.get(material) || {};
+    const events = [
+      ...(receipts.data || []).map((row) => ({
+        id: `r${row.id}`,
+        at: row.received_at,
+        kind: row.kind,
+        costcenter: row.costcenter,
+        department: dept.get(row.costcenter)?.department || '',
+        material: row.material,
+        materialDescription: describe(row.material).material_description || '',
+        bun: describe(row.material).bun || '',
+        qty: Number(row.qty),
+        by: row.received_by,
+        borrowId: row.borrow_id,
+        status: row.kind === 'replacement' ? 'ซื้อทดแทนแล้ว' : 'รับเข้า',
+        open: false
+      })),
+      ...(borrows.data || []).map((row) => ({
+        id: `b${row.id}`,
+        at: row.borrowed_at,
+        kind: 'borrow',
+        costcenter: row.borrower_costcenter,
+        department: dept.get(row.borrower_costcenter)?.department || '',
+        lenderCostcenter: row.lender_costcenter,
+        lenderDepartment: dept.get(row.lender_costcenter)?.department || '',
+        material: row.material,
+        materialDescription: describe(row.material).material_description || '',
+        bun: describe(row.material).bun || '',
+        qty: Number(row.qty),
+        by: row.borrowed_by,
+        borrowId: row.id,
+        status: row.status === 'open' ? 'ยืม' : 'ปิดแล้ว',
+        open: row.status === 'open'
+      }))
+    ].sort((a, b) => new Date(b.at) - new Date(a.at));
+    res.json({ events });
+  }));
+
   app.post('/api/receipts', wrap(requireUser), atLeast(mod, 2), wrap(async (req, res) => {
     try {
       const month = monthOf(req.body?.month);
@@ -199,7 +256,7 @@ export function mountLedger(app, mod) {
         await moveStock(lender.costcenter, borrow.data.material, qty);
         const inserted = await mx.from('tx_sto_receipt').insert({
           costcenter: lender.costcenter, material: borrow.data.material, qty, kind: 'replacement',
-          borrow_id: borrow.data.id, received_at: stamp(month), received_by: req.user.employeeId
+          borrow_id: borrow.data.id, received_at: new Date().toISOString(), received_by: req.user.employeeId
         }).select('id');
         if (inserted.error || !inserted.data?.length) {
           await moveStock(lender.costcenter, borrow.data.material, -qty);
@@ -216,7 +273,7 @@ export function mountLedger(app, mod) {
       await moveStock(center.costcenter, material, qty);
       const inserted = await mx.from('tx_sto_receipt').insert({
         costcenter: center.costcenter, material, qty, kind: 'purchase',
-        received_at: stamp(month), received_by: req.user.employeeId
+        received_at: new Date().toISOString(), received_by: req.user.employeeId
       }).select('id');
       if (inserted.error || !inserted.data?.length) {
         await moveStock(center.costcenter, material, -qty);
@@ -248,7 +305,7 @@ export function mountLedger(app, mod) {
       await moveStock(lender.costcenter, material, -qty);
       const inserted = await mx.from('tx_sto_borrow').insert({
         borrower_costcenter: borrower.costcenter, lender_costcenter: lender.costcenter,
-        material, qty, status: 'open', borrowed_at: stamp(month), borrowed_by: req.user.employeeId
+        material, qty, status: 'open', borrowed_at: new Date().toISOString(), borrowed_by: req.user.employeeId
       }).select('id');
       if (inserted.error || !inserted.data?.length) {
         await moveStock(lender.costcenter, material, qty);

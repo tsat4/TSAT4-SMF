@@ -3,7 +3,7 @@ import { fail, wrap, qtyOf, cleanTerm, listFilters } from '../../core/http.js';
 import { atLeast, rankIn } from '../../core/access.js';
 import { nameOf, requireUser } from '../../core/users.js';
 import { centersForDepartments, costcenterMap, ownCenter } from '../../core/master.js';
-import { assertEntitlement } from './ledger.js';
+import { assertEntitlement, yearBounds } from './ledger.js';
 
 const DRAFT_COSTCENTER = '-';
 
@@ -173,6 +173,58 @@ export function mountRequisitions(app, mod) {
     if (error) return fail(res, 400, 'อ่านใบเบิกไม่ได้');
     const rows = await decorate(data || []);
     res.json({ requisitions: rows });
+  }));
+
+  app.get('/api/issues', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+    const { start, end } = yearBounds(req.query.year);
+    const issued = await mx.from('tx_sto_issue').select('*').gte('issued_at', start).lt('issued_at', end).order('issued_at', { ascending: false }).limit(500);
+    if (issued.error) return fail(res, 400, 'อ่านประวัติเบิกไม่ได้');
+    let openQuery = mx.from('tx_sto_requisition').select('*')
+      .in('status', ['submitted', 'accepted', 'preparing', 'ready'])
+      .gte('created_at', start).lt('created_at', end).order('created_at', { ascending: false }).limit(200);
+    if (!isAdmin(req)) openQuery = openQuery.eq('requested_by', req.user.employeeId);
+    const open = await openQuery;
+    if (open.error) return fail(res, 400, 'อ่านใบเบิกไม่ได้');
+    const cart = await mx.from('tx_sto_requisition').select('*').eq('requested_by', req.user.employeeId).eq('status', 'cart')
+      .gte('created_at', start).lt('created_at', end);
+    if (cart.error) return fail(res, 400, 'อ่านตะกร้าไม่ได้');
+    const openHeaders = [...(open.data || []), ...(cart.data || [])];
+    const headerIds = [...new Set((issued.data || []).map((row) => row.requisition_id))];
+    const issuedHeaders = headerIds.length
+      ? await mx.from('tx_sto_requisition').select('*').in('id', headerIds)
+      : { data: [], error: null };
+    if (issuedHeaders.error) return fail(res, 400, 'อ่านใบเบิกไม่ได้');
+    const headerMap = new Map([...(issuedHeaders.data || []), ...openHeaders].map((row) => [row.id, row]));
+    const openIds = openHeaders.map((row) => row.id);
+    const openLines = openIds.length
+      ? await mx.from('tx_sto_requisition_line').select('*').in('requisition_id', openIds)
+      : { data: [], error: null };
+    if (openLines.error) return fail(res, 400, 'อ่านรายการไม่ได้');
+    const issueRows = isAdmin(req)
+      ? (issued.data || [])
+      : (issued.data || []).filter((row) => headerMap.get(row.requisition_id)?.requested_by === req.user.employeeId);
+    const materials = await materialMap([...issueRows.map((row) => row.material), ...(openLines.data || []).map((row) => row.material)]);
+    const centers = await costcenterMap([...issueRows.map((row) => row.costcenter), ...(openLines.data || []).map((row) => row.costcenter)]);
+    const people = await requesterNames([...[...headerMap.values()].map((row) => row.requested_by)]);
+    const of = (header, line, at, status) => ({
+      at,
+      requisitionId: header?.id || line.requisition_id,
+      requestedBy: header?.requested_by || '',
+      requesterName: people.get(header?.requested_by) || '',
+      material: line.material,
+      materialDescription: materials.get(line.material)?.material_description || '',
+      bun: materials.get(line.material)?.bun || '',
+      qty: Number(line.qty),
+      costcenter: line.costcenter,
+      costcenterName: centers.get(line.costcenter)?.object_name || '',
+      department: centers.get(line.costcenter)?.department || '',
+      status
+    });
+    const rows = [
+      ...issueRows.map((row) => of(headerMap.get(row.requisition_id), row, row.issued_at, headerMap.get(row.requisition_id)?.status || 'received')),
+      ...(openLines.data || []).map((line) => of(headerMap.get(line.requisition_id), line, headerMap.get(line.requisition_id)?.created_at, headerMap.get(line.requisition_id)?.status || 'cart'))
+    ].sort((a, b) => new Date(b.at) - new Date(a.at) || b.requisitionId - a.requisitionId);
+    res.json({ rows });
   }));
 
   app.get('/api/requisitions/:id', wrap(requireUser), wrap(async (req, res) => {

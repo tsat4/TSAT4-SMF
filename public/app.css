@@ -130,7 +130,7 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px}
 .toolbar .field{width:152px;flex:0 0 152px;max-width:100%}
 .toolbar .field.grow{flex:1 1 220px;min-width:180px;max-width:280px;width:auto}
-.action-bar{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-left:auto;flex:0 0 auto}
+.action-bar{display:flex;gap:8px;align-items:flex-end;justify-content:flex-end;margin-left:auto;flex:0 0 auto;align-self:flex-end}
 .hold-btn{position:relative;overflow:hidden;min-width:168px;touch-action:none;user-select:none}
 .hold-btn .hold-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,255,255,.42);pointer-events:none}
 html[data-theme="dark"] .hold-btn .hold-fill{background:rgba(232,160,32,.4)}
@@ -426,7 +426,8 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .page-bar .search-slot{flex:0 1 200px;min-width:150px;width:auto}
 .page-bar .search-slot .btn{padding:0 8px}
 .page-bar .search-slot .field{max-width:none}
-.page-bar .action-bar{margin-left:0}
+.page-bar .action-bar{margin-left:0;align-items:flex-end;align-self:flex-end}
+.page-bar .action-bar .btn,.page-bar-right > .btn,.toolbar .action-bar .btn{align-self:flex-end}
 .page-bar .seg,.page-bar .a5-year,.page-bar .btn{flex:0 0 auto;white-space:nowrap}
 @media(min-width:1280px){
   /* tabs never shrink under the tools: when both do not fit, the tools wrap to the next line (right aligned) */
