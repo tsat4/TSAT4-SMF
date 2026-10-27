@@ -147,14 +147,21 @@ function headFor(head, reload) {
   return { ...head, onChange: (next) => { Object.assign(head, next); reload(); } };
 }
 
-// ---------- Charts: one look for every dashboard (CFO style, cool green) ----------
-// Marks: solid edge + the same colour inside 60% transparent (AGENTS.md "หน้าจอ"). CSS: .ch-* in app.css.
+// ---------- Charts: one look for every dashboard (CFO layout) ----------
+// Tone by section: ระบบงาน warm (orange), ระบบกิจกรรม and the rest cool (green). Marks: solid edge + the same colour
+// inside 60% transparent (AGENTS.md "หน้าจอ"). CSS: .ch-* in app.css.
+const CHART_THEMES = {
+  cool: { series: ['#0f766e', '#14b8a6', '#5eead4', '#0891b2', '#67e8f9', '#16a34a', '#86efac', '#64748b'], base: ['#334155', '#64748b', '#94a3b8'], line: '#0891b2', dark: '#1e293b', target: '#16a34a' },
+  warm: { series: ['#c2410c', '#f97316', '#fdba74', '#ea580c', '#fed7aa', '#b45309', '#fbbf24', '#78716c'], base: ['#44403c', '#78716c', '#a8a29e'], line: '#ea580c', dark: '#292524', target: '#b45309' }
+};
+// Read at render time, so the colours follow the page being drawn (openView sets body[data-zone]).
 const CHART = {
-  series: ['#0f766e', '#14b8a6', '#5eead4', '#0891b2', '#67e8f9', '#16a34a', '#86efac', '#64748b'],
-  base: ['#334155', '#64748b', '#94a3b8'],
-  line: '#0891b2',
-  dark: '#1e293b',
-  target: '#16a34a'
+  get theme() { return CHART_THEMES[document.body.dataset.zone === 'work' ? 'warm' : 'cool']; },
+  get series() { return CHART.theme.series; },
+  get base() { return CHART.theme.base; },
+  get line() { return CHART.theme.line; },
+  get dark() { return CHART.theme.dark; },
+  get target() { return CHART.theme.target; }
 };
 
 function chartNum(value, digits = 3) {
@@ -176,15 +183,22 @@ function chartPill(now, was, suffix = '', upGood = false) {
   return `<span class="ch-pill ${good ? 'is-good' : 'is-bad'}">${pct > 0 ? 'เพิ่มขึ้น' : 'ลดลง'} ${Math.abs(pct)}%${suffix}</span>`;
 }
 
-// KPI card: label, big value (+ unit, pill), note. pie = 0–100 share drawn in color; icon = Material Symbol name.
-function chartKpi({ label, value, unit = '', pill = '', note = '', color = CHART.series[0], pie = null, icon = '' }) {
-  const lead = pie != null ? `<span class="ch-pie" style="--p:${Math.max(0, Math.min(100, pie))}%"></span>` : icon ? `<span class="ch-icon material-symbols-rounded">${icon}</span>` : '';
-  return `<article class="ch-kpi" style="--c:${color}">${lead}<div><div class="ch-kpi-label">${label}</div>
-    <div class="ch-kpi-row"><strong>${value}</strong>${unit ? `<small>${unit}</small>` : ''}${pill}</div>${note ? `<div class="ch-kpi-note">${note}</div>` : ''}</div></article>`;
+// KPI card, same frame everywhere: [pie or icon] label / value + unit / pill + note.
+// pie = 0–100 share drawn in color; otherwise icon (Material Symbol name, default insights).
+function chartKpi({ label, value, unit = '', pill = '', note = '', color = CHART.series[0], pie = null, icon = 'insights' }) {
+  const lead = pie != null ? `<span class="ch-pie" style="--p:${Math.max(0, Math.min(100, pie))}%"></span>` : `<span class="ch-icon material-symbols-rounded">${icon}</span>`;
+  return `<article class="ch-kpi" style="--c:${color}">${lead}<div class="ch-kpi-body"><div class="ch-kpi-label">${label}</div>
+    <div class="ch-kpi-value"><strong>${value}</strong>${unit ? `<small>${unit}</small>` : ''}</div><div class="ch-kpi-foot">${pill}${note ? `<span>${note}</span>` : ''}</div></div></article>`;
+}
+
+// Chart card frame: title (left), optional small text (right), then the chart.
+function chartCard(title, body, meta = '') {
+  return `<section class="card ch-card"><div class="ch-head"><div class="card-title">${title}</div>${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>${body}</section>`;
 }
 
 // Monthly (or any labelled) chart: bars on the left axis — each series one bar per label, a value or a stack
-// [v1, v2, …] coloured by `colors` — and lines on the left or right axis, gridlines, axis titles and a legend.
+// [v1, v2, …] coloured by `colors` — and lines on the left or right axis, gridlines, and a legend.
+// Axis titles sit above their axis (left / right), so the plot keeps the full width.
 // legend: { line: color, dash, label } | { box: color, label } | { head: text }. Hover tip: chartTip(id, (i) => html).
 function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', legend = [], leftMax = 0, digits = 0 }) {
   const n = labels.length;
@@ -209,7 +223,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
   const dots = (l) => (l.dots === false ? '' : l.values.map((v, i) => (v == null ? '' : `<i class="ch-pt" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}"></i>`)).join(''));
   const key = (item) => (item.head ? `<b>${esc(item.head)}</b>` : item.line ? `<span><i class="ln${item.dash ? ' is-dash' : ''}" style="--c:${item.line}"></i>${esc(item.label)}</span>` : `<span><i class="sq" style="--c:${item.box}"></i>${esc(item.label)}</span>`);
   return `<div class="ch-plot${yR ? ' has-right' : ''}">
-      <div class="ch-ytitle">${esc(left)}</div>
+      <div class="ch-titles"><span>${esc(left)}</span>${yR ? `<span>${esc(right)}</span>` : ''}</div>
       <div class="ch-yaxis">${ticks(yL)}</div>
       <div class="ch-area" id="${id}">
         ${[0, 1, 2, 3, 4].map((k) => `<i class="ch-grid" style="bottom:${k * 25}%"></i>`).join('')}
@@ -218,7 +232,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
         ${lines.map(dots).join('')}
         <div class="ch-tip" hidden></div>
       </div>
-      ${yR ? `<div class="ch-yaxis is-right">${ticks(yR)}</div><div class="ch-ytitle is-right">${esc(right)}</div>` : ''}
+      ${yR ? `<div class="ch-yaxis is-right">${ticks(yR)}</div>` : ''}
       <div class="ch-xaxis" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${labels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
     </div>
     ${legend.length ? `<div class="ch-legend">${legend.map(key).join('')}</div>` : ''}`;

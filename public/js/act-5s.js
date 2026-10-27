@@ -97,13 +97,10 @@ async function a5DrawSummary(body, activity) {
       ${field('ประเภทพื้นที่', `<select id="a5-atype">${options(['', ...A5_AREA_TYPES], a5Summary.areaType, (v) => v || 'ทั้งหมด')}</select>`)}
       ${field('พื้นที่', `<select id="a5-area"><option value="">ทั้งหมด</option>${areas.map((a) => `<option value="${a.id}"${String(a.id) === String(a5Summary.area) ? ' selected' : ''}>${esc(a.code)} ${esc(a.name)}</option>`).join('')}</select>`, 'grow')}
     </div>
-    <div class="ch-kpis">${(data.groups.length ? data.groups : [1, 2, 3, 4, 5].map((n) => ({ group: n, percent: 0 }))).map((g, i) => chartKpi({ label: `${esc(a5GroupName(activity, g.group))} · เฉลี่ยทั้งปี`, value: `${g.percent}%`, pie: g.percent, color: CHART.series[i % CHART.series.length], note: g.percent >= pass ? 'ผ่านเกณฑ์' : g.percent ? `ต่ำกว่าเกณฑ์ ${pass}%` : '' })).join('')}</div>
-    <section class="card ch-card">
-      <div class="ch-head"><div class="card-title">${esc(actLabel(activity))} Score % รายเดือน</div><div class="sum-meta">${data.owner ? `เจ้าของพื้นที่: ${esc(data.owner.name || data.owner.employeeId)} · ` : ''}${data.audits} ใบตรวจ</div></div>
-      ${chartPlot({ id: 'a5-plot', labels: ACT_MONTHS_SHORT, left: 'Score (%)', leftMax: 100, bars: [{ values: months.map((m) => m.percent), colors: [CHART.series[0]] }],
+    <div class="ch-kpis">${(data.groups.length ? data.groups : [1, 2, 3, 4, 5].map((n) => ({ group: n, percent: 0 }))).map((g, i) => chartKpi({ label: `${esc(a5GroupName(activity, g.group))} · เฉลี่ยทั้งปี`, value: g.percent, unit: '%', pie: g.percent, color: CHART.series[i % CHART.series.length], note: g.percent >= pass ? 'ผ่านเกณฑ์' : g.percent ? `ต่ำกว่าเกณฑ์ ${pass}%` : '' })).join('')}</div>
+    ${chartCard(`${esc(actLabel(activity))} Score % รายเดือน`, `${chartPlot({ id: 'a5-plot', labels: ACT_MONTHS_SHORT, left: 'Score (%)', leftMax: 100, bars: [{ values: months.map((m) => m.percent), colors: [CHART.series[0]] }],
         lines: [{ values: months.map(() => pass), color: CHART.target, dash: true, dots: false }],
-        legend: [{ box: CHART.series[0], label: `${actLabel(activity)} % เฉลี่ยของเดือน` }, { line: CHART.target, dash: true, label: `เกณฑ์ผ่าน ${pass}%` }] })}
-    </section>
+        legend: [{ box: CHART.series[0], label: `${actLabel(activity)} % เฉลี่ยของเดือน` }, { line: CHART.target, dash: true, label: `เกณฑ์ผ่าน ${pass}%` }] })}`, `${data.owner ? `เจ้าของพื้นที่: ${esc(data.owner.name || data.owner.employeeId)} · ` : ''}${data.audits} ใบตรวจ`)}
     <div class="a5-two">
       <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th>${esc(actLabel(activity))} %</th><th>ครั้ง</th></tr></thead><tbody>${months.slice(0, 6).map(row).join('')}</tbody></table></div>
       <div class="table-wrap"><table class="mo-data-table"><thead><tr><th>เดือน</th><th>${esc(actLabel(activity))} %</th><th>ครั้ง</th></tr></thead><tbody>${months.slice(6).map(row).join('')}</tbody></table></div>

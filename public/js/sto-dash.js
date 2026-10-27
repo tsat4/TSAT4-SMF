@@ -1,6 +1,5 @@
 // Store > Usage dashboard. The sidebar has one Dashboard button. The pages are buttons inside that page.
-// Charts use the shared look (core.js chartPlot / chartKpi / CHART palette).
-const STO_DASH_COLORS = CHART.series;
+// Charts use the shared look (core.js chartPlot / chartKpi / chartCard; CHART colours: warm tone in ระบบงาน).
 let stoDashYear = new Date().getFullYear();
 let stoDashPage = 'overview';
 
@@ -17,8 +16,8 @@ function stoDashDelta(current, previous) {
   return `<span class="sto-delta ${up ? 'is-up' : 'is-down'}">${up ? '↑' : '↓'} ${stoDashNum(Math.abs(pct), 1)}% เทียบเดือนที่แล้ว</span>`;
 }
 
-function stoDashKpi(icon, label, value, extra = '') {
-  return chartKpi({ icon, label, value, note: extra });
+function stoDashKpi(icon, label, value, unit, extra = '') {
+  return chartKpi({ icon, label, value, unit, note: extra });
 }
 
 // Monthly quantity issued: a line on the shared chart (hover a month for its numbers).
@@ -29,7 +28,7 @@ function stoDashLine(months) {
 }
 
 function stoDashDonut(slices) {
-  const colors = STO_DASH_COLORS;
+  const colors = CHART.series;
   let cursor = 0;
   const stops = slices.map((slice, index) => {
     const start = cursor;
@@ -62,43 +61,33 @@ function stoDashMonthTable(months) {
 function stoDashOverview(data) {
   const k = data.kpis;
   return `<div class="ch-kpis">
-      ${stoDashKpi('inventory_2', 'รายการใช้งาน', stoDashNum(k.items), `<span class="sto-delta">${stoDashNum(k.groups)} ${esc(data.groupBy)}</span>`)}
-      ${stoDashKpi('output', 'จ่ายออกปีนี้', stoDashNum(k.outQty, 2), stoDashDelta(k.outQtyNow, k.outQtyPrev))}
-      ${stoDashKpi('payments', 'มูลค่าจ่ายออก', stoDashNum(k.outValue, 2), stoDashDelta(k.outValueNow, k.outValuePrev))}
-      ${stoDashKpi('input', 'รับเข้าปีนี้', stoDashNum(k.inQty, 2), '<span class="sto-delta">ยังไม่มีตารางรับเข้า</span>')}
-      ${stoDashKpi('account_balance', 'มูลค่าคงเหลือ', stoDashNum(k.stockValue, 2), `<span class="sto-delta">คงเหลือ ${stoDashNum(k.stockQty, 2)}</span>`)}
+      ${stoDashKpi('inventory_2', 'รายการใช้งาน', stoDashNum(k.items), 'รายการ', `<span class="sto-delta">${stoDashNum(k.groups)} ${esc(data.groupBy)}</span>`)}
+      ${stoDashKpi('output', 'จ่ายออกปีนี้', stoDashNum(k.outQty, 2), 'หน่วย', stoDashDelta(k.outQtyNow, k.outQtyPrev))}
+      ${stoDashKpi('payments', 'มูลค่าจ่ายออก', stoDashNum(k.outValue, 2), 'บาท', stoDashDelta(k.outValueNow, k.outValuePrev))}
+      ${stoDashKpi('input', 'รับเข้าปีนี้', stoDashNum(k.inQty, 2), 'หน่วย', '<span class="sto-delta">ยังไม่มีตารางรับเข้า</span>')}
+      ${stoDashKpi('account_balance', 'มูลค่าคงเหลือ', stoDashNum(k.stockValue, 2), 'บาท', `<span class="sto-delta">คงเหลือ ${stoDashNum(k.stockQty, 2)} หน่วย</span>`)}
     </div>
     <div class="sto-split">
-      <section class="card"><div class="card-title">จ่ายออกรายเดือน</div><p class="sum-meta">จำนวนที่จ่ายออกในปี ${data.year}</p>${stoDashLine(data.months)}</section>
-      <section class="card"><div class="card-title">สัดส่วนตาม${esc(data.groupBy)}</div><p class="sum-meta">${esc(data.donut)}</p>${stoDashDonut(data.slices)}</section>
+      ${chartCard('จ่ายออกรายเดือน', stoDashLine(data.months), `ปี ${data.year}`)}
+      ${chartCard(`สัดส่วนตาม${esc(data.groupBy)}`, stoDashDonut(data.slices), esc(data.donut))}
     </div>`;
 }
 
 function stoDashFlow(data) {
   const k = data.kpis;
   return `<div class="ch-kpis">
-      ${stoDashKpi('input', 'รับเข้า', stoDashNum(k.inQty, 2), '<span class="sto-delta">ยังไม่มีรายการรับเข้า</span>')}
-      ${stoDashKpi('output', 'จ่ายออก', stoDashNum(k.outQty, 2), stoDashDelta(k.outQtyNow, k.outQtyPrev))}
-      ${stoDashKpi('account_balance', 'คงเหลือ', stoDashNum(k.stockQty, 2), `<span class="sto-delta">มูลค่า ${stoDashNum(k.stockValue, 2)}</span>`)}
+      ${stoDashKpi('input', 'รับเข้า', stoDashNum(k.inQty, 2), 'หน่วย', '<span class="sto-delta">ยังไม่มีรายการรับเข้า</span>')}
+      ${stoDashKpi('output', 'จ่ายออก', stoDashNum(k.outQty, 2), 'หน่วย', stoDashDelta(k.outQtyNow, k.outQtyPrev))}
+      ${stoDashKpi('account_balance', 'คงเหลือ', stoDashNum(k.stockQty, 2), 'หน่วย', `<span class="sto-delta">มูลค่า ${stoDashNum(k.stockValue, 2)} บาท</span>`)}
     </div>
-    <section class="card sto-month-card">
-      <div class="card-title">รับเข้าและจ่ายออกรายเดือน</div>
-      <p class="sum-meta">ขอบเขต ${esc(data.scope)}</p>
-      ${stoDashBars(data.months)}
-      ${stoDashMonthTable(data.months)}
-    </section>`;
+    ${chartCard('รับเข้าและจ่ายออกรายเดือน', stoDashBars(data.months) + stoDashMonthTable(data.months), `ขอบเขต ${esc(data.scope)}`)}`;
 }
 
 function stoDashMonth(data) {
   const idleText = data.idleBasis === 'stock'
     ? 'ยอดคงเหลือที่ไม่มีการจ่ายออกในปีนี้'
     : 'ยังไม่มียอดคงเหลือ แสดง 10 รายการราคาสูงสุดที่ไม่มีการจ่ายออก';
-  return `<section class="card sto-month-card">
-      <div class="card-title">กราฟรายเดือน ${data.year}</div>
-      <p class="sum-meta">จำนวนจ่ายออก · ขอบเขต ${esc(data.scope)}</p>
-      ${stoDashLine(data.months)}
-      ${stoDashMonthTable(data.months)}
-    </section>
+  return `${chartCard(`กราฟรายเดือน ${data.year}`, stoDashLine(data.months) + stoDashMonthTable(data.months), `ขอบเขต ${esc(data.scope)}`)}
     <div class="sto-three">
       <section class="card"><div class="card-title">ใช้มากสุด 10 รายการ</div><p class="sum-meta">จำนวนจ่ายออก</p>${stoDashRanks(data.topQty, (row) => row.qty, 2)}</section>
       <section class="card"><div class="card-title">มูลค่าสูงสุด 10 รายการ</div><p class="sum-meta">จำนวนจ่ายออก × ราคา</p>${stoDashRanks(data.topValue, (row) => row.value, 2)}</section>
