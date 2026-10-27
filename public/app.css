@@ -333,8 +333,8 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 .sto-split{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:8px}
 .sto-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .sto-donut-wrap{display:flex;gap:12px;align-items:center}
-.sto-donut{width:132px;height:132px;border-radius:50%;position:relative;flex:0 0 auto}
-.sto-donut-hole{position:absolute;inset:32px;border-radius:50%;background:var(--mo-surface)}
+.sto-donut{width:150px;height:150px;flex:0 0 auto;overflow:visible}
+.sto-donut path{fill:color-mix(in srgb,var(--c) 40%,transparent);stroke:var(--c);stroke-width:1;stroke-linejoin:round}
 .sto-legend{list-style:none;margin:0;padding:0;min-width:0;flex:1}
 .sto-legend li{display:grid;grid-template-columns:10px minmax(0,1fr) auto auto;gap:6px;align-items:center;font-size:11.5px;padding:2px 0}
 .sto-legend i{width:10px;height:10px;border-radius:50%;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 40%,transparent)}

@@ -29,15 +29,20 @@ function stoDashLine(months) {
 
 function stoDashDonut(slices) {
   const colors = CHART.series;
+  // SVG ring, one path per slice: solid edge + the same colour inside 60% transparent.
+  const point = (pct, r) => { const a = (pct / 100) * 2 * Math.PI - Math.PI / 2; return `${(60 + r * Math.cos(a)).toFixed(2)} ${(60 + r * Math.sin(a)).toFixed(2)}`; };
+  const arc = (from, to, c) => {
+    const big = to - from > 50 ? 1 : 0;
+    return `<path d="M${point(from, 58)}A58 58 0 ${big} 1 ${point(to, 58)}L${point(to, 32)}A32 32 0 ${big} 0 ${point(from, 32)}Z" style="--c:${c}"/>`;
+  };
   let cursor = 0;
-  const stops = slices.map((slice, index) => {
+  const paths = slices.map((slice, index) => {
     const start = cursor;
     cursor += Number(slice.share) || 0;
-    return `color-mix(in srgb, ${colors[index % colors.length]} 40%, transparent) ${start}% ${cursor}%`;
-  }).join(', ');
-  const paint = slices.length ? stops : '#d4d4d8 0% 100%';
+    return cursor > start ? arc(start, Math.min(cursor, start + 99.99), colors[index % colors.length]) : '';
+  }).join('') || arc(0, 99.99, '#a1a1aa');
   const legend = slices.map((slice, index) => `<li><i style="--c:${colors[index % colors.length]}"></i><span>${esc(slice.name)}</span><b>${stoDashNum(slice.value, 2)}</b><em>${stoDashNum(slice.share, 1)}%</em></li>`).join('');
-  return `<div class="sto-donut-wrap"><div class="sto-donut" style="background:conic-gradient(${paint})"><div class="sto-donut-hole"></div></div><ul class="sto-legend">${legend || '<li>ไม่มีข้อมูล</li>'}</ul></div>`;
+  return `<div class="sto-donut-wrap"><svg class="sto-donut" viewBox="0 0 120 120" aria-hidden="true">${paths}</svg><ul class="sto-legend">${legend || '<li>ไม่มีข้อมูล</li>'}</ul></div>`;
 }
 
 // Received next to issued per month on the shared chart.
