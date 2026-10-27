@@ -539,9 +539,10 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-org-group{display:flex;flex-direction:column;gap:2px;margin-top:6px}
 .cfo-org-person{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--mo-line)}.cfo-org-person span{color:var(--mo-text-muted)}
 .cfo-report-page .ch-card{padding:10px 12px}.cfo-report-page .ch-head{margin-bottom:4px}.cfo-report-page .ch-plot{grid-template-rows:auto 130px auto}.cfo-report-page .ch-legend{margin-top:6px}
-.cfo-report table.mo-data-table thead th{height:auto;padding-top:4px;padding-bottom:4px;font-size:11.5px}.cfo-report td{padding-top:3px;padding-bottom:3px;font-size:12.5px}
+.cfo-report table.mo-data-table thead th{height:auto;padding:3px 6px;font-size:11px}.cfo-report td{height:22px;padding:0 6px;font-size:12px}
+.cfo-report-page .a5-two .ch-card{padding:8px 10px}.cfo-report-page .a5-two .card-title{font-size:13px}
 .cfo-report table{width:100%}.cfo-report th{white-space:normal;line-height:1.3;vertical-align:bottom}.cfo-report td:first-child{white-space:nowrap}.cfo-report td.sum-meta{white-space:nowrap;font-size:11px}
-.cfo-report .cfo-group td{background:var(--mo-surface-2);font-weight:600}.cfo-report .cfo-sub td:first-child{padding-left:24px}
+.cfo-report .cfo-group td{background:var(--mo-surface-2);font-weight:600}.cfo-report .cfo-sub td:first-child{padding-left:18px}
 .cfo-report .cfo-total td{background:color-mix(in srgb,var(--mo-text-muted) 14%,transparent);font-weight:600}
 #cfo-rows .cfo-group td,.cfo-scope-table .cfo-group td{background:var(--mo-surface-2);font-weight:600}
 .cfo-freq{display:inline-grid;place-items:center;width:20px;height:20px;border:1px solid var(--mo-border);border-radius:50%;font-size:10px;font-weight:500;color:var(--mo-text-muted);margin-left:4px}
