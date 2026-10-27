@@ -34,6 +34,19 @@ function qtyText(value) {
   return String(Math.round(amount * 1000) / 1000);
 }
 
+function monthNow() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+}
+
+function ledgerBadge(status) {
+  const kind = status === 'ใช้เกิน' ? 'badge-danger' : status === 'เหลือ' ? 'badge-success' : 'badge-primary';
+  return `<span class="badge ${kind}">${esc(status)}</span>`;
+}
+
+function centerOptions(rows) {
+  return rows.map((row) => `<option value="${esc(row.costcenter)}">${esc(row.costcenter)} · ${esc(row.objectName)} · ${esc(row.department)}</option>`).join('');
+}
+
 function badge(status) {
   const kind = status === 'ready' || status === 'received' ? 'badge-success' : status === 'cancelled' ? 'badge-danger' : status === 'cart' ? 'badge-warning' : 'badge-primary';
   return `<span class="badge ${kind}">${esc(STATUS[status] || status)}</span>`;
@@ -198,10 +211,30 @@ async function renderEdit(target) {
   };
   const loadReceive = async () => {
     if (!alive() || !$('edit-actions')) return;
-    $('edit-q').placeholder = 'เลขที่หรือรายการ';
-    $('edit-actions').innerHTML = '';
-    fillTable('edit-rows', ['เลขที่', 'รายการ', 'จำนวน', 'costcenter', 'สถานะ'], '', 'ยังไม่มีรายการรับเข้า');
-    setFoot(0, 0);
+    $('edit-q').placeholder = 'หน่วยงานหรือรายการ';
+    const month = $('edit-month')?.value || monthNow();
+    $('edit-actions').innerHTML = `<label class="field">เดือน<input id="edit-month" type="month" value="${esc(month)}"></label>${button('edit-receipt', 'รับเข้า', 'primary')}${button('edit-borrow', 'ยืม')}`;
+    $('edit-month').onchange = () => { state.offset = 0; load().catch(onErr); };
+    $('edit-receipt').onclick = () => openLedgerPopup('receipt', () => load()).catch(onErr);
+    $('edit-borrow').onclick = () => openLedgerPopup('borrow', () => load()).catch(onErr);
+    const data = await api(`/api/ledger?month=${encodeURIComponent($('edit-month').value)}`);
+    if (!alive() || !$('edit-rows')) return;
+    const term = $('edit-q').value.trim().toLowerCase();
+    const filtered = listQuery(data.rows.filter((row) => !term || [row.department, row.material, row.materialDescription].join(' ').toLowerCase().includes(term)), head, (row, key) => row[key]);
+    const page = pageOf(filtered);
+    const replaceOf = (row) => data.borrows
+      .filter((item) => item.material === row.material && item.borrowerDepartment === row.department && (admin || item.borrowerDepartment === me.department))
+      .map((item) => `<button class="tx-line-drop" type="button" data-replace="${esc(item.id)}" data-qty="${esc(item.qty)}" data-lender="${esc(item.lenderDepartment)}">ซื้อทดแทน</button>`)
+      .join('');
+    fillTable('edit-rows', [{ label: 'หน่วยงาน', key: 'department' }, { label: 'รายการ', key: 'materialDescription' }, { label: 'ซื้อ', key: 'bought' }, { label: 'เบิก', key: 'used' }, { label: 'ยืม', key: 'borrowed' }, { label: 'ให้ยืม', key: 'lent' }, { label: 'เหลือ', key: 'left' }, 'สถานะ'], page.map((row) => `<tr><td>${esc(row.department)}</td><td>${esc(row.materialDescription || row.material)}<div class="sum-meta">${esc(row.material)}</div></td><td>${qtyText(row.bought)} ${esc(row.bun)}</td><td>${qtyText(row.used)}</td><td>${qtyText(row.borrowed)}</td><td>${qtyText(row.lent)}</td><td>${qtyText(row.left)}</td><td>${ledgerBadge(row.status)} ${replaceOf(row)}</td></tr>`).join(''), 'เดือนนี้ยังไม่มีการซื้อเข้า', columnHead());
+    setFoot(page.length, filtered.length);
+    $('edit-rows').querySelectorAll('[data-replace]').forEach((node) => {
+      node.onclick = () => confirmPopup('ซื้อทดแทน', `ซื้อ ${esc(node.dataset.qty)} คืนให้ ${esc(node.dataset.lender)}`, async () => {
+        await api('/api/receipts', { method: 'POST', body: { month: $('edit-month').value, borrowId: Number(node.dataset.replace), qty: Number(node.dataset.qty) } });
+        toast('ซื้อทดแทนแล้ว');
+        await load();
+      }, 'ซื้อทดแทน');
+    });
   };
   const loadStock = async () => {
     if (!alive()) return;
@@ -378,6 +411,50 @@ async function putInCart(material, qty, costcenter) {
   let id = cartHeader?.id;
   if (!id) id = (await api('/api/requisitions', { method: 'POST', body: { costcenter } })).id;
   await api(`/api/requisitions/${id}/lines`, { method: 'POST', body: { material, qty, costcenter } });
+}
+
+async function openLedgerPopup(kind, onDone) {
+  const month = $('edit-month')?.value || monthNow();
+  const data = await api(`/api/ledger?month=${encodeURIComponent(month)}`);
+  if (kind === 'receipt' && !data.centers.length) return toast('ยังไม่มี costcenter ในหน่วยงาน', 'error');
+  if (kind === 'borrow' && !data.lenders.length) return toast('ไม่มีหน่วยงานอื่นให้ยืม', 'error');
+  let picked = null;
+  const fields = kind === 'borrow'
+    ? `${field('ผู้ยืม', `<select id="led-from">${centerOptions(data.centers)}</select>`)}${field('ผู้ให้ยืม', `<select id="led-to">${centerOptions(data.lenders)}</select>`)}`
+    : field('costcenter', `<select id="led-cc">${centerOptions(data.centers)}</select>`);
+  openPopup(kind === 'borrow' ? 'ยืม' : 'รับเข้า', [
+    fields,
+    searchBlock(searchSlot('รายการ', 'pick-q', 'pick-search', { placeholder: 'หมายเลขหรือชื่อ' }), 'pick-results'),
+    field('รายการที่เลือก', '<input id="pick-name" readonly>'),
+    field('จำนวน', '<input id="led-qty" type="number" min="0.001" step="0.001" value="1">')
+  ].join(''), async () => {
+    if (!picked) throw new Error('เลือกรายการ');
+    const qty = Number($('led-qty').value);
+    if (!(qty > 0)) throw new Error('ระบุจำนวน');
+    const body = { month, material: picked.material, qty };
+    if (kind === 'borrow') {
+      body.borrowerCostcenter = $('led-from').value;
+      body.lenderCostcenter = $('led-to').value;
+      await api('/api/borrows', { method: 'POST', body });
+      toast('บันทึกการยืมแล้ว');
+    } else {
+      body.costcenter = $('led-cc').value;
+      await api('/api/receipts', { method: 'POST', body });
+      toast('บันทึกรับเข้าแล้ว');
+    }
+    closePopup();
+    if (onDone) await onDone();
+  }, 'บันทึก');
+  const search = async () => {
+    const materials = (await api(`/api/materials?q=${encodeURIComponent($('pick-q').value.trim())}`)).materials || [];
+    fillTable('pick-results', ['รหัส', 'ชื่อ', 'หน่วย'], materials.map((row) => `<tr data-pick="${esc(row.material)}" data-name="${esc(row.material_description)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join(''), 'ไม่พบรายการ');
+    bindRowSelect($('pick-results'), (id, row) => {
+      picked = { material: id, name: row.dataset.name };
+      $('pick-name').value = row.dataset.name || id;
+    });
+  };
+  $('pick-search').onclick = () => search().catch(onErr);
+  onEnter('pick-q', () => search().catch(onErr));
 }
 
 async function openCartPopup(item, onDone) {

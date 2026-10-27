@@ -30,6 +30,7 @@ GET /api/act/:activity/team auth
 GET /api/act/calendar auth
 GET /api/employees auth sto:3
 GET /api/health
+GET /api/ledger auth sto:1
 GET /api/materials auth sto:1
 GET /api/me auth
 GET /api/pay-centers auth sto:1
@@ -67,9 +68,11 @@ POST /api/act/:activity/issues/:id/photo auth
 POST /api/act/:activity/tasks auth
 POST /api/act/:activity/team auth
 POST /api/act/:activity/team/copy auth
+POST /api/borrows auth sto:1
 POST /api/login
 POST /api/logout
 POST /api/password auth
+POST /api/receipts auth sto:1
 POST /api/requisitions auth sto:1
 POST /api/requisitions/:id/lines auth sto:1
 POST /api/requisitions/:id/status auth

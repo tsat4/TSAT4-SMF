@@ -105,6 +105,8 @@ scripts/
 | mt_sto_user | mx | สมาชิก Usage และ role |
 | mt_sto_usage | mx | รายการวัสดุ + รูป (storage bucket `usage-img`) |
 | mt_sto_stock | mx | ยอด min/current/max ต่อ costcenter และ material |
+| tx_sto_receipt | mx | รับเข้าเดือนนั้น เป็นสิทธิ์ซื้อของหน่วยงาน (purchase) หรือซื้อทดแทนใบยืม (replacement) |
+| tx_sto_borrow | mx | ใบยืมข้ามหน่วยงาน เปิดอยู่จนกว่าจะซื้อทดแทนเข้าคลังผู้ให้ยืม |
 | mt_sto_buyer | mx | costcenter ที่ซื้อได้ |
 | tx_sto_requisition / _line | tx | ใบเบิกและรายการในใบเบิก |
 | tx_sto_issue | tx | ประวัติการจ่าย |

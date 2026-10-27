@@ -3,6 +3,7 @@ import { fail, wrap, qtyOf, cleanTerm, listFilters } from '../../core/http.js';
 import { atLeast, rankIn } from '../../core/access.js';
 import { nameOf, requireUser } from '../../core/users.js';
 import { centersForDepartments, costcenterMap, ownCenter } from '../../core/master.js';
+import { assertEntitlement } from './ledger.js';
 
 const DRAFT_COSTCENTER = '-';
 
@@ -77,6 +78,9 @@ async function move(id, from, patch) {
 // tx_sto_receive (db/03_receive_rpc.sql, Mx Data) cuts all stock and marks the requisition received
 // in one transaction.
 async function receive(header) {
+  const { data: lines, error: lineError } = await mx.from('tx_sto_requisition_line').select('costcenter,material,qty').eq('requisition_id', header.id);
+  if (lineError) throw new Error('เปลี่ยนสถานะไม่ได้');
+  await assertEntitlement(lines || []);
   const { error } = await mx.rpc('tx_sto_receive', { p_id: header.id, p_employee: header.requested_by });
   if (!error) return;
   const text = error.message || '';
