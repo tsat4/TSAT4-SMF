@@ -46,8 +46,9 @@ async function cfoDashboard(target) {
   if (cfoDashTab === 'scope') return cfoDrawProgress(body);
   if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
   if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
-  document.querySelector('.a5-year').insertAdjacentHTML('beforebegin', field('หน้า', `<select id="cfo-d-page">${options(['1', '2'], cfoDash.page, (v) => (v === '1' ? 'หน้า 1 · รายเดือน' : 'หน้า 2 · ตาม Scope'))}</select>`));
+  document.querySelector('.a5-year').insertAdjacentHTML('beforebegin', field('หน้า', `<select id="cfo-d-page">${options(['1', '2', '3'], cfoDash.page, (v) => (v === '3' ? 'หน้า 3 · ตามก๊าซ' : v === '2' ? 'หน้า 2 · ตาม Scope' : 'หน้า 1 · รายเดือน'))}</select>`));
   $('cfo-d-page').onchange = () => { cfoDash.page = $('cfo-d-page').value; rerender(); };
+  if (cfoDash.page === '3') return cfoDrawGases(body);
   return cfoDash.page === '2' ? cfoDrawReport(body) : cfoDrawSummary(body);
 }
 
@@ -101,6 +102,11 @@ async function cfoDrawSummary(body) {
       ${d.scopes.map((x, i) => chartKpi({ label: `Scope ${x.scope}`, value: cfoT(x.tco2e), unit: 'tCO₂e', pill: chartPill(x.tco2e, c.scopes[i]), note: `${cfoPct(x.tco2e, d.total)} ของทั้งหมด`, color: CFO_SCOPE_COLORS[i], pie: d.total ? (x.tco2e / d.total) * 100 : 0 })).join('')}
     </div>
     ${chartCard(`Accumulation CO₂ Emission${pick ? ` · Scope ${pick}` : ''}`, chart)}
+    ${d.departments.length ? chartCard('เทียบตามหน่วยงาน', chartPlot({
+      id: 'cfo-dept', labels: d.departments.slice(0, 8).map((x) => x.label), left: 'tCO₂e', digits: 1,
+      bars: [{ values: d.departments.slice(0, 8).map((x) => x.tco2e), colors: [CFO_SCOPE_COLORS[1]] }],
+      legend: [{ box: CFO_SCOPE_COLORS[1], label: `ปี ${a5Year}` }]
+    })) : ''}
     <div class="table-wrap cfo-month-table"><table class="mo-data-table"><thead><tr><th>เดือน</th>${hasBase ? `<th class="num">${esc(baseName)}</th>` : ''}<th class="num">ปี ${a5Year}</th>${hasBase ? '<th class="num">เป้า</th>' : ''}<th class="num">Scope 1</th><th class="num">Scope 2</th><th class="num">Scope 3</th></tr></thead>
       <tbody>${d.months.map((m) => `<tr><td>${ACT_MONTHS[m.month - 1]}</td>${hasBase ? `<td class="num">${cfoT(m.base)}</td>` : ''}<td class="num">${cfoT(m.total)}</td>${hasBase ? `<td class="num">${cfoT(m.target)}</td>` : ''}${m.scopes.map((x) => `<td class="num">${cfoT(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   a5Lift(body);
@@ -150,15 +156,43 @@ async function cfoDrawReport(body) {
     legend: [{ box: CFO_BASE_COLORS[1], label: years[0].title }, { box: CFO_SCOPE_COLORS[0], label: years[1].title }]
   });
   body.innerHTML = `
-    <div class="toolbar a5-filters">${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}</div>
+    <div class="toolbar a5-filters">${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}${button('cfo-export', 'ดาวน์โหลด Excel', 'secondary')}</div>
     <div class="cfo-report-page">${chartCard('เปรียบเทียบตาม Scope', chart, 'tCO₂e ทั้งปี')}
     <div class="a5-two">${years.map(table).join('')}</div></div>`;
   a5Lift(body);
   $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawReport(body).catch(onErr); };
+  $('cfo-export').onclick = () => cfoDownload(`cfo-summary-${a5Year}.csv`, [
+    ['ขอบเขต', 'ปี', 'tCO2e'],
+    ...d.categories.flatMap((g) => [[g.label, years[0].year, g.base], [g.label, years[1].year, g.tco2e]]),
+    ...(d.gases || []).map((g) => [g.scope ? `Scope ${g.scope}` : 'รวม', 'CO2', g.co2, 'CH4', g.ch4, 'N2O', g.n2o, 'F-gas', g.fgas])
+  ]);
   chartTip('cfo-cmp', (i) => `<strong>Scope ${i + 1}</strong>
     <div class="ch-tip-row"><span>${esc(years[0].title)}</span><b>${cfoT(was[i])} tCO₂e</b></div>
     <div class="ch-tip-row"><span>${esc(years[1].title)}</span><b>${cfoT(now[i])} tCO₂e</b></div>
     ${now[i] && was[i] ? chartPill(now[i], was[i], ` เทียบ${esc(years[0].title)}`) : ''}`);
+}
+
+// Dashboard > Summary หน้า 3: CO₂ / CH₄ / N₂O and fluorinated gases together. SF₆ and NF₃ are not stored separately.
+async function cfoDrawGases(body) {
+  const d = await a5Api(CFO, `cfo/summary?year=${a5Year}&department=${encodeURIComponent(cfoDash.department)}`);
+  const departments = [...new Set([...d.departments.map((x) => x.key), cfoDash.department].filter(Boolean))].sort();
+  const names = [['co2', 'CO₂'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['fgas', 'HFCs + PFCs']];
+  const rows = (d.gases || []).map((g) => `<tr class="${g.scope ? '' : 'cfo-total'}"><td>${g.scope ? `Scope ${g.scope}` : 'รวม'}</td>${names.map(([key]) => `<td class="num">${cfoT(g[key])}</td>`).join('')}</tr>`).join('');
+  body.innerHTML = `
+    <div class="toolbar a5-filters">${field('หน่วยงาน', `<select id="cfo-d-dept">${options(['', ...departments], cfoDash.department, (v) => v || 'ทั้งหมด')}</select>`)}</div>
+    ${chartCard(`สรุปตามก๊าซ ปี ${a5Year}`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>ขอบเขต</th>${names.map(([, label]) => `<th class="num">${label}</th>`).join('')}</tr></thead><tbody>${rows || '<tr><td colspan="5" class="empty">ยังไม่มีรายการ</td></tr>'}</tbody></table></div>`, 'tCO₂e · ก๊าซฟลูออรีนรวมกัน เพราะฐานเก็กรวมไว้')}
+    <p class="sum-meta">แถวก๊าซนอกพิธีสารเกียวโตยังไม่แสดง จนกว่าจะกำหนดว่าจะนับอะไร</p>`;
+  a5Lift(body);
+  $('cfo-d-dept').onchange = () => { cfoDash.department = $('cfo-d-dept').value; cfoDrawGases(body).catch(onErr); }
+}
+
+function cfoDownload(name, rows) {
+  const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')}`;
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 // Dashboard > Scope: how complete each activity is this year — 12 month cells (recorded / due but missing),
@@ -331,11 +365,11 @@ async function cfoEntries(target) {
       ${field('เดือน', `<select id="cfo-s-month">${options(['', ...Array.from({ length: 12 }, (_, i) => String(i + 1))], cfoTx.month, (v) => (v ? ACT_MONTHS[v - 1] : 'ทั้งปี'))}</select>`)}
       ${field('category', `<select id="cfo-s-cat">${options(['', ...categories], cfoTx.category, (v) => v || 'ทั้งหมด')}</select>`)}
       ${field('Activity', `<select id="cfo-s-act"><option value="">ทั้งหมด</option>${inCategory.map((r) => `<option value="${r.id}"${String(r.id) === cfoTx.activity ? ' selected' : ''}>${esc(r.name)} · ${esc(r.detail || '')}</option>`).join('')}</select>`)}
-      <div class="action-bar">${button('cfo-record', 'บันทึกกิจกรรม', 'primary', 'disabled')}${d.admin ? button('cfo-confirm', confirmed ? 'เปิดให้แก้เดือนนี้' : 'ยืนยันเดือนนี้', 'secondary', m ? '' : 'disabled title="เลือกเดือนก่อน"') : ''}</div>
+      <div class="action-bar">${button('cfo-record', 'บันทึกกิจกรรม', 'primary', 'disabled')}${d.admin ? `${button('cfo-confirm', confirmed ? 'เปิดให้แก้เดือนนี้' : 'ยืนยันเดือนนี้', 'secondary', m ? '' : 'disabled title="เลือกเดือนก่อน"')}${button('cfo-year', 'ปิดทั้งปี', 'secondary')}` : ''}</div>
     </div>
     <div class="table-wrap sheet" id="cfo-rows"><table class="mo-data-table cfo-scope-table"><thead><tr><th>Activity</th><th>Description</th><th>emission source</th><th class="num">kgCO₂e/unit</th><th>Progress</th><th class="num">Amount</th><th>Unit</th><th class="num">tCO₂e</th><th>สถานะ</th><th></th></tr></thead>
       <tbody>${groups.map((g) => `<tr class="cfo-group"><td colspan="10">${esc(g)}</td></tr>${list.filter((r) => r.category === g).map(row).join('')}`).join('') || '<tr><td colspan="10" class="empty">ไม่มีกิจกรรม</td></tr>'}</tbody></table></div>
-    <p class="sum-meta">รวม ${cfoT(list.reduce((t, r) => t + value(r, 'tco2e'), 0))} tCO₂e · ${list.length} กิจกรรม${m ? ` · ${ACT_MONTHS[m - 1]} ${a5Year} บันทึกแล้ว ${list.filter((r) => r.byMonth[m]).length}` : ` · ปี ${a5Year}`}</p>`;
+    <p class="sum-meta">รวม ${cfoT(list.reduce((t, r) => t + value(r, 'tco2e'), 0))} tCO₂e · ${list.length} กิจกรรม${m ? ` · ${ACT_MONTHS[m - 1]} ${a5Year} บันทึกแล้ว ${list.filter((r) => r.byMonth[m]).length}` : ` · ปี ${a5Year}`}${a5Year === new Date().getFullYear() ? ` · เดือนนี้หน่วยงานคุณยังไม่บันทึก ${all.filter((r) => r.canEdit && !r.byMonth[new Date().getMonth() + 1]).length} กิจกรรม` : ''}</p>`;
   a5Lift(body);
   $('cfo-s-scope').onchange = () => { cfoTx.scope = $('cfo-s-scope').value; cfoTx.category = ''; cfoTx.activity = ''; rerender(); };
   $('cfo-s-month').onchange = () => { cfoTx.month = $('cfo-s-month').value; rerender(); };
@@ -372,6 +406,13 @@ async function cfoEntries(target) {
       rerender();
     }, confirmed ? 'เปิดให้แก้' : 'ยืนยัน');
   }
+  if ($('cfo-year')) {
+    $('cfo-year').onclick = () => confirmPopup('ปิดทั้งปี', `ยืนยันข้อมูลที่บันทึกไว้ทั้งปี ${a5Year} ทุกเดือน ทุก Scope`, async () => {
+      const r = await a5Api(CFO, 'cfo/confirm', { method: 'POST', body: { year: a5Year, status: 'CONFIRMED' } });
+      toast(`ปิดปีแล้ว ${r.count} รายการ`);
+      rerender();
+    }, 'ปิดทั้งปี');
+  }
 }
 
 // บันทึกกิจกรรม: quantity of one activity for a month (changing the month loads what that month has).
@@ -389,11 +430,17 @@ function cfoEntryForm(row, septic, month, reload) {
       <p class="sum-meta" id="cfo-kg"></p>`
     : field(`ปริมาณ (${esc(row.unit || '')})`, '<input id="cfo-qty" type="number" min="0" step="any">')}
     ${field('ลิงก์เอกสาร / หลักฐาน', '<input id="cfo-doc" maxlength="500">')}
+    ${field('รูปหลักฐาน', '<input id="cfo-shot" type="file" accept="image/*">')}
+    ${field('คุณภาพข้อมูลกิจกรรม', `<select id="cfo-q-act">${options(['', 'X', 'Y', 'Z'], '', (v) => ({ '': 'ไม่ระบุ', X: 'X เก็บต่อเนื่อง (6)', Y: 'Y มิเตอร์/ใบเสร็จ (3)', Z: 'Z ประมาณค่า (1)' }[v]))}</select>`)}
+    ${field('คุณภาพ EF', `<select id="cfo-q-ef">${options(['', 'C', 'D', 'E', 'F'], '', (v) => ({ '': 'ไม่ระบุ', C: 'C วัดเอง (4)', D: 'D ประเทศ/ผู้ผลิต (3)', E: 'E ภูมิภาค (2)', F: 'F สากล (1)' }[v]))}</select>`)}
     ${field('หมายเหตุ', '<textarea id="cfo-remark" rows="2" maxlength="500"></textarea>')}
     <p class="sum-meta" id="cfo-e-note"></p>
     ${button('cfo-del', 'ลบข้อมูลเดือนนี้', 'danger')}`;
   openPopup('บันทึกกิจกรรม', fields, async () => {
     const body = { activityId: row.id, month: cfoMonthIso($('cfo-e-month').value), doc: $('cfo-doc').value, remark: $('cfo-remark').value };
+    if ($('cfo-q-act').value && $('cfo-q-ef').value) body.quality = { activity: $('cfo-q-act').value, ef: $('cfo-q-ef').value };
+    const file = $('cfo-shot').files?.[0];
+    if (file) body.image = await cfoJpeg(file);
     if (isSeptic) body.inputs = { people: $('cfo-people').value, days: $('cfo-days').value };
     else body.qty = $('cfo-qty').value;
     await a5Api(CFO, 'cfo/entries', { method: 'PUT', body });
@@ -407,11 +454,21 @@ function cfoEntryForm(row, septic, month, reload) {
     if (isSeptic) { $('cfo-people').value = e.inputs?.people ?? ''; $('cfo-days').value = e.inputs?.days ?? ''; } else $('cfo-qty').value = e.qty ?? '';
     $('cfo-doc').value = e.doc || '';
     $('cfo-remark').value = e.remark || '';
-    $('cfo-e-note').textContent = e.id ? `${e.status === 'CONFIRMED' ? 'ยืนยันแล้ว (แก้ได้เฉพาะผู้จัดทำ)' : 'ร่าง'}${e.updated_at ? ` · แก้ล่าสุด ${new Date(e.updated_at).toLocaleString('th-TH')}` : ''}` : 'ยังไม่บันทึกเดือนนี้';
+    $('cfo-q-act').value = e.inputs?.quality?.activity || '';
+    $('cfo-q-ef').value = e.inputs?.quality?.ef || '';
+    scoreNote();
     $('cfo-del').hidden = !e.id;
     show();
   };
+  const scoreNote = () => {
+    const points = { X: 6, Y: 3, Z: 1 }[$('cfo-q-act').value] + { C: 4, D: 3, E: 2, F: 1 }[$('cfo-q-ef').value];
+    const level = points >= 19 ? 4 : points >= 13 ? 3 : points >= 7 ? 2 : points ? 1 : 0;
+    const e = row.byMonth[Number($('cfo-e-month').value)] || {};
+    $('cfo-e-note').textContent = `${e.id ? `${e.status === 'CONFIRMED' ? 'ยืนยันแล้ว (แก้ได้เฉพาะผู้จัดทำ)' : 'ร่าง'}${e.updated_at ? ` · แก้ล่าสุด ${new Date(e.updated_at).toLocaleString('th-TH')}` : ''}` : 'ยังไม่บันทึกเดือนนี้'}${level ? ` · คุณภาพข้อมูลระดับ ${level} (${points} คะแนน)` : ''}`;
+  };
   $('cfo-e-month').onchange = load;
+  $('cfo-q-act').onchange = scoreNote;
+  $('cfo-q-ef').onchange = scoreNote;
   if (isSeptic) { $('cfo-people').oninput = show; $('cfo-days').oninput = show; }
   load();
   $('cfo-del').onclick = () => {

@@ -39,7 +39,7 @@ export function mountCfo(app) {
     const compareYear = baseYear && baseYear !== year ? baseYear : year - 1;
     const target = Number(settings.target_percent ?? 5) || 0;
     const rowsOf = (y) => fetchAll(() => {
-      let q = tx.from(t.entryView).select('month,scope,scope_code,scope_name,department,tco2e').gte('month', `${y}-01-01`).lte('month', `${y}-12-01`).order('id');
+      let q = tx.from(t.entryView).select('month,scope,scope_code,scope_name,department,tco2e,tco2e_co2,tco2e_ch4,tco2e_n2o,tco2e_fgas').gte('month', `${y}-01-01`).lte('month', `${y}-12-01`).order('id');
       if (department) q = q.eq('department', department);
       return q;
     });
@@ -54,6 +54,10 @@ export function mountCfo(app) {
       return acc;
     }, {})).map((g) => ({ ...g, tco2e: Math.round(g.tco2e * 1000) / 1000, base: Math.round(g.base * 1000) / 1000 })).sort((a, b) => b.tco2e - a.tco2e);
     const tagged = (withBase) => [...cur.map((r) => [r, 'tco2e']), ...(withBase ? base.map((r) => [r, 'base']) : [])];
+    const gasOf = (list) => {
+      const add = (key) => Math.round(list.reduce((s, r) => s + Number(r[key] || 0), 0) * 1000) / 1000;
+      return { co2: add('tco2e_co2'), ch4: add('tco2e_ch4'), n2o: add('tco2e_n2o'), fgas: add('tco2e_fgas') };
+    };
     res.json({
       year,
       department,
@@ -72,6 +76,7 @@ export function mountCfo(app) {
       categories: group('scope_code', (r) => `${r.scope_code} ${r.scope_name}`, tagged(true))
         .sort((a, b) => a.scope - b.scope || Number(a.key.split('-')[1]) - Number(b.key.split('-')[1])),
       departments: group('department', (r) => r.department, tagged(false)),
+      gases: [0, 1, 2, 3].map((scope) => ({ scope, ...gasOf(scope ? cur.filter((r) => r.scope === scope) : cur) })),
       settings
     });
   });
@@ -141,11 +146,32 @@ export function mountCfo(app) {
       qty = septicKg(inputs, await settingsOf(t));
     }
     if (qty == null || Number.isNaN(qty) || qty < 0) return fail(res, 400, 'ปริมาณต้องเป็นตัวเลข 0 ขึ้นไป');
-    const ef = must(await tx.from(t.ef).select('id,kgco2e,status').eq('id', act.ef_id).maybeSingle());
+    const linked = must(await tx.from(t.ef).select('id,code,year,kgco2e,status').eq('id', act.ef_id).maybeSingle());
+    let ef = linked;
+    if (linked?.code) {
+      const peers = must(await tx.from(t.ef).select('id,year,kgco2e,status').eq('code', linked.code).eq('status', 'Active'));
+      const entryYear = Number(month.slice(0, 4));
+      const fit = peers.filter((row) => row.kgco2e != null && (row.year == null || Number(row.year) <= entryYear))
+        .sort((a, b) => Number(b.year || 0) - Number(a.year || 0))[0];
+      if (fit) ef = fit;
+    }
     if (!ef || ef.kgco2e == null) return fail(res, 400, 'EF ของกิจกรรมนี้ยังไม่มีค่า ให้ผู้จัดทำแก้ที่ Setting');
-    const row = { qty, inputs, doc: text(req.body?.doc), remark: text(req.body?.remark), updated_by: req.user.employeeId, updated_at: new Date().toISOString() };
+    const quality = req.body?.quality && typeof req.body.quality === 'object' ? {
+      activity: ['X', 'Y', 'Z'].includes(req.body.quality.activity) ? req.body.quality.activity : '',
+      ef: ['C', 'D', 'E', 'F'].includes(req.body.quality.ef) ? req.body.quality.ef : ''
+    } : null;
+    if (quality?.activity && quality?.ef) inputs = { ...(inputs || {}), quality };
+    let doc = text(req.body?.doc);
+    const shot = imageBytes(req.body?.image);
+    if (shot) {
+      const key = `evidence/${act.id}_${month}_${Date.now()}.jpg`;
+      const uploaded = await tx.storage.from(t.bucket).upload(key, new Uint8Array(shot), { contentType: 'image/jpeg', upsert: false });
+      if (uploaded.error) return fail(res, 400, /bucket/i.test(String(uploaded.error.message)) ? `ยังไม่ได้สร้างที่เก็บรูป ${t.bucket} ใน Tx Data` : 'อัปโหลดหลักฐานไม่ได้');
+      doc = tx.storage.from(t.bucket).getPublicUrl(key).data.publicUrl;
+    }
+    const row = { qty, inputs, doc, ef_id: ef.id, gwp_code: act.gwp_code, remark: text(req.body?.remark), updated_by: req.user.employeeId, updated_at: new Date().toISOString() };
     if (current) must(await tx.from(t.entry).update(row).eq('id', current.id));
-    else must(await tx.from(t.entry).insert({ ...row, activity_id: act.id, month, ef_id: act.ef_id, gwp_code: act.gwp_code, created_by: req.user.employeeId }));
+    else must(await tx.from(t.entry).insert({ ...row, activity_id: act.id, month, created_by: req.user.employeeId }));
     res.json({ ok: true, qty });
   });
 
@@ -161,11 +187,14 @@ export function mountCfo(app) {
 
   // Admin confirms (or reopens) a whole month.
   route('post', '/api/act/:activity/cfo/confirm', async (req, res, activity, t) => {
-    const month = monthOf(req.body?.month);
     const status = req.body?.status === 'DRAFT' ? 'DRAFT' : 'CONFIRMED';
-    if (!month) return fail(res, 400, 'เดือนไม่ถูกต้อง');
-    if (!(await requireAdmin(req, res, activity, Number(month.slice(0, 4))))) return;
-    const done = must(await tx.from(t.entry).update({ status, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }).eq('month', month).select('id'));
+    const year = !req.body?.month && yearOf(req.body?.year, 0);
+    const month = monthOf(req.body?.month);
+    if (!month && !year) return fail(res, 400, 'เดือนไม่ถูกต้อง');
+    if (!(await requireAdmin(req, res, activity, Number((month || String(year)).slice(0, 4))))) return;
+    let query = tx.from(t.entry).update({ status, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }).select('id');
+    query = month ? query.eq('month', month) : query.gte('month', `${year}-01-01`).lte('month', `${year}-12-01`);
+    const done = must(await query);
     res.json({ ok: true, count: done.length });
   });
 
