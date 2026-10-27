@@ -182,9 +182,9 @@ if (!fs.existsSync(importFile)) {
 }
 
 // CFO (db/act/cfo.sql + inbox/import_cfo.sql from python -I scripts/import_cfo_excel.py): totals must match the Excel.
-ok(fs.readFileSync(path.join(ROOT, 'db', 'act', 'cfo.sql'), 'utf8') === actSql('cfo', { audit: false }), 'db/act/cfo.sql is up to date (node scripts/act-sql.js cfo --no-audit)');
-await db.exec(actSql('cfo', { audit: false }));
-await db.exec(actSql('cfo', { audit: false }));
+ok(fs.readFileSync(path.join(ROOT, 'db', 'act', 'cfo.sql'), 'utf8') === actSql('cfo', { audit: false, planner: false }), 'db/act/cfo.sql is up to date (node scripts/act-sql.js cfo --no-audit --no-planner)');
+await db.exec(actSql('cfo', { audit: false, planner: false }));
+await db.exec(actSql('cfo', { audit: false, planner: false }));
 ok(await throws(db, `insert into mt_cfo_team (year, employee_id, role) values (2026, '1', 'member')`), 'a member needs a department');
 await db.exec(`insert into mt_cfo_team (year, employee_id, role, department) values (2026, '1', 'member', 'PD1'), (2026, '1', 'member', 'PD2')`);
 ok(true, 'one person may represent several departments');

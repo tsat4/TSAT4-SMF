@@ -1,8 +1,9 @@
 // SQL for one activity in Tx Data, from one template so every activity has the same shape.
 // Every activity gets team + settings + Project Planner + photo bucket; checklist-audit activities add the audit tables.
+// CFO has no Planner (ผู้ใช้ตัด Schedule ออก 2026-10-27): --no-planner.
 //   node scripts/act-sql.js 5s                -> db/act/5s.sql       (with checklist audit tables)
 //   node scripts/act-sql.js 100p --no-audit   -> db/act/100p.sql     (no audit tables)
-//   node scripts/act-sql.js cfo --no-audit    -> db/act/cfo.sql      (+ CFO tables: scope, gwp, ef, activity, entry)
+//   node scripts/act-sql.js cfo --no-audit --no-planner -> db/act/cfo.sql (+ CFO tables, no Planner)
 //   node scripts/act-sql.js 5s --add-task     -> db/act/5s_task.sql  (add the Planner to a running database, copy the old Gantt plan)
 // Table names: mt_<key>_* (setting) / tx_<key>_* (transaction), key = activity id without symbols (e-day -> eday).
 // Keep server/modules/act/common.js tablesOf() in step with the names here.
@@ -248,7 +249,7 @@ group by month, scope;
 `;
 }
 
-export function actSql(activity, { audit = true } = {}) {
+export function actSql(activity, { audit = true, planner = true } = {}) {
   if (!ACTIVITIES.includes(activity)) throw new Error(`unknown activity ${activity}`);
   const k = activity.replace(/[^a-z0-9]/g, '');
   const rls = (t) => `alter table public.${t} enable row level security;`;
@@ -408,14 +409,14 @@ join public.mt_${k}_checklist c on c.id = s.checklist_id
 group by s.audit_id, c.s_group;
 `;
   const extra = activity === 'cfo';
-  const tables = [`mt_${k}_team`, `mt_${k}_setting`, `mt_${k}_task`]
+  const tables = [`mt_${k}_team`, `mt_${k}_setting`].concat(planner ? [`mt_${k}_task`] : [])
     .concat(extra ? [`mt_${k}_scope`, `mt_${k}_gwp`, `mt_${k}_ef`, `mt_${k}_activity`, `tx_${k}_entry`, `mt_${k}_s3_assess`, `tx_${k}_revision`] : [], audit
     ? [`mt_${k}_area`, `mt_${k}_checklist`, `mt_${k}_audit_plan`, `tx_${k}_audit`, `tx_${k}_audit_score`, `tx_${k}_issue`]
     : []);
   return `-- กิจกรรม ${activity} — รันใน **Tx Data** (รันซ้ำได้) · สร้างจาก scripts/act-sql.js ห้ามแก้มือ
 -- spec: docs/specs/act-5s.md · ทดสอบ: npm run test:act
 
-${core}${taskTableSql(activity, k)}${extra ? cfoSql(k) : ''}${audit ? auditPart : ''}
+${core}${planner ? taskTableSql(activity, k) : ''}${extra ? cfoSql(k) : ''}${audit ? auditPart : ''}
 -- server ใช้ service key ซึ่งข้าม RLS ได้ เปิด RLS ไว้กันการเข้าถึงด้วย anon key
 ${tables.map(rls).join('\n')}
 
@@ -426,12 +427,12 @@ notify pgrst, 'reload schema';
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const activity = process.argv[2];
   if (!activity) {
-    console.error('usage: node scripts/act-sql.js <activity> [--no-audit | --add-task]');
+    console.error('usage: node scripts/act-sql.js <activity> [--no-audit] [--no-planner] | --add-task');
     process.exit(1);
   }
   const addTask = process.argv.includes('--add-task');
   const out = path.join(ROOT, 'db', 'act', `${activity}${addTask ? '_task' : ''}.sql`);
   fs.mkdirSync(path.dirname(out), { recursive: true });
-  fs.writeFileSync(out, addTask ? actTaskSql(activity) : actSql(activity, { audit: !process.argv.includes('--no-audit') }));
+  fs.writeFileSync(out, addTask ? actTaskSql(activity) : actSql(activity, { audit: !process.argv.includes('--no-audit'), planner: !process.argv.includes('--no-planner') }));
   console.log(`wrote ${path.relative(ROOT, out)}`);
 }

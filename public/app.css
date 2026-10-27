@@ -549,6 +549,27 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-photos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.cfo-photos img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--mo-radius);border:1px solid var(--mo-border)}
 .cfo-org-group{display:flex;flex-direction:column;gap:2px;margin-top:6px}
 .cfo-org-person{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--mo-line)}.cfo-org-person span{color:var(--mo-text-muted)}
+/* Fr-01 รายละเอียดขององค์กร: form table in the section green (--ch-1), standard text sizes */
+.cfo-fr01{display:flex;flex-direction:column;gap:8px}
+.fr01-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 16px}.fr01-head .card-title{margin:0 0 2px;color:var(--mo-text-muted)}.fr01-head strong{font-size:16px;font-weight:600}
+.fr01-head dl{display:grid;grid-template-columns:auto auto;gap:2px 12px;margin:0;font-size:12px}.fr01-head dt{color:var(--mo-text-muted)}.fr01-head dd{margin:0;font-weight:500}
+.fr01-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:8px;align-items:start}
+.fr01-org{display:flex;flex-direction:column;gap:8px;padding:12px 16px}.fr01-org .card-title{margin:4px 0 0}
+.fr01-photos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:8px;align-items:center}
+.fr01-logo{width:100%;max-height:120px;object-fit:contain}.fr01-building{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:var(--mo-radius);border:1px solid var(--mo-border)}
+.fr01-info{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:13px}.fr01-info li{padding-left:2px}.fr01-info span{display:inline-block;min-width:110px;color:var(--mo-text-muted)}.fr01-info b{font-weight:500}
+.fr01-more{display:grid;grid-template-columns:130px 1fr;gap:4px 8px;margin:4px 0 0;font-size:13px;border-top:1px solid var(--mo-line);padding-top:8px}.fr01-more dt{color:var(--mo-text-muted)}.fr01-more dd{margin:0}
+.fr01-scope{padding:0;overflow:hidden}
+.fr01-table{width:100%;border-collapse:collapse;font-size:13px}
+.fr01-table th,.fr01-table td{height:auto;padding:7px 10px;border:1px solid color-mix(in srgb,var(--ch-1) 35%,var(--mo-border));white-space:normal;overflow:visible;vertical-align:middle}
+.fr01-table thead th{background:var(--ch-1);color:#fff;font-size:14px;font-weight:600;text-align:left}
+.fr01-table tbody th{width:150px;font-size:13px;background:color-mix(in srgb,var(--ch-1) 85%,#000);color:#fff;font-weight:600;text-align:left}
+.fr01-table td{background:color-mix(in srgb,var(--ch-1) 7%,var(--mo-surface))}
+.fr01-table td b{display:block;font-weight:600}.fr01-table td span{color:var(--mo-text-muted);font-size:12px}
+.fr01-code{width:52px;text-align:center;font-variant-numeric:tabular-nums;color:var(--mo-text-muted)}.fr01-none{color:var(--mo-text-muted)}
+.fr01-tail td.num b{display:inline;font-size:15px}.fr01-center{text-align:center}
+.cfo-fr01 .ch-plot{grid-template-rows:auto 200px auto}
+@media(max-width:900px){.fr01-grid{grid-template-columns:1fr}}
 .cfo-c{text-align:center}
 .cfo-explain{margin:0 0 8px;font-size:12px}.cfo-explain summary{cursor:pointer;color:var(--mo-text-muted)}.cfo-explain dl{display:grid;grid-template-columns:160px 1fr;gap:4px 12px;margin:8px 0}.cfo-explain dt{font-weight:600}.cfo-explain dd{margin:0;color:var(--mo-text-muted)}
 .cfo-s3 table{width:100%}.cfo-s3 th{white-space:normal;line-height:1.25}.cfo-s3 td{white-space:normal}.cfo-s3 td:last-child{min-width:140px}.cfo-s3 td:last-child input{width:100%;height:26px}
@@ -568,12 +589,6 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-report .cfo-total td{background:color-mix(in srgb,var(--mo-text-muted) 14%,transparent);font-weight:600}
 #cfo-rows .cfo-group td,.cfo-scope-table .cfo-group td{background:var(--mo-surface-2);font-weight:600}
 .cfo-freq{display:inline-grid;place-items:center;width:20px;height:20px;border:1px solid var(--mo-border);border-radius:50%;font-size:10px;font-weight:500;color:var(--mo-text-muted);margin-left:4px}
-.cfo-co{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,34%);grid-template-rows:auto 1fr;gap:16px;padding:24px 28px;min-height:520px}
-.cfo-co-text{grid-column:1;grid-row:1 / span 2;display:flex;flex-direction:column;gap:10px;color:var(--mo-primary)}
-.cfo-co-text h2{margin:0 0 6px;font-size:30px;line-height:1.2}
-.cfo-co-line{display:flex;gap:10px;font-size:18px;line-height:1.45}.cfo-co-line span{flex:0 0 auto;font-weight:600}.cfo-co-line strong{font-weight:500}
-.cfo-co-logo{grid-column:2;grid-row:1;width:100%;max-height:220px;object-fit:contain}
-.cfo-co-building{grid-column:1 / span 2;grid-row:3;justify-self:end;width:min(100%,780px);max-height:320px;object-fit:contain}
 :root{--cfo-tier-1:#f97316;--cfo-tier-2:#3b82f6;--cfo-tier-3:#ca8a04}
 .cfo-team{display:flex;flex-direction:column;gap:6px}
 .cfo-tier{display:flex;flex-direction:column;gap:10px;padding-top:16px}
@@ -583,8 +598,6 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-person strong{font-size:12.5px;font-weight:500;text-align:center}.cfo-person small{font-size:11px;color:var(--mo-text-muted)}
 .cfo-tier-rule{display:flex;align-items:center;gap:8px;color:var(--tier);font-size:13px;font-weight:500}
 .cfo-tier-rule::before{content:"";flex:1;border-top:2px dashed var(--tier)}
-@media(max-width:900px){.cfo-co{grid-template-columns:1fr;min-height:0}.cfo-co-text,.cfo-co-logo,.cfo-co-building{grid-column:1;grid-row:auto}}
-
 .cfo-scope-table td:nth-child(-n+3){white-space:normal;min-width:110px}
 /* CFO Summary (carbon-form style, cool green). Marks: solid border, same colour inside 60% transparent. */
 /* Shared charts (core.js chartPlot / chartKpi / chartCard / chartPill): one frame and size everywhere.

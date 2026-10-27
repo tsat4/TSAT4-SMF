@@ -6,7 +6,7 @@ import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, namesOf, requir
 // Tables: db/act/cfo.sql (scripts/act-sql.js cfoSql) · spec: docs/specs/act-cfo.md
 export const CFO_ON = ['cfo'];
 const SETTING_KEYS = ['company_name', 'company_address', 'company_area', 'company_business', 'company_customers', 'company_employees', 'company_updated',
-  'company_photo1', 'company_photo2', 'base_year', 'target_percent', 'septic_bod', 'septic_b0', 'septic_mcf', 'septic_i'];
+  'company_photo1', 'company_photo2', 'company_register', 'base_year', 'target_percent', 'septic_bod', 'septic_b0', 'septic_mcf', 'septic_i'];
 // production_<year> = pieces produced that year (Carbon intensity = tCO2e / pieces)
 const settingKey = (k) => SETTING_KEYS.includes(k) || /^production_\d{4}$/.test(k);
 // Values an EF keeps once entries use it (Fr-04.1 gas columns included).

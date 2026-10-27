@@ -1,5 +1,5 @@
-// ระบบกิจกรรม > CFO (Carbon Footprint for Organization): Dashboard (Summary / Scope / Company / Team / Schedule /
-// TGO forms Fr-03.2, Fr-04.1 + บันทึกการปรับปรุง),
+// ระบบกิจกรรม > CFO (Carbon Footprint for Organization): Dashboard (Summary / Scope / TGO forms Fr-01, Fr-03.1,
+// Fr-03.2, Fr-04.1 + บันทึกการปรับปรุง),
 // transaction (TSATP4-CFO Scope pages + บันทึกกิจกรรม), Setting (plan / activities / emission factors / team / company). Server: server/modules/act/cfo.js
 // spec: docs/specs/act-cfo.md · uses the shared year (a5Year), page bar slots and team tab of act-5s.js.
 const CFO = 'cfo';
@@ -7,8 +7,8 @@ const CFO = 'cfo';
 const CFO_SCOPE_COLORS = CHART_THEMES.cool.series.slice(0, 3);
 const CFO_BASE_COLORS = CHART_THEMES.cool.base;
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
-const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Company Overview', team: 'Team', schedule: 'Schedule', fr032: 'Fr-03.2', fr041: 'Fr-04.1', revision: 'บันทึกการปรับปรุง' };
-const CFO_SET_TABS = { plan: 'แผนงาน', activities: 'กิจกรรม', ef: 'Emission Factor', s3: 'Scope 3 (Fr-03.2)', team: 'ทีม', company: 'บริษัท' };
+const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Fr-01', team: 'Fr-03.1', fr032: 'Fr-03.2', fr041: 'Fr-04.1', revision: 'บันทึกการปรับปรุง' };
+const CFO_SET_TABS = { activities: 'กิจกรรม', ef: 'Emission Factor', s3: 'Scope 3 (Fr-03.2)', team: 'ทีม', company: 'บริษัท' };
 // TGO Fr-03.2 criteria (server S3_CRITERIA) and their explanation from the form (หัวข้อ 12 ข้อกำหนด CFO)
 const CFO_S3_CRITERIA = [
   ['magnitude', 'Magnitude', 'ขนาด: สันนิษฐานว่ามีปริมาณการปล่อยหรือดูดกลับในปริมาณมากอย่างมีนัยสำคัญ'],
@@ -27,12 +27,12 @@ const CFO_CALCS = {
 };
 const CFO_SOURCE_TYPES = [['self', 'Self collect (1st)'], ['supplier', 'Supplier (1st)'], ['th_lci', 'TH LCI DB (2nd)'], ['tgo', 'TGO EF (2nd)'], ['thai_res', 'Thai Res. (2nd)'], ['int_db', 'Int. DB (2nd)'], ['other', 'Other']];
 const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['company_address', 'สถานที่ตั้ง'], ['company_area', 'พื้นที่โรงงาน'], ['company_business', 'ประเภทธุรกิจ'],
-  ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
+  ['company_customers', 'กลุ่มลูกค้าหลัก'], ['company_employees', 'จำนวนพนักงาน'], ['company_updated', 'อัพเดท (วันที่)'], ['company_register', 'วันที่ขอขึ้นทะเบียน'], ['company_photo1', 'ลิงก์รูป 1'], ['company_photo2', 'ลิงก์รูป 2'],
   ['base_year', 'ปีฐาน'], ['target_percent', 'เป้าลด (% จากปีฐาน)'], ['septic_bod', 'บ่อเกรอะ BOD (g/คน/วัน)'], ['septic_b0', 'บ่อเกรอะ B0'], ['septic_mcf', 'บ่อเกรอะ MCF'], ['septic_i', 'บ่อเกรอะ I']];
 const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6', 'SF₆'], ['nf3', 'NF₃'], ['hfc', 'HFCs'], ['hfc_gwp', 'GWP HFCs'], ['pfc', 'PFCs'], ['pfc_gwp', 'GWP PFCs'],
   ['other', 'GHG นอกข้อกำหนด'], ['other_gwp', 'GWP นอกข้อกำหนด'], ['co2_bio', 'CO₂ ชีวมวล (รายงานแยก)']];
 let cfoDashTab = 'summary';
-let cfoSetTab = 'plan';
+let cfoSetTab = 'activities';
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
 // page: Summary หน้า 1 (monthly accumulation) / หน้า 2 (summary by Scope), picked in the dropdown before the year
 const cfoDash = { department: '', chartScope: '', scope: '1', page: '1' };
@@ -61,7 +61,6 @@ async function cfoDashboard(target) {
   const rerender = () => cfoDashboard(target).catch(onErr);
   target.querySelectorAll('[data-cfodash]').forEach((node) => { node.onclick = () => { cfoDashTab = node.dataset.cfodash; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
-  if (cfoDashTab === 'schedule') return aplRender(body, CFO, { inPage: true, readOnly: true });
   if (cfoDashTab === 'scope') return cfoDrawProgress(body);
   if (cfoDashTab === 'company') return cfoDrawCompany(body, me.access.admin, rerender);
   if (cfoDashTab === 'team') return cfoDrawTeam(body, me.access.admin);
@@ -440,36 +439,79 @@ function cfoJpeg(file) {
   });
 }
 
-// Company Overview (TSATP4-CFO): company lines, customer logo picture (photo 1) and building picture (photo 2).
+// Fr-01 รายละเอียดขององค์กร (TGO TCFO_R_01): photos + organisation details on the left, ขอบเขตขององค์กร on the right
+// (each Scope's categories with the activities recorded under them, period and production of this year and the base
+// year), then the GHG per Scope bar chart. ผู้จัดทำ edits the details and photos (Setting values company_*).
 async function cfoDrawCompany(body, admin, rerender) {
-  const s = (await a5Api(CFO, 'cfo/master')).settings;
-  const updated = s.company_updated ? new Date(`${s.company_updated}T00:00:00`) : null;
-  const line = (label, value) => (value ? `<div class="cfo-co-line"><span>${esc(label)} :</span><strong>${esc(value)}</strong></div>` : '');
+  const [m, team, sum] = await Promise.all([a5Api(CFO, 'cfo/master'), a5Api(CFO, `team?year=${a5Year}`), a5Api(CFO, `cfo/summary?year=${a5Year}`)]);
+  const s = m.settings;
+  const day = (v) => { const d = v ? new Date(`${v}T00:00:00`) : null; return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('en-GB') : ''; };
   const img = (url, cls) => (url ? `<img class="${cls}" src="${esc(cfoPhotoSrc(url))}" alt="" loading="lazy">` : '');
+  const makers = team.members.filter((x) => x.role === 'admin' && x.status === 'Active').map((x) => x.name || x.employee_id).join(', ');
+  // ขอบเขตขององค์กร: categories that have active activities, with those activities' names
+  const efById = new Map(m.ef.map((e) => [e.id, e]));
+  const scopeName = new Map(m.scopes.map((x) => [x.code, x]));
+  const byCode = new Map();
+  m.activities.filter((x) => x.status === 'Active').forEach((x) => {
+    const code = efById.get(x.ef_id)?.scope_code;
+    if (!code) return;
+    if (!byCode.has(code)) byCode.set(code, new Set());
+    byCode.get(code).add(x.name);
+  });
+  const codes = [...byCode.keys()].sort((x, y) => x.localeCompare(y, 'en', { numeric: true }));
+  const scopeRows = [1, 2, 3].map((n) => {
+    const list = codes.filter((c) => c.startsWith(`${n}-`));
+    const cells = list.length ? list.map((c) => `<td class="fr01-code">${esc(c)}</td><td><b>${esc(scopeName.get(c)?.name || '')}</b><span>${esc([...byCode.get(c)].join(', '))}</span></td>`)
+      : [`<td class="fr01-code">-</td><td class="fr01-none">ยังไม่มีกิจกรรม${n === 3 ? ' (ประเมินนัยสำคัญที่ Fr-03.2)' : ''}</td>`];
+    return cells.map((cell, i) => `<tr>${i ? '' : `<th rowspan="${cells.length}">ประเภท ${n}</th>`}${cell}</tr>`).join('');
+  }).join('');
+  const baseYear = Number(s.base_year) || 0;
+  const pieces = (y) => (Number(s[`production_${y}`]) ? Number(s[`production_${y}`]).toLocaleString('en-US', { maximumFractionDigits: 2 }) : '-');
+  const tail = [
+    ['ระยะเวลาเก็บข้อมูล', `ม.ค. – ธ.ค. ${a5Year}`],
+    ['ผลผลิต', pieces(a5Year), 'ชิ้น'],
+    ['ปีฐาน', baseYear ? `ม.ค. – ธ.ค. ${baseYear}` : 'ยังไม่ได้ตั้ง (Setting > บริษัท)'],
+    ['ผลผลิตปีฐาน', baseYear ? pieces(baseYear) : '-', 'ชิ้น']
+  ].map(([label, value, unit]) => `<tr class="fr01-tail"><th colspan="2">${label}</th>${unit ? `<td class="num"><b>${esc(value)}</b> <span>${unit}</span></td>` : `<td class="fr01-center">${esc(value)}</td>`}</tr>`).join('');
+  const info = [['ชื่อธุรกิจ', s.company_name], ['ประเภทธุรกิจ', s.company_business], ['พื้นที่โรงงาน', s.company_area], ['กลุ่มลูกค้าหลัก', s.company_customers],
+    ['จำนวนพนักงาน', s.company_employees ? `${s.company_employees} คน${day(s.company_updated) ? ` (อัพเดท ${day(s.company_updated)})` : ''}` : '']];
+  const c = sum.compare;
+  const chart = chartPlot({
+    id: 'cfo-fr01', labels: ['Scope 1', 'Scope 2', 'Scope 3'], left: 'tCO₂e',
+    bars: [...(c.total ? [{ values: c.scopes, colors: [CFO_BASE_COLORS[1]] }] : []), { values: sum.scopes.map((x) => x.tco2e), colors: [CFO_SCOPE_COLORS[0]] }],
+    legend: [...(c.total ? [{ box: CFO_BASE_COLORS[1], label: c.isBase ? `ปีฐาน ${c.year}` : `ปี ${c.year}` }] : []), { box: CFO_SCOPE_COLORS[0], label: `ปี ${a5Year}` }]
+  });
   body.innerHTML = `
     ${admin ? `<div class="action-bar a5-actions">${button('cfo-co-edit', 'แก้ไขข้อมูล')}</div>` : ''}
-    <section class="card cfo-co">
-      <div class="cfo-co-text">
-        <h2>Company Overview</h2>
-        ${line('ชื่อธุรกิจ', s.company_name)}${line('สถานที่ตั้ง', s.company_address)}${line('พื้นที่โรงงาน', s.company_area)}
-        ${line('ประเภทของธุรกิจ', s.company_business)}${line('กลุ่มลูกค้าหลัก', s.company_customers)}
-        ${line('จำนวนพนักงาน', s.company_employees ? `${s.company_employees} คน${updated && !Number.isNaN(updated.getTime()) ? ` อัพเดท ${updated.toLocaleDateString('en-GB')}` : ''}` : '')}
-        ${s.base_year ? line('ปีฐาน', `${s.base_year} · เป้าลด ${s.target_percent || 5}%`) : ''}
-        ${s.company_name ? '' : '<p class="empty">ยังไม่มีข้อมูลบริษัท</p>'}
+    <div class="cfo-fr01">
+      <section class="card fr01-head"><div><div class="card-title">รายละเอียดขององค์กร</div><strong>${esc(s.company_name || 'ยังไม่มีชื่อองค์กร')}</strong></div>
+        <dl><dt>รหัสฟอร์ม</dt><dd>Fr-01</dd><dt>ผู้จัดทำ</dt><dd>${esc(makers || '-')}</dd><dt>ปี</dt><dd>${a5Year}</dd></dl></section>
+      <div class="fr01-grid">
+        <section class="card fr01-org">
+          <div class="card-title">รูปขององค์กร</div>
+          <div class="fr01-photos">${img(s.company_photo1, 'fr01-logo')}${img(s.company_photo2, 'fr01-building')}${s.company_photo1 || s.company_photo2 ? '' : '<p class="empty">ยังไม่มีรูป</p>'}</div>
+          <div class="card-title">ข้อมูลองค์กร</div>
+          <ol class="fr01-info">${info.map(([label, value]) => `<li><span>${label}</span><b>${esc(value || '-')}</b></li>`).join('')}</ol>
+          <dl class="fr01-more"><dt>สถานที่ติดต่อ</dt><dd>${esc(s.company_address || '-')}</dd><dt>วันที่ขอขึ้นทะเบียน</dt><dd>${esc(day(s.company_register) || '-')}</dd></dl>
+        </section>
+        <section class="card fr01-scope">
+          <table class="fr01-table"><thead><tr><th colspan="3">ขอบเขตขององค์กร</th></tr></thead><tbody>${scopeRows}${tail}</tbody></table>
+        </section>
       </div>
-      ${img(s.company_photo1, 'cfo-co-logo')}
-      ${img(s.company_photo2, 'cfo-co-building')}
-    </section>`;
+      ${chartCard('กราฟแท่งแสดงการปล่อย GHG แต่ละขอบเขต', chart, `tCO₂e ทั้งปี${c.total ? ' · เทียบปีฐาน' : ''}`)}
+    </div>`;
   a5Lift(body);
+  chartTip('cfo-fr01', (i) => `<strong>Scope ${i + 1}</strong><div class="ch-tip-row"><span>ปี ${a5Year}</span><b>${cfoT(sum.scopes[i].tco2e)} tCO₂e</b></div>
+    ${c.total ? `<div class="ch-tip-row"><span>${c.isBase ? 'ปีฐาน' : 'ปี'} ${c.year}</span><b>${cfoT(c.scopes[i])}</b></div>` : ''}`);
   if (!admin) return;
   $('cfo-co-edit').onclick = () => {
     const picked = {};
     const fields = CFO_COMPANY.filter(([key]) => key.startsWith('company_') && !key.startsWith('company_photo'))
-      .map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(s[key] ?? '')}"${key === 'company_updated' ? ' type="date"' : ''}>`)).join('');
-    openPopup('แก้ไข Company Overview', `${fields}
-      ${field('รูปโลโก้ลูกค้า (รูป 1)', '<input id="cfo-s-photo1" type="file" accept="image/*">')}
+      .map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(s[key] ?? '')}"${['company_updated', 'company_register'].includes(key) ? ' type="date"' : ''}>`)).join('');
+    openPopup('แก้ไข Fr-01 รายละเอียดขององค์กร', `${fields}
+      ${field('รูปโลโก้ / องค์กร (รูป 1)', '<input id="cfo-s-photo1" type="file" accept="image/*">')}
       ${field('รูปอาคาร (รูป 2)', '<input id="cfo-s-photo2" type="file" accept="image/*">')}
-      <p class="sum-meta">ไม่เลือกรูป = ใช้รูปเดิม · รูปเก็บใน ${CFO === 'cfo' ? 'img_cfo' : ''}</p>`, async () => {
+      <p class="sum-meta">ไม่เลือกรูป = ใช้รูปเดิม · ผลผลิตและปีฐานแก้ที่ Setting > บริษัท</p>`, async () => {
       for (const slot of [1, 2]) if (picked[slot]) await a5Api(CFO, 'cfo/photo', { method: 'POST', body: { slot, image: picked[slot] } });
       const values = Object.fromEntries(CFO_COMPANY.filter(([key]) => $(`cfo-s-${key}`)).map(([key]) => [key, $(`cfo-s-${key}`).value]));
       await a5Api(CFO, 'cfo/settings', { method: 'PUT', body: values });
@@ -497,7 +539,7 @@ async function cfoDrawTeam(body, admin) {
   body.innerHTML = `
     ${admin ? `<div class="action-bar a5-actions">${button('cfo-team-edit', 'แก้ไขทีม')}</div>` : ''}
     <section class="card cfo-team">
-      <div class="plan-head"><div class="card-title">Team Member · ปี ${a5Year}</div><span class="sum-meta">${active.length} คน</span></div>
+      <div class="plan-head"><div class="card-title">Fr-03.1 โครงสร้างและหน้าที่ความรับผิดชอบ · ปี ${a5Year}</div><span class="sum-meta">${active.length} คน</span></div>
       ${tiers.map((t) => `<div class="cfo-tier">${t.people.length ? `<div class="cfo-tier-people">${t.people.map(card).join('')}</div>` : '<p class="empty">ยังไม่มี</p>'}
         <div class="cfo-tier-rule" style="--tier:${t.color}"><span>${esc(t.label)}</span></div></div>`).join('')}
     </section>`;
@@ -664,7 +706,6 @@ async function cfoSetting(target) {
   const rerender = () => cfoSetting(target).catch(onErr);
   target.querySelectorAll('[data-cfoset]').forEach((node) => { node.onclick = () => { cfoSetTab = node.dataset.cfoset; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
-  if (cfoSetTab === 'plan') return aplRender(body, CFO, { inPage: true });
   if (cfoSetTab === 'team') return a5SetTeam(body, CFO, me.access.admin, rerender, CFO_ROLE_LABEL);
   if (cfoSetTab === 's3') return cfoSetS3(body, rerender);
   const m = await a5Api(CFO, 'cfo/master');
