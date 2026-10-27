@@ -91,8 +91,10 @@ async function renderEdit(target) {
     ${pageBar(seg, '', 'edit')}
     <div class="tx-board">
       <section class="tx-list">
-        <div class="tx-groups" id="edit-groups"></div>
-        ${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'หมายเลข ชื่อ หรือ group' })}
+        <div class="tx-list-tools">
+          <label class="field">กลุ่ม<select id="edit-group"></select></label>
+          ${searchSlot('ค้นหา', 'edit-q', 'edit-search', { placeholder: 'หมายเลข ชื่อ หรือ group' })}
+        </div>
         <div class="tx-deck" id="edit-rows"></div>
         ${tableFoot('edit')}
       </section>
@@ -135,21 +137,14 @@ async function renderEdit(target) {
   const drawGroups = () => {
     const named = (groups || []).filter((row) => row.name).sort((a, b) => a.name.localeCompare(b.name, 'th'));
     const blank = (groups || []).some((row) => !row.name);
-    const buttonOf = (value, label) => `<button class="tx-group${state.group === value ? ' is-active' : ''}" type="button" data-group="${esc(value)}">${esc(label)}</button>`;
-    const host = $('edit-groups');
+    const choice = (value, label) => `<option value="${esc(value)}"${state.group === value ? ' selected' : ''}>${esc(label)}</option>`;
+    const host = $('edit-group');
     if (!host) return;
     host.innerHTML = [
-      buttonOf('', 'ทั้งหมด'),
-      ...named.map((row) => buttonOf(row.name, row.name)),
-      blank ? buttonOf('-', 'ยังไม่จัดกลุ่ม') : ''
+      choice('', 'ทั้งหมด'),
+      ...named.map((row) => choice(row.name, row.name)),
+      blank ? choice('-', 'ยังไม่จัดกลุ่ม') : ''
     ].join('');
-    host.querySelectorAll('[data-group]').forEach((node) => {
-      node.onclick = () => {
-        state.group = node.dataset.group;
-        state.offset = 0;
-        load().catch(onErr);
-      };
-    });
   };
   const loadOrder = async () => {
     if (!alive()) return;
@@ -421,6 +416,7 @@ async function renderEdit(target) {
   });
   $('edit-search').onclick = () => { state.offset = 0; load().catch(onErr); };
   onEnter('edit-q', () => { state.offset = 0; load().catch(onErr); });
+  if ($('edit-group')) $('edit-group').onchange = () => { state.group = $('edit-group').value; state.offset = 0; load().catch(onErr); };
   $('edit-prev').onclick = () => { state.offset = Math.max(0, state.offset - PAGE); load().catch(onErr); };
   $('edit-next').onclick = () => { state.offset += PAGE; load().catch(onErr); };
   try {
