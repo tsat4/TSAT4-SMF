@@ -39,7 +39,7 @@ async function centers() {
 async function names(codes) {
   const unique = [...new Set(codes.filter(Boolean))];
   if (!unique.length) return new Map();
-  const { data, error } = await mx.from('mt_sto_usage').select('material,material_description,bun').in('material', unique);
+  const { data, error } = await mx.from('mt_sto_usage').select('material,material_description,bun,status').in('material', unique);
   if (error) throw error;
   return new Map((data || []).map((row) => [row.material, row]));
 }
@@ -105,16 +105,27 @@ export function mountReserves(app, mod) {
     const material = String(req.body?.material || '').trim();
     const costcenter = String(req.body?.costcenter || '').trim();
     if (!month) return fail(res, 400, 'บันทึกเดือนหน้าไม่ได้');
-    if (!qty || !material || !costcenter) return fail(res, 400, 'ระบุรายการ จำนวน และ costcenter');
+    if (Array.isArray(req.body?.lines) && req.body.lines.length > 40) return fail(res, 400, 'บันทึกได้ครั้งละไม่เกิน 40 รายการ');
+    const rawLines = Array.isArray(req.body?.lines) && req.body.lines.length
+      ? req.body.lines
+      : [{ material, qty }];
+    const lines = [];
+    for (const row of rawLines) {
+      const code = String(row?.material || '').trim();
+      const amount = qtyOf(row?.qty);
+      if (!code || !amount) return fail(res, 400, 'ระบุรหัสรายการและจำนวนทุกแถว');
+      lines.push({ material: code, qty: amount });
+    }
     const center = (await centers()).find((row) => row.costcenter === costcenter);
-    if (!center || (!adminOf(req) && center.department !== req.user.department)) return fail(res, 400, 'เลือก costcenter ในขอบเขตของคุณ');
-    const item = await mx.from('mt_sto_usage').select('status').eq('material', material).maybeSingle();
-    if (item.error || !item.data || item.data.status !== 'Active') return fail(res, 400, 'รายการนี้ใช้งานไม่ได้');
-    const inserted = await mx.from('tx_sto_reserve').insert({
-      costcenter, material, qty, status: 'open', reserved_at: stamp(month), requested_by: req.user.employeeId
-    }).select('id');
+    if (!center || center.department !== req.user.department) return fail(res, 400, 'เลือก costcenter ในหน่วยงานของคุณ');
+    const found = await names(lines.map((row) => row.material));
+    const missing = lines.find((row) => found.get(row.material)?.status !== 'Active');
+    if (missing) return fail(res, 400, `รายการ ${missing.material} ใช้งานไม่ได้`);
+    const inserted = await mx.from('tx_sto_reserve').insert(lines.map((row) => ({
+      costcenter, material: row.material, qty: row.qty, status: 'open', reserved_at: stamp(month), requested_by: req.user.employeeId
+    }))).select('id');
     if (inserted.error || !inserted.data?.length) return fail(res, 400, 'บันทึกการสั่งจองไม่ได้');
-    res.status(201).json({ ok: true });
+    res.status(201).json({ ok: true, count: inserted.data.length });
   }));
 
   app.post('/api/reserves/order', wrap(requireUser), atLeast(mod, 3), wrap(async (req, res) => {

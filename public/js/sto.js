@@ -449,32 +449,77 @@ async function putInCart(material, qty, costcenter) {
 async function openReservePopup(onDone) {
   const month = $('edit-month')?.value || monthNow();
   const data = await api(`/api/reserves?month=${encodeURIComponent(month)}`);
-  if (!data.centers.length) return toast('ยังไม่มี costcenter ในหน่วยงาน', 'error');
-  let picked = null;
+  const centers = data.centers.filter((row) => row.department === me.department);
+  if (!centers.length) return toast('ยังไม่มี costcenter ในหน่วยงาน', 'error');
+  const blank = 12;
+  const rowHtml = (index) => `<tr data-i="${index}"><td class="rsv-no">${index + 1}</td><td><input class="rsv-code" data-i="${index}" autocomplete="off"></td><td><input class="rsv-qty" data-i="${index}" inputmode="decimal" autocomplete="off"></td><td class="rsv-name"></td><td class="rsv-bun"></td></tr>`;
   openPopup('สั่งจอง', [
-    field('costcenter', `<select id="rsv-cc">${centerOptions(data.centers)}</select>`),
-    searchBlock(searchSlot('รายการ', 'pick-q', 'pick-search', { placeholder: 'หมายเลขหรือชื่อ' }), 'pick-results'),
-    field('รายการที่เลือก', '<input id="pick-name" readonly>'),
-    field('จำนวน', '<input id="rsv-qty" type="number" min="0.001" step="0.001" value="1">')
+    field('costcenter', `<select id="rsv-cc">${centerOptions(centers)}</select>`),
+    '<p class="sum-meta">วางรหัสรายการกับจำนวนจากตารางลงช่องรหัสรายการได้</p>',
+    `<div class="rsv-sheet"><table class="rsv-grid" id="rsv-grid"><thead><tr><th></th><th>รหัสรายการ</th><th>จำนวน</th><th>ชื่อรายการ</th><th>หน่วย</th></tr></thead><tbody>${Array.from({ length: blank }, (_, index) => rowHtml(index)).join('')}</tbody></table></div>`
   ].join(''), async () => {
-    if (!picked) throw new Error('เลือกรายการ');
-    const qty = Number($('rsv-qty').value);
-    if (!(qty > 0)) throw new Error('ระบุจำนวน');
-    await api('/api/reserves', { method: 'POST', body: { month, costcenter: $('rsv-cc').value, material: picked.material, qty } });
+    const lines = [...document.querySelectorAll('#rsv-grid tbody tr')].flatMap((row) => {
+      const material = row.querySelector('.rsv-code').value.trim();
+      const qty = row.querySelector('.rsv-qty').value.trim().replace(/\s/g, '');
+      const amount = qty.includes('.') ? qty.replace(/,/g, '') : qty.replace(',', '.');
+      return material || qty ? [{ material, qty: amount }] : [];
+    });
+    if (!lines.length) throw new Error('วางรหัสรายการและจำนวน');
+    if (lines.some((row) => !row.material || !(Number(row.qty) > 0))) throw new Error('ระบุรหัสรายการและจำนวนทุกแถว');
+    const unknown = [...document.querySelectorAll('#rsv-grid .rsv-name.is-miss')].map((node) => node.closest('tr').querySelector('.rsv-code').value.trim());
+    if (unknown.length) throw new Error(`ไม่พบรายการ ${unknown[0]}`);
+    await api('/api/reserves', { method: 'POST', body: { month, costcenter: $('rsv-cc').value, lines } });
     toast('บันทึกการสั่งจองแล้ว');
     closePopup();
     if (onDone) await onDone();
   }, 'บันทึก');
-  const search = async () => {
-    const materials = (await api(`/api/materials?q=${encodeURIComponent($('pick-q').value.trim())}`)).materials || [];
-    fillTable('pick-results', ['รหัส', 'ชื่อ', 'หน่วย'], materials.map((row) => `<tr data-pick="${esc(row.material)}" data-name="${esc(row.material_description)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join(''), 'ไม่พบรายการ');
-    bindRowSelect($('pick-results'), (id, row) => {
-      picked = { material: id };
-      $('pick-name').value = row.dataset.name || id;
+  document.querySelector('#popup .popup')?.classList.add('popup-wide');
+  const grid = $('rsv-grid');
+  const paint = (found) => {
+    grid.querySelectorAll('tbody tr').forEach((row) => {
+      const code = row.querySelector('.rsv-code').value.trim();
+      const name = row.querySelector('.rsv-name');
+      const unit = row.querySelector('.rsv-bun');
+      const item = code ? found.get(code) : null;
+      name.textContent = !code ? '' : item?.status === 'Active' ? (item.material_description || code) : 'ไม่พบรายการ';
+      name.classList.toggle('is-miss', Boolean(code) && item?.status !== 'Active');
+      unit.textContent = item?.status === 'Active' ? (item.bun || '') : '';
     });
   };
-  $('pick-search').onclick = () => search().catch(onErr);
-  onEnter('pick-q', () => search().catch(onErr));
+  const lookup = async () => {
+    const codes = [...new Set([...grid.querySelectorAll('.rsv-code')].map((node) => node.value.trim()).filter(Boolean))];
+    if (!codes.length) return paint(new Map());
+    const listed = await api(`/api/materials?codes=${codes.map(encodeURIComponent).join(',')}`);
+    paint(new Map((listed.materials || []).map((row) => [row.material, row])));
+  };
+  const grow = (count) => {
+    const body = grid.querySelector('tbody');
+    while (body.rows.length < count && body.rows.length < 40) body.insertAdjacentHTML('beforeend', rowHtml(body.rows.length));
+  };
+  grid.addEventListener('paste', (event) => {
+    const text = event.clipboardData?.getData('text') || '';
+    const pasted = text.replace(/\r/g, '').split('\n').map((line) => line.trim()).filter(Boolean);
+    if (pasted.length < 2 && !pasted[0]?.includes('\t')) return;
+    event.preventDefault();
+    const start = Number(event.target.dataset?.i) || 0;
+    if (start + pasted.length > 40) toast('วางได้ครั้งละไม่เกิน 40 แถว', 'error');
+    const onQty = event.target.classList?.contains('rsv-qty');
+    grow(start + pasted.length);
+    pasted.forEach((line, offset) => {
+      const parts = line.split('\t').map((part) => part.trim());
+      const row = grid.querySelector(`tbody tr[data-i="${start + offset}"]`);
+      if (!row) return;
+      if (onQty && parts.length === 1) row.querySelector('.rsv-qty').value = parts[0];
+      else {
+        if (parts[0]) row.querySelector('.rsv-code').value = parts[0];
+        if (parts[1]) row.querySelector('.rsv-qty').value = parts[1];
+      }
+    });
+    lookup().catch(onErr);
+  });
+  grid.addEventListener('change', (event) => {
+    if (event.target.classList.contains('rsv-code')) lookup().catch(onErr);
+  });
 }
 
 async function openLedgerPopup(kind, onDone) {

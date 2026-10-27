@@ -124,6 +124,13 @@ export function mountMaterials(app, mod) {
   }));
 
   app.get('/api/materials', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
+    if (req.query.codes != null) {
+      const codes = [...new Set(String(req.query.codes).split(',').map((item) => item.trim()).filter(Boolean))].slice(0, 40);
+      if (!codes.length) return res.json({ materials: [] });
+      const { data, error } = await mx.from('mt_sto_usage').select('material,material_description,bun,status').in('material', codes);
+      if (error) return fail(res, 400, 'ค้นหารายการไม่ได้');
+      return res.json({ materials: data || [] });
+    }
     if (req.query.part === 'groups') {
       const groups = new Map();
       for (let from = 0; ; from += 1000) {

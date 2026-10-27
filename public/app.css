@@ -106,6 +106,14 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;justify-content:flex-end}
 .popup-back{position:fixed;inset:0;z-index:80;background:rgba(23,23,23,.45);display:grid;place-items:center;padding:16px}
 .popup{width:min(380px,100%);max-height:min(88vh,760px);overflow:auto;background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:var(--mo-radius);padding:16px 16px 12px;box-shadow:0 16px 40px rgba(0,0,0,.2)}
+.popup.popup-wide{width:min(760px,100%)}
+.rsv-sheet{max-height:min(52vh,420px);overflow:auto;border:1px solid var(--mo-line);border-radius:var(--mo-radius)}
+.rsv-grid{width:100%;border-collapse:collapse;font-size:12px}
+.rsv-grid th{position:sticky;top:0;z-index:1;background:var(--mo-surface-2);color:var(--mo-text-muted);font-weight:500;text-align:left;height:32px;padding:0 8px}
+.rsv-grid td{height:32px;padding:2px 6px;border-top:1px solid var(--mo-line);vertical-align:middle}
+.rsv-grid .rsv-no{width:28px;color:var(--mo-text-muted);text-align:right}
+.rsv-name.is-miss{color:var(--mo-danger)}
+.popup-fields .rsv-grid input{min-height:26px}
 .popup-title{font-size:14px;font-weight:500;margin:0 0 12px}
 .popup-fields{display:flex;flex-direction:column;gap:10px}
 .popup-fields .field{width:100%;max-width:none;flex:none}
