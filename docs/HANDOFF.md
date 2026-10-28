@@ -14,6 +14,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
+- `db/act/smf.sql` ใน Tx Data (แผนงาน SMF)
 - `db/act/kaizen.sql` ใน Tx Data (KAIZEN ใหม่)
 
 ## ข้อควรระวัง
@@ -22,6 +23,8 @@
 - หน้า PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-28 · Claude · เปิดใช้แผนงาน Project Planner ของ SMF (`PLANNER_ON` / `APL_ON` = `smf`, หน้า SMF > Setting และ Dashboard ดูอย่างเดียว + ปฏิทินรวม) · สร้าง `db/act/smf.sql` (`node scripts/act-sql.js smf --no-audit`) · **ผู้ใช้ต้องรัน `db/act/smf.sql` ใน Tx Data**
 
 - 2026-10-28 · Claude · หัวตารางทุกหน้าใช้โทนสีของส่วน (เหมือนแท็บ/เมนูที่เลือก) ผ่าน `--th-bg` / `--th-ink` / `--th-line` · ตาราง Fr-01 ใช้โทนเดียวกัน (ไม่ใช่เขียวเข้มตัวขาวแล้ว) · กฎใน AGENTS.md
 - 2026-10-27 · Claude · **KAIZEN** (ผู้ใช้สั่ง จาก inbox/Kaizen.xlsx): ตาราง `db/act/kaizen.sql` (ทีม + แผนงาน Planner + `tx_kaizen_entry` + bucket `img_kaizen`) · server `kaizen.js` · หน้าจอ `act-kaizen.js` (Dashboard Summary / Schedule / Team · Transaction ใบ Kaizen ตามด้านหน้า รูป 16:9 เงินที่ใช้ = ค่าแรง + ค่าอุปกรณ์ คืนทุน = เงินที่ใช้ ÷ ผลตอบแทนต่อเดือน · Setting แผนงาน / ทีม) · spec `docs/specs/act-kaizen.md` · **ผู้ใช้ต้องรัน `db/act/kaizen.sql` ใน Tx Data**

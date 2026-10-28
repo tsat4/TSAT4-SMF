@@ -17,6 +17,7 @@ const throws = async (db, sql) => { try { await db.exec(sql); return false; } ca
 ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '5s.sql'), 'utf8') === actSql('5s'), 'db/act/5s.sql is up to date (node scripts/act-sql.js 5s)');
 ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '5s_task.sql'), 'utf8') === actTaskSql('5s'), 'db/act/5s_task.sql is up to date (node scripts/act-sql.js 5s --add-task)');
 ok(fs.readFileSync(path.join(ROOT, 'db', 'act', '100p.sql'), 'utf8') === actSql('100p', { audit: false }), 'db/act/100p.sql is up to date (node scripts/act-sql.js 100p --no-audit)');
+ok(fs.readFileSync(path.join(ROOT, 'db', 'act', 'smf.sql'), 'utf8') === actSql('smf', { audit: false }), 'db/act/smf.sql is up to date (node scripts/act-sql.js smf --no-audit)');
 
 const db = new PGlite();
 await db.exec(`do $$ begin create role anon; create role authenticated; exception when duplicate_object then null; end $$;`);

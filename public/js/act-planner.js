@@ -3,7 +3,7 @@
 // drag bars (whole bar = move, edge = resize), add rows with +, and create / edit / delete. Others read only.
 // 100P: its own Setting page (APL_ON). 5S: a tab inside Setting (edit) and Dashboard (read only), see act-5s.js.
 // Turn it on for another activity by adding its id to PLANNER_ON in planner.js and here (or calling aplRender from a tab).
-const APL_ON = ['100p'];
+const APL_ON = ['100p', 'smf'];
 const APL_COLORS = { p1: '#ec6f73', p2: '#3fbfbf', p3: '#e3a52f', p4: '#8b6fd8', p5: '#4b8bea' };
 // Narrowest column in px; wider screens stretch the columns so the last month ends at the right edge.
 const APL_COL = { year: 15, month: 26 };
@@ -366,4 +366,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
   a5EmployeeSearch(activity, (p) => { ownerId = p.employeeId; $('apl-owner').value = `${p.employeeId} · ${p.name}`; }, aplYear);
 }
 
-for (const id of APL_ON) VIEWS[`${id}-setting`] = (target) => aplRender(target, id);
+for (const id of APL_ON) {
+  VIEWS[`${id}-home`] = (target) => aplRender(target, id, { readOnly: true });
+  VIEWS[`${id}-setting`] = (target) => aplRender(target, id);
+}

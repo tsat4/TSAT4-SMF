@@ -4,7 +4,7 @@
 
 ## ใช้ที่ไหน
 
-- 100P > Setting (หน้าเต็ม)
+- 100P, SMF > Setting (หน้าเต็ม) และ Dashboard (ดูอย่างเดียว)
 - 5S > Setting > แผนงาน (admin วางแผน) และ 5S > Dashboard > Schedule (ดูอย่างเดียว แม้เป็น admin) แทนแผน Gantt เดิม (ผู้ใช้สั่ง 2026-10-25) · ตารางวงกลมแผนตรวจพื้นที่ย้ายไปแท็บ Dashboard > Audit Plan
 - ในแท็บของ 5S ใช้ปีของหน้า 5S (`a5Year`) และวางปุ่มลงแถวเครื่องมือของหน้า (`aplRender(body, act, { inPage, readOnly })`)
 
