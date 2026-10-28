@@ -24,6 +24,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-28 · Claude · ผู้ใช้เพิ่ม **Antigravity** แทน Cursor ช่วงนี้: ใช้โฟลเดอร์ `C:\Work\projects\SMF` และกฎเดียวกับ Cursor · กฎย่อ `.agent/rules/smf.md` · AGENTS.md หัวข้อ 0 อัปเดตแล้ว · ใน HANDOFF ให้เขียนชื่อผู้ทำตามจริง
+
 - 2026-10-28 · Claude · **QCC** (ผู้ใช้สั่ง จาก inbox/QCC.xlsx 10 ชีต FM-QMR-022…031): ตาราง `db/act/qcc.sql` (ทีม + แผนงาน + `tx_qcc_project` 1 กลุ่ม 1 เรื่อง ฟอร์มใน `forms` jsonb + bucket `img_qcc`) · server `qcc.js` · หน้าจอ `act-qcc.js` (Dashboard Summary / Schedule / Team · Transaction โครงการ + dropdown เลือกฟอร์ม · Setting แผนงาน / ทีม) · spec `docs/specs/act-qcc.md` · **ผู้ใช้ต้องรัน `db/act/qcc.sql` ใน Tx Data** · หมายเหตุ: ตอน commit นี้ working copy ของ `docs/HANDOFF.md` และ `server/modules/act/audit.js` ถูกเขียนกลับเป็นเวอร์ชันก่อน commit 0f48789 (ไม่ใช่งานของ Claude session นี้) จึงไม่ได้ commit สองไฟล์นั้น
 
 - 2026-10-28 · Claude · KAIZEN ทีมประจำปี (`mt_kaizen_team` เพิ่ม `target_count` จำนวนเรื่องที่ต้องส่งต่อปี และ `manager_id` ผู้จัดการประเมิน Kaizen หลังส่งเรื่อง, ผังองค์กร 3 ระดับใน Dashboard > Team) · ตัวแทนสมาชิกประจำแผนกเลือกพนักงานในสังกัดสร้างและส่งเรื่อง Kaizen ได้ (ชื่อคนเดิมส่งเรื่องเพิ่มได้ไม่จำกัด) · ประเมินผล Kaizen ด้านหลังฟอร์ม FM-QSM-039 (`tx_kaizen_entry` เพิ่ม `start_on`, `end_on`, `saved_hours` เกรด A–I, `saved_baht` เกรด Q–Z, `scores` 6 หัวข้อ 0–5 คะแนน เกรด J–P, คำนวณ `eval_grade` และ `eval_reward` อัตโนมัติ) · เพิ่ม `PATCH /api/act/:activity/team/:id` · **ผู้ใช้ต้องรัน `db/act/kaizen.sql` ใน Tx Data อีกรอบ**

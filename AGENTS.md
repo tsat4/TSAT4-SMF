@@ -1,17 +1,18 @@
-# กฎสำหรับ AI ทุกตัวในโปรเจกต์นี้ (Claude Code, Cursor และตัวอื่น)
+# กฎสำหรับ AI ทุกตัวในโปรเจกต์นี้ (Claude Code, Cursor, Antigravity และตัวอื่น)
 
 โปรเจกต์นี้มี AI 2 ตัวทำงานพร้อมกันได้ **คนละโฟลเดอร์** แต่เป็น repo, เว็บ (Render) และฐานข้อมูล (Supabase) ชุดเดียวกัน
 **ระบบที่ deploy อยู่ต้องไม่พัง** ทุกตัวจึงต้องทำตามกฎนี้ทุกครั้ง ไม่มีข้อยกเว้น
 
 ## 0. ใครทำงานที่ไหน
 
-| | Cursor | Claude Code |
+| | Cursor / Antigravity (ใช้ทีละตัว) | Claude Code |
 |---|---|---|
 | โฟลเดอร์ | `C:\Work\projects\SMF` (branch `main`) | `C:\Work\projects\SMF-act` (git worktree, branch `claude-act` ติดตาม `origin/main`) |
 | ส่วนที่ดูแลหลัก | ระบบงาน (Store, PD, MTN) + งานรัน SQL ใน Supabase | ระบบกิจกรรม (`server/modules/act/`, `public/js/act*.js`, `db/act/`, `scripts/act-sql.js`, `scripts/*5s*`) |
 | ดึงโค้ดล่าสุด | `git pull --rebase` | `git pull --rebase` |
 | deploy | `git push origin main` | `git push origin HEAD:main` |
 
+- Antigravity (ผู้ใช้เพิ่ม 2026-10-28 แทน Cursor ช่วงที่ Cursor ติด limit) ใช้โฟลเดอร์และกฎเดียวกับ Cursor · กฎย่อของมันอยู่ที่ `.agent/rules/smf.md` (ของ Cursor อยู่ที่ `.cursor/rules/smf.mdc`) · ใน HANDOFF ให้เขียนชื่อผู้ทำตามจริง (Claude / Cursor / Antigravity)
 - ห้ามทำงานในโฟลเดอร์ของอีกตัว ห้าม commit ไฟล์ที่อีกตัวกำลังแก้
 - ไฟล์กลาง (`public/index.html`, `public/app.css`, `server/core/`, `server/modules/index.js`, `scripts/routes.snapshot.txt`, `docs/*`) แตะได้ทั้งคู่: แก้เท่าที่จำเป็น commit ให้เร็ว ถ้า `git pull --rebase` เจอ conflict ให้รวมทั้งสองฝั่ง ห้ามเลือกฝั่งตัวเองทิ้งของอีกตัว
 - `inbox/` (Excel และ SQL ย้ายข้อมูล ไม่อยู่ใน git) มีจริงที่ `SMF\inbox` ส่วน `SMF-act\inbox` เป็นลิงก์ (junction) ไปที่เดียวกัน
