@@ -514,7 +514,7 @@ const ZOOM_THUMBS = 'img.tx-card-img, img.usage-thumb, img.img-zoom';
   document.body.appendChild(box);
   const place = (thumb) => {
     const r = thumb.getBoundingClientRect();
-    const size = Math.min(320, window.innerWidth - 32, window.innerHeight - 32);
+    const size = Math.min(200, window.innerWidth - 32, window.innerHeight - 32);
     const left = r.right + 12 + size <= window.innerWidth ? r.right + 12 : Math.max(16, r.left - 12 - size);
     const top = Math.min(Math.max(16, r.top + r.height / 2 - size / 2), window.innerHeight - 16 - size);
     Object.assign(box.style, { left: `${left}px`, top: `${top}px`, width: `${size}px`, height: `${size}px` });
