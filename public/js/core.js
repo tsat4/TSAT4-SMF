@@ -423,6 +423,9 @@ function openView(name) {
   if (rule && rankOf(rule[0]) < rule[1]) name = 'locked';
   if (name === 'system' && !me.creator) name = 'main';
   view = name;
+  // Dashboard pages use the compact sizes (body[data-dash] in app.css).
+  if (TITLES[name]?.[0] === 'Dashboard') document.body.dataset.dash = '1';
+  else delete document.body.dataset.dash;
   const zone = zoneOf(view);
   if (zone) document.body.dataset.zone = zone;
   else delete document.body.dataset.zone;
