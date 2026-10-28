@@ -216,7 +216,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
     const v = b.values[i];
     const parts = Array.isArray(v) ? v : [v];
     const total = sum(v);
-    return `<div class="ch-stack" style="height:${(total / yL) * 100}%">${total ? parts.map((p, k) => (p ? `<div style="flex:${p};--c:${(b.colors || CHART.series)[k]}"></div>` : '')).reverse().join('') : ''}</div>`;
+    return `<div class="ch-stack" style="height:${(total / yL) * 100}%">${total ? `<span class="ch-val">${chartNum(total, digits)}</span>` : ''}${total ? parts.map((p, k) => (p ? `<div style="flex:${p};--c:${(b.colors || CHART.series)[k]}"></div>` : '')).reverse().join('') : ''}</div>`;
   };
   const scale = (l) => (l.axis === 'right' ? yR : yL);
   const poly = (l) => {
@@ -224,6 +224,12 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
     return pts.length ? `<polyline points="${pts.join(' ')}" fill="none" stroke="${l.color}" stroke-width="2.5"${l.dash ? ' stroke-dasharray="7 5"' : ''} vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>` : '';
   };
   const dots = (l) => (l.dots === false ? '' : l.values.map((v, i) => (v == null ? '' : `<i class="ch-pt" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}"></i>`)).join(''));
+  // Value above each point (below for a dashed line, so a target under its base line does not collide); labels: 'last' = only the latest point (lines that sit close to another line), false = none.
+  const values = (l) => {
+    if (l.labels === false) return '';
+    const last = l.values.reduce((k, v, i) => (v == null ? k : i), -1);
+    return l.values.map((v, i) => (v == null || (l.labels === 'last' && i !== last) ? '' : `<span class="ch-lv${l.dash ? ' is-below' : ''}" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}">${chartNum(v, digits)}</span>`)).join('');
+  };
   const key = (item) => (item.head ? `<b>${esc(item.head)}</b>` : item.line ? `<span><i class="ln${item.dash ? ' is-dash' : ''}" style="--c:${item.line}"></i>${esc(item.label)}</span>` : `<span><i class="sq" style="--c:${item.box}"></i>${esc(item.label)}</span>`);
   return `<div class="ch-plot${yR ? ' has-right' : ''}">
       <div class="ch-titles"><span>${esc(left)}</span>${yR ? `<span>${esc(right)}</span>` : ''}</div>
@@ -232,7 +238,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
         ${[0, 1, 2, 3, 4].map((k) => `<i class="ch-grid" style="bottom:${k * 25}%"></i>`).join('')}
         <div class="ch-cols" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${labels.map((_, i) => `<div class="ch-col" data-i="${i}"><div class="ch-pair">${bars.map((b) => bar(b, i)).join('')}</div></div>`).join('')}</div>
         <svg class="ch-lines" viewBox="0 0 1200 1000" preserveAspectRatio="none" aria-hidden="true">${lines.map(poly).join('')}</svg>
-        ${lines.map(dots).join('')}
+        ${lines.map(dots).join('')}${lines.map(values).join('')}
         <div class="ch-tip" hidden></div>
       </div>
       ${yR ? `<div class="ch-yaxis is-right">${ticks(yR)}</div>` : ''}
@@ -241,6 +247,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
     ${legend.length ? `<div class="ch-legend">${legend.map(key).join('')}</div>` : ''}`;
 }
 
+// Every bar shows its total on top and every line point its value (AGENTS.md: chart rules).
 // Hover box over a chartPlot column; html(i) returns its content (rows: <div class="ch-tip-row"><span>…</span><b>…</b></div>).
 function chartTip(id, html) {
   const area = $(id);

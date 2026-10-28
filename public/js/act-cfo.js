@@ -103,7 +103,7 @@ async function cfoDrawSummary(body) {
       { values: d.months.map((m, i) => (pick ? [cur[i]] : m.scopes)), colors: pick ? [CFO_SCOPE_COLORS[pick - 1]] : CFO_SCOPE_COLORS }
     ],
     lines: [
-      ...(hasBase ? [{ values: cumBase, color: CHART.dark, axis: 'right' }, { values: cumBase.map((v) => v * factor), color: CHART.target, dash: true, axis: 'right' }] : []),
+      ...(hasBase ? [{ values: cumBase, color: CHART.dark, axis: 'right', labels: 'last' }, { values: cumBase.map((v) => v * factor), color: CHART.target, dash: true, axis: 'right', labels: 'last' }] : []),
       { values: cumNow, color: CHART.line, axis: 'right' }
     ],
     legend: [
@@ -123,11 +123,6 @@ async function cfoDrawSummary(body) {
       ${d.scopes.map((x, i) => chartKpi({ label: `Scope ${x.scope}`, value: cfoT(x.tco2e), unit: 'tCO₂e', pill: chartPill(x.tco2e, c.scopes[i]), note: `${cfoPct(x.tco2e, d.total)} ของทั้งหมด`, color: CFO_SCOPE_COLORS[i], pie: d.total ? (x.tco2e / d.total) * 100 : 0 })).join('')}
     </div>
     ${chartCard(`Accumulation CO₂ Emission${pick ? ` · Scope ${pick}` : ''}`, chart)}
-    ${d.departments.length ? chartCard('เทียบตามหน่วยงาน', chartPlot({
-      id: 'cfo-dept', labels: d.departments.slice(0, 8).map((x) => x.label), left: 'tCO₂e', digits: 1,
-      bars: [{ values: d.departments.slice(0, 8).map((x) => x.tco2e), colors: [CFO_SCOPE_COLORS[1]] }],
-      legend: [{ box: CFO_SCOPE_COLORS[1], label: `ปี ${a5Year}` }]
-    })) : ''}
     <div class="table-wrap cfo-month-table"><table class="mo-data-table"><thead><tr><th>เดือน</th>${hasBase ? `<th class="num">${esc(baseName)}</th>` : ''}<th class="num">ปี ${a5Year}</th>${hasBase ? '<th class="num">เป้า</th>' : ''}<th class="num">Scope 1</th><th class="num">Scope 2</th><th class="num">Scope 3</th></tr></thead>
       <tbody>${d.months.map((m) => `<tr><td>${ACT_MONTHS[m.month - 1]}</td>${hasBase ? `<td class="num">${cfoT(m.base)}</td>` : ''}<td class="num">${cfoT(m.total)}</td>${hasBase ? `<td class="num">${cfoT(m.target)}</td>` : ''}${m.scopes.map((x) => `<td class="num">${cfoT(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
   a5Lift(body);
