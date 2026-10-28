@@ -290,7 +290,7 @@ async function cfoDrawInventory(body) {
   const span = 3 + CFO_INV_EF.length + 2 + 1 + 3;
   const line = (r) => `<tr><td title="${esc(r.department)} · ${esc(r.source)}">${esc(r.activity)}<div class="sum-meta">${esc(r.department)} · ${esc(r.scope_code)}</div></td><td>${esc(r.unit)}</td><td class="num">${num(r.qty, 3) || '0'}</td>
     ${CFO_INV_EF.map(([k]) => `<td class="num">${num(r.ef[k])}</td>`).join('')}<td class="num">${num(r.ef.other)}</td><td class="num">${num(r.ef.other_gwp)}</td>
-    <td class="num"><b>${num(r.total_ef)}</b></td><td>${esc(source(r.source_type))}</td><td>${esc(r.substitute || '')}</td><td title="${esc(r.reference || '')}">${esc(r.reference || '')}</td>
+    <td class="num"><b>${num(r.total_ef)}</b></td><td>${esc(source(r.source_type))}</td><td>${esc(r.substitute || '')}</td><td class="cfo-ref" title="${esc(r.reference || '')}">${esc(r.reference || '')}</td>
     ${CFO_INV_TON.map(([k]) => `<td class="num">${num(r.ton[k])}</td>`).join('')}${CFO_INV_CO2E.map(([k]) => `<td class="num">${num(r.tco2e[k])}</td>`).join('')}
     <td class="num"><b>${num(r.total)}</b></td><td class="num">${pct(r.total, total[r.group])}</td><td class="num">${['s1', 's2'].includes(r.group) ? pct(r.total, s12) : ''}</td><td class="num">${r.group === 'separate' ? '' : pct(r.total, s123)}</td></tr>`;
   const sums = (label, list, value, cls = 'cfo-total') => `<tr class="${cls}"><td colspan="${span}">${label}</td>
@@ -781,7 +781,7 @@ function cfoSetEf(body, m, rerender) {
     const list = listQuery(m.ef.filter((e) => (!cfoFilter.scope || e.scope_code.startsWith(`${cfoFilter.scope}-`)) && (!cfoFilter.status || e.status === cfoFilter.status)
       && (!term || `${e.name} ${e.kind || ''} ${e.code || ''}`.toLowerCase().includes(term))), cfoHeads.ef, (e, key) => e[key] ?? '');
     fillTable('cfo-rows', [{ label: 'หมวด', key: 'scope_code' }, { label: 'กลุ่ม', key: 'kind' }, { label: 'ชื่อ', key: 'name' }, { label: 'หน่วย', key: 'unit' }, { label: 'kgCO₂e/หน่วย', key: 'kgco2e', num: true }, { label: 'อ้างอิง', key: 'reference' }, 'ใช้แล้ว', { label: 'สถานะ', key: 'status' }],
-      list.map((e) => `<tr data-pick="${e.id}"><td>${esc(e.scope_code)}</td><td>${esc(e.kind || '')}</td><td title="${esc(e.detail || '')}">${esc(e.name)}</td><td>${esc(e.unit)}</td><td class="num">${e.kgco2e == null ? '-' : cfoT(e.kgco2e)}</td><td>${esc(e.reference || '')}</td><td>${e.used ? '✓' : ''}</td><td>${esc(e.status)}</td></tr>`).join(''), 'ไม่มี EF', headFor(cfoHeads.ef, draw));
+      list.map((e) => `<tr data-pick="${e.id}"><td>${esc(e.scope_code)}</td><td>${esc(e.kind || '')}</td><td title="${esc(e.detail || '')}">${esc(e.name)}</td><td>${esc(e.unit)}</td><td class="num">${e.kgco2e == null ? '-' : cfoT(e.kgco2e)}</td><td class="cfo-ref" title="${esc(e.reference || '')}">${esc(e.reference || '')}</td><td>${e.used ? '✓' : ''}</td><td>${esc(e.status)}</td></tr>`).join(''), 'ไม่มี EF', headFor(cfoHeads.ef, draw));
     bindRowSelect($('cfo-rows'), (id) => { picked = m.ef.find((e) => String(e.id) === id); ['cfo-edit', 'cfo-del'].forEach((b) => { if ($(b)) $(b).disabled = !picked; }); });
   };
   body.innerHTML = `

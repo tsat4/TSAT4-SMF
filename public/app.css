@@ -604,6 +604,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-inv thead tr:first-child th{height:30px;top:0}.cfo-inv thead tr:nth-child(2) th{height:28px;top:30px}.cfo-inv thead th{white-space:normal;line-height:1.25;font-size:11px}
 .cfo-inv tbody td:first-child,.cfo-inv thead tr:first-child th:first-child{position:sticky;left:0;z-index:2;background:var(--mo-surface);min-width:220px;max-width:280px;white-space:normal}
 .cfo-inv thead tr:first-child th:first-child{z-index:6;background:var(--th-bg)}
+td.cfo-ref{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cfo-inv .cfo-group td{background:var(--mo-surface-2);font-weight:600}.cfo-inv .cfo-sub-total td{font-weight:600;background:color-mix(in srgb,var(--mo-text-muted) 7%,var(--mo-surface))}
 .cfo-inv .cfo-total td{font-weight:600;background:color-mix(in srgb,var(--mo-text-muted) 14%,var(--mo-surface))}
 #cfo-rev-rows table{width:100%}.cfo-rev-detail{white-space:normal;min-width:260px;max-width:520px;line-height:1.35;padding-top:4px;padding-bottom:4px}

@@ -126,3 +126,5 @@
 - 2026-10-24 · Cursor · สร้างตาราง tx_* ใน MX, คัดลอกใบเบิก cart 1 ใบ, ติดตั้งทริกเกอร์และ `tx_sto_receive` แล้ว แอปสดยังยิงฐาน TX อยู่ จนกว่าจะสลับค่า Render ในช่วงที่ไม่มีคนใช้
 - 2026-10-24 · Claude · เตรียมรวมฐาน TX เข้า MX: receive เรียก RPC `tx_sto_receive` ถ้ามี ถ้าไม่มีใช้วิธีเดิม เพิ่ม db/ (inspect, receive RPC, คู่มือ) และ `npm run migrate:tx` ยังไม่ได้แตะฐานข้อมูล
 - 2026-10-24 · Claude · แยก `server.js` เป็น `server/core` + `server/modules/{sto,system}` และแยก `public/app.js` เป็น `public/js/*` พฤติกรรมเหมือนเดิม (route และสิทธิ์ทั้ง 30 รายการตรงกับของเดิม) ระบบสิทธิ์รองรับหลายโมดูลแล้ว (`req.user.roles`) เพิ่ม `npm run check`, AGENTS.md, CLAUDE.md, .cursor/rules ไม่ได้แตะฐานข้อมูล
+
+- 2026-10-28 (Claude): CFO แหล่งอ้างอิง (Fr-04.1 + ตาราง EF ใน Setting) ตัดเป็น xxx... ที่ 200px (`td.cfo-ref`), ชี้ค้างเห็นข้อความเต็ม
