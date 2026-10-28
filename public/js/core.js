@@ -501,3 +501,31 @@ function bindHold(button, onDone) {
 }
 
 VIEWS.main = renderMain;
+
+// Hovering a list thumbnail shows it large next to the pointer (ผู้ใช้กำหนด 2026-10-28). One floating box for the
+// whole app, fixed position so table cells that clip overflow do not cut it. New thumbnails: add class img-zoom.
+const ZOOM_THUMBS = 'img.tx-card-img, img.usage-thumb, img.img-zoom';
+(() => {
+  if (!window.matchMedia('(hover: hover)').matches) return;
+  const box = document.createElement('div');
+  box.className = 'img-zoom-box';
+  box.hidden = true;
+  box.innerHTML = '<img alt="">';
+  document.body.appendChild(box);
+  const place = (thumb) => {
+    const r = thumb.getBoundingClientRect();
+    const size = Math.min(320, window.innerWidth - 32, window.innerHeight - 32);
+    const left = r.right + 12 + size <= window.innerWidth ? r.right + 12 : Math.max(16, r.left - 12 - size);
+    const top = Math.min(Math.max(16, r.top + r.height / 2 - size / 2), window.innerHeight - 16 - size);
+    Object.assign(box.style, { left: `${left}px`, top: `${top}px`, width: `${size}px`, height: `${size}px` });
+  };
+  document.addEventListener('mouseover', (event) => {
+    const thumb = event.target.closest?.(ZOOM_THUMBS);
+    if (!thumb || !thumb.getAttribute('src')) return;
+    box.firstChild.src = thumb.src;
+    place(thumb);
+    box.hidden = false;
+  });
+  document.addEventListener('mouseout', (event) => { if (event.target.closest?.(ZOOM_THUMBS)) box.hidden = true; });
+  window.addEventListener('scroll', () => { box.hidden = true; }, true);
+})();
