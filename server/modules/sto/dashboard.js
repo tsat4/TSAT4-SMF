@@ -37,7 +37,7 @@ export function mountDashboard(app, mod) {
   app.get('/api/usage-dashboard', wrap(requireUser), atLeast(mod, 1), wrap(async (req, res) => {
     const year = Number(req.query.year) || new Date().getFullYear();
     if (year < 2000 || year > 2100) return fail(res, 400, 'ปีไม่ถูกต้อง');
-    const wide = rankIn(req.user, mod.id) >= 3;
+    const wide = rankIn(req.user, mod.id) >= 3 || Boolean(req.user.executive);
     let codes = null;
     if (!wide) {
       const grouped = await centersForDepartments([req.user.department || '']);

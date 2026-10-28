@@ -110,24 +110,27 @@ export async function namesOf(ids) {
 
 // What the signed-in user may do in one activity for one year.
 // admin -> Setting · chairman (+ vice) / auditor / area owner / department member -> transaction · everyone -> Dashboard
+// Account level (mt_main_user): creator or admin_of this activity = admin every year · executive = chairman every year.
 export async function accessOf(req, activity, year) {
   const me = req.user.employeeId;
   const t = tablesOf(activity);
-  const none = { admin: Boolean(req.user.creator), chairman: false, auditor: false, teams: [], ownerAreaIds: [], departments: [], member: Boolean(req.user.creator) };
+  const lead = Boolean(req.user.creator) || (req.user.adminOf || []).includes(activity);
+  const executive = Boolean(req.user.executive);
+  const none = { admin: lead, chairman: executive, auditor: false, teams: [], ownerAreaIds: [], departments: [], member: lead || executive };
   // One table says who does what this year, area owners included (role owner + area_id).
   const team = await tx.from(t.team).select('*').eq('year', year).eq('employee_id', me).eq('status', 'Active');
   if (team.error?.code === 'PGRST205') return none;
   if (team.error) throw team.error;
   const roles = team.data || [];
   const access = {
-    admin: Boolean(req.user.creator) || roles.some((r) => r.role === 'admin'),
-    chairman: roles.some((r) => r.role === 'chairman' || r.role === 'vice'),
+    admin: lead || roles.some((r) => r.role === 'admin'),
+    chairman: executive || roles.some((r) => r.role === 'chairman' || r.role === 'vice'),
     auditor: roles.some((r) => r.role === 'auditor'),
     teams: [...new Set(roles.filter((r) => r.team).map((r) => r.team))],
     ownerAreaIds: roles.filter((r) => r.role === 'owner').map((r) => Number(r.area_id)),
     departments: roles.filter((r) => r.role === 'member').map((r) => r.department)
   };
-  access.member = roles.length > 0 || access.admin;
+  access.member = roles.length > 0 || access.admin || executive;
   return access;
 }
 

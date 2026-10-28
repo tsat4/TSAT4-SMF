@@ -11,7 +11,8 @@ export function nameOf(employee) {
 export async function loadUser(employeeId) {
   const { data, error } = await mx
     .from('mt_main_user')
-    .select('employee_id,creator,status,password_expires_at,password_hash,department,mt_main_employee!mt_main_user_employee_id_fkey(prefix,first_name,last_name,department,position,status)')
+    // '*' so executive / admin_of read as missing (not an error) before db/06_main_user_access.sql is run.
+    .select('*,mt_main_employee!mt_main_user_employee_id_fkey(prefix,first_name,last_name,department,position,status)')
     .eq('employee_id', employeeId)
     .maybeSingle();
   if (error) throw error;
@@ -28,13 +29,17 @@ export async function loadUser(employeeId) {
   return data;
 }
 
+const adminOf = (row) => (Array.isArray(row.admin_of) ? row.admin_of : []);
+
 function rolesOf(row) {
   const creator = isCreatorRow(row);
   const roles = {};
   for (const moduleId of Object.keys(MEMBER_TABLES)) {
     const member = row.members?.[moduleId];
-    if (creator) roles[moduleId] = 'admin';
-    else roles[moduleId] = member?.status === 'Active' ? member.role : null;
+    const own = member?.status === 'Active' ? member.role : null;
+    // creator / ผู้ดูแลของระบบนี้ = admin · ผู้บริหาร = at least viewer everywhere.
+    if (creator || adminOf(row).includes(moduleId)) roles[moduleId] = 'admin';
+    else roles[moduleId] = own || (row.executive ? 'viewer' : null);
   }
   return roles;
 }
@@ -46,6 +51,8 @@ export function publicUser(row) {
     employeeId: row.employee_id,
     creator: isCreatorRow(row),
     founder: row.employee_id === CREATOR_ID,
+    executive: Boolean(row.executive),
+    adminOf: adminOf(row),
     roles,
     usageRole: roles.sto ?? null,
     status: row.status,

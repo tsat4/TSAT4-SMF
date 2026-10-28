@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { mx, tx } from '../../core/db.js';
 import { fail, wrap, cleanTerm, adminWriteError, listFilters } from '../../core/http.js';
-import { CREATOR_ID, MEMBER_TABLES, creatorOnly, defineModule } from '../../core/access.js';
+import { ADMIN_SCOPES, CREATOR_ID, MEMBER_TABLES, creatorOnly, defineModule } from '../../core/access.js';
 import { requireUser } from '../../core/users.js';
 import { MAIN_TABLES } from '../../core/tables.js';
 
@@ -22,6 +22,12 @@ function adminValue(column, raw, { insert }) {
     if (!password) return insert && column.required ? null : undefined;
     if (password.length < 8) return null;
     return password;
+  }
+  if (column.type === 'scopes') {
+    if (raw === undefined) return undefined;
+    const list = raw == null || raw === '' ? [] : Array.isArray(raw) ? raw : String(raw).split(',');
+    const ids = [...new Set(list.map((id) => String(id).trim()).filter(Boolean))];
+    return ids.every((id) => ADMIN_SCOPES.includes(id)) ? ids : null;
   }
   if (raw == null || raw === '') return column.required ? null : undefined;
   if (column.type === 'bool') return raw === true || raw === 'true';
@@ -104,7 +110,7 @@ export default defineModule({
       const filters = listFilters(req);
       for (const column of spec.columns) {
         const term = cleanTerm(filters[column.name]);
-        if (!term || !readable.includes(column.name)) continue;
+        if (!term || !readable.includes(column.name) || column.type === 'scopes') continue;
         if (['int', 'qty', 'money'].includes(column.type)) {
           const n = Number(term);
           if (Number.isFinite(n)) query = query.eq(column.name, n);
@@ -118,6 +124,7 @@ export default defineModule({
       }
       const { data, error, count } = await query;
       if (error?.code === 'PGRST205') return fail(res, 400, `ยังไม่มีตาราง ${req.params.name} ในฐานข้อมูล ต้องรัน SQL สร้างตารางก่อน`);
+      if (error?.code === '42703') return fail(res, 400, `ตาราง ${req.params.name} ยังไม่มีคอลัมน์ใหม่ ต้องรัน SQL ใน db/ ก่อน (mt_main_user: db/06_main_user_access.sql)`);
       if (error) return fail(res, 400, 'อ่านตารางไม่ได้');
       res.json({ rows: data || [], total: count || 0 });
     }));

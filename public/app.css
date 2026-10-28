@@ -673,4 +673,6 @@ body[data-zone="work"]{--ch-1:#ea580c}
 #cfo-rows .cfo-group td,.cfo-scope-table .cfo-group td{background:var(--mo-surface-2);font-weight:600}
 .sto-track i{background:color-mix(in srgb,var(--ch-1) 40%,transparent);box-shadow:inset 0 0 0 1px var(--ch-1)}
 @media(max-width:700px){.ch-plot{grid-template-columns:36px minmax(0,1fr)}.ch-plot.has-right{grid-template-columns:36px minmax(0,1fr) 36px}.ch-pair{width:86%;gap:2px}}
-
+/* System > Setting: mt_main_user ผู้ดูแลระบบ (admin_of) checklist */
+.sys-scope-field{grid-column:1/-1}.sys-scopes{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px 12px;margin-top:4px}
+.sys-scopes .check{display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer}.sys-scopes .check input{width:auto;height:auto;margin:0}

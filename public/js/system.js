@@ -10,10 +10,19 @@ const CHOICES = {
 };
 
 TITLES.system = ['Setting', 'ตารางทั้งระบบ'];
+// mt_main_user.admin_of choices: Store + ระบบงาน + ระบบกิจกรรม (server: ADMIN_SCOPES in server/core/access.js).
+const SYS_SCOPES = [['sto', 'Store / Usage'], ...PLANTS.map(([id, label]) => [id, label]), ...ACTIVITIES.map(([id, label]) => [id, label])];
+const SYS_USER_LABELS = { creator: 'จัดการได้ทั้งหมด', executive: 'ผู้บริหาร', admin_of: 'ผู้ดูแลระบบ' };
 
 function columnLabel(table, column) {
-  if (table?.name === 'mt_main_user' && column.name === 'creator') return 'สิทธิ์จัดการระบบ';
+  if (table?.name === 'mt_main_user' && SYS_USER_LABELS[column.name]) return SYS_USER_LABELS[column.name];
   return column.name;
+}
+
+function cellText(column, value) {
+  if (column.type === 'scopes') return (Array.isArray(value) ? value : []).map((id) => (SYS_SCOPES.find(([key]) => key === id) || [, id])[1]).join(', ');
+  if (column.type === 'bool') return value ? '✓' : '';
+  return value ?? '';
 }
 
 function columnControl(table, column, value) {
@@ -21,6 +30,11 @@ function columnControl(table, column, value) {
   const label = columnLabel(table, column);
   if (column.type === 'password') return field(label, `<input id="${id}" type="password" autocomplete="new-password">`);
   if (column.type === 'bool') return field(label, `<select id="${id}"><option value="false">false</option><option value="true"${value ? ' selected' : ''}>true</option></select>`);
+  if (column.type === 'scopes') {
+    const on = Array.isArray(value) ? value : [];
+    // A div, not field(): checkbox labels must not sit inside another label.
+    return `<div class="field sys-scope-field">${label}<div id="${id}" class="sys-scopes">${SYS_SCOPES.map(([key, name]) => `<label class="check"><input type="checkbox" value="${esc(key)}"${on.includes(key) ? ' checked' : ''}> ${esc(name)}</label>`).join('')}</div></div>`;
+  }
   if (CHOICES[column.type]) return field(label, `<select id="${id}">${options(CHOICES[column.type], value)}</select>`);
   const number = ['int', 'qty', 'money'].includes(column.type);
   const step = column.type === 'int' ? '1' : '0.001';
@@ -57,7 +71,7 @@ async function renderSystem(target) {
     countText('sys-count', state.rows.length, data.total);
     setPager('sys', state.offset, data.total);
     const visible = table.columns.filter((column) => column.type !== 'password');
-    fillTable('sys-rows', visible.map((column) => ({ label: columnLabel(table, column), key: column.name })), state.rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(row[column.name] ?? '')}</td>`).join('')}</tr>`).join(''), 'ไม่มีแถว', columnHead());
+    fillTable('sys-rows', visible.map((column) => ({ label: columnLabel(table, column), key: column.name })), state.rows.map((row, index) => `<tr data-pick="${index}">${visible.map((column) => `<td>${esc(cellText(column, row[column.name]))}</td>`).join('')}</tr>`).join(''), 'ไม่มีแถว', columnHead());
     bindRowSelect($('sys-rows'), (pick) => {
       state.selected = state.rows[Number(pick)];
       $('sys-edit').disabled = false;
@@ -72,6 +86,7 @@ async function renderSystem(target) {
       const input = $(`sys-${column.name}`);
       if (!input || input.disabled) continue;
       if (column.type === 'password') { if (input.value) values.password = input.value; continue; }
+      if (column.type === 'scopes') { values[column.name] = [...input.querySelectorAll('input:checked')].map((box) => box.value); continue; }
       values[column.name] = column.type === 'bool' ? input.value === 'true' : input.value;
     }
     if (state.editing) {
@@ -90,8 +105,7 @@ async function renderSystem(target) {
     const table = tableOf();
     const fields = table.columns.map((column) => {
       if (column.type === 'read') return '';
-      const fresh = !state.editing && table.name === 'mt_main_user' && column.name === 'creator';
-      return columnControl(table, column, state.editing ? state.editing[column.name] : (fresh ? true : ''));
+      return columnControl(table, column, state.editing ? state.editing[column.name] : '');
     }).join('');
     const title = table.name === 'mt_main_user'
       ? (state.editing ? 'แก้ไขสิทธิ์จัดการระบบ' : 'เพิ่มสิทธิ์จัดการระบบ')

@@ -128,3 +128,5 @@
 - 2026-10-24 · Claude · แยก `server.js` เป็น `server/core` + `server/modules/{sto,system}` และแยก `public/app.js` เป็น `public/js/*` พฤติกรรมเหมือนเดิม (route และสิทธิ์ทั้ง 30 รายการตรงกับของเดิม) ระบบสิทธิ์รองรับหลายโมดูลแล้ว (`req.user.roles`) เพิ่ม `npm run check`, AGENTS.md, CLAUDE.md, .cursor/rules ไม่ได้แตะฐานข้อมูล
 
 - 2026-10-28 (Claude): CFO แหล่งอ้างอิง (Fr-04.1 + ตาราง EF ใน Setting) ตัดเป็น xxx... ที่ 200px (`td.cfo-ref`), ชี้ค้างเห็นข้อความเต็ม
+
+- 2026-10-28 (Claude): ระดับสิทธิ์ภาพรวมใน `mt_main_user`: `executive` (ผู้บริหาร: ดูทุกหน้า + อนุมัติเท่าประธานทุกกิจกรรม) และ `admin_of text[]` (ผู้ดูแลบางระบบ = admin ของระบบที่ติ๊กทุกปี) · `creator` เดิม = จัดการได้ทั้งหมด (2101999, 2103801 คงไว้ตามที่ผู้ใช้สั่ง) · System > Setting มีช่องติ๊กระบบ · กฎใน AGENTS.md · **SQL ที่รอผู้ใช้รัน: `db/06_main_user_access.sql` ใน Mx Data** (ก่อนรัน ระบบยังใช้ได้ปกติ แต่ตาราง mt_main_user ใน System > Setting จะขึ้นข้อความให้รัน SQL)
