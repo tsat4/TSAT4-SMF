@@ -1,9 +1,9 @@
-// ระบบกิจกรรม > KAIZEN: Dashboard (Summary / Schedule / Team), Transaction (ใบ Kaizen FM-QSM-039 ด้านหน้า + ด้านหลังประเมินผล),
-// Setting (แผนงาน = Planner, ทีมประจำปี + เป้าหมายเรื่องต่อปี + ผู้จัดการประเมิน).
+// ระบบกิจกรรม > KAIZEN: Dashboard (Summary / Ranking / Schedule / Team), Transaction (ใบ Kaizen FM-QSM-039 ด้านหน้า + ด้านหลังประเมินผล),
+// Setting (แผนงาน = Planner, ทีมประจำปี + เป้าหมายเรื่องต่อปี + เป้าขั้นต่ำต่อเดือน ปิดจบก่อน 15 พ.ย. + ผู้จัดการประเมิน).
 // Server: server/modules/act/kaizen.js · spec: docs/specs/act-kaizen.md · uses the shared year (a5Year) of act-5s.js.
 const KZ = 'kaizen';
 const KZ_ROLE_LABEL = { chairman: 'ประธาน', vice: 'รองประธาน', admin: 'ผู้ดูแล (เลขานุการ)', member: 'ตัวแทนสมาชิก (ประจำแผนก)' };
-const KZ_DASH_TABS = { summary: 'Summary', schedule: 'Schedule', team: 'Team' };
+const KZ_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', team: 'Team' };
 const KZ_SET_TABS = { plan: 'แผนงาน', team: 'ทีม' };
 const KZ_KINDS = { person: 'บุคคล', team: 'ทีม', qcc: 'เป็นกิจกรรมที่มาจาก QCC' };
 const KZ_TYPES = [['Q', 'การปรับปรุงด้านคุณภาพ'], ['C', 'การลดต้นทุนการผลิต / ค่าใช้จ่าย'], ['D', 'การปรับปรุงด้านการส่งมอบ'],
@@ -21,8 +21,11 @@ const KZ_CRITERIA = [
   '5. ความปลอดภัย',
   '6. ประสิทธิภาพ'
 ];
+// ต้องปิดจบส่งครบก่อน 15 พ.ย. ของทุกปี: นำจำนวนเรื่องต่อปีหาร 11 เดือน (ม.ค.–พ.ย.) ปัดเศษขึ้นเป็นจำนวนเรื่องขั้นต่ำที่ต้องส่งต่อเดือน
+const KZ_CUTOFF_MONTHS = 11;
 let kzDashTab = 'summary';
 let kzSetTab = 'plan';
+let kzRankMode = 'dept';
 const kzFilter = { status: '', department: '', q: '' };
 const kzHead = { sort: '', dir: 'asc', filters: {} };
 const kzTeamHead = { sort: '', dir: 'asc', filters: {} };
@@ -32,6 +35,9 @@ const kzNum = (n, digits = 2) => Number(n || 0).toLocaleString('en-US', { maximu
 const kzBadge = (s) => `<span class="badge ${KZ_STATUS[s]?.[1] || ''}">${KZ_STATUS[s]?.[0] || esc(s)}</span>`;
 // Invested = labour + material · payback (months) = invested ÷ return per month (server kaizenMoney).
 const kzPayback = (cost, perMonth) => (perMonth > 0 ? Math.round((cost / perMonth) * 100) / 100 : null);
+const kzCutoffDate = (year) => `${year}-11-15`;
+const kzOnTime = (submittedOn, year) => Boolean(submittedOn) && String(submittedOn).slice(0, 10) <= kzCutoffDate(year);
+const kzMonthlyMin = (target) => Math.ceil(Math.max(0, Number(target || 0)) / KZ_CUTOFF_MONTHS);
 
 function kzEvalCalc(hours, baht, scores) {
   const h = Math.max(0, Number(hours || 0));
@@ -103,6 +109,7 @@ async function kzDashboard(target) {
   const rerender = () => kzDashboard(target).catch(onErr);
   target.querySelectorAll('[data-kzdash]').forEach((node) => { node.onclick = () => { kzDashTab = node.dataset.kzdash; rerender(); }; });
   $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
+  if (kzDashTab === 'ranking') return kzDrawRanking(body);
   if (kzDashTab === 'schedule') return aplRender(body, KZ, { inPage: true, readOnly: true });
   if (kzDashTab === 'team') return kzDrawTeam(body, me.access.admin);
   return kzDrawSummary(body);
@@ -151,17 +158,164 @@ async function kzDrawSummary(body) {
   const departments = Object.values(byDept).sort((a, b) => b.count - a.count || b.target - a.target || a.department.localeCompare(b.department));
   body.innerHTML = `
     <div class="ch-kpis">
-      ${chartKpi({ icon: 'lightbulb', label: 'Kaizen ที่ส่ง', value: kzNum(sent.length, 0), unit: 'ใบ', note: `เป้าปีนี้ ${kzNum(totalTarget, 0)} ใบ · ร่าง ${kzNum(d.rows.length - sent.length, 0)} ใบ` })}
+      ${chartKpi({ icon: 'lightbulb', label: 'Kaizen ที่ส่ง', value: kzNum(sent.length, 0), unit: 'ใบ', note: `เป้าปีนี้ ${kzNum(totalTarget, 0)} ใบ (ก่อน 15 พ.ย.) · ร่าง ${kzNum(d.rows.length - sent.length, 0)} ใบ` })}
       ${chartKpi({ icon: 'verified', label: 'อนุมัติแล้ว', value: kzNum(approved.length, 0), unit: 'ใบ', note: `รอพิจารณา ${kzNum(waiting.length, 0)} ใบ · รางวัล ${kzNum(totalReward, 0)} บาท` })}
       ${chartKpi({ icon: 'payments', label: 'เงินที่ใช้ในการปรับปรุง', value: kzMoney(cost), unit: 'บาท', note: 'ค่าแรง + ค่าอุปกรณ์ (อนุมัติแล้ว)' })}
       ${chartKpi({ icon: 'savings', label: 'ผลตอบแทน', value: kzMoney(perMonth), unit: 'บาท/เดือน', note: `ปีละ ${kzMoney(perMonth * 12)} บาท` })}
       ${chartKpi({ icon: 'hourglass_bottom', label: 'ระยะเวลาคืนทุน (รวม)', value: kzPayback(cost, perMonth) == null ? '-' : kzNum(kzPayback(cost, perMonth)), unit: 'เดือน', note: 'เงินที่ใช้ ÷ ผลตอบแทนต่อเดือน' })}
     </div>
     ${chartCard(`Kaizen รายเดือน ปี ${a5Year}`, chart, 'ตามวันที่เสนอ')}
-    ${chartCard('ตามหน่วยงานและเป้าหมายประจำปี', `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>หน่วยงาน</th><th>ตัวแทนสมาชิก</th><th>ผู้จัดการประเมิน</th><th class="num">เป้า/ปี (ใบ)</th><th class="num">ส่งแล้ว (ใบ)</th><th class="num">อนุมัติ (ใบ)</th><th class="num">เงินที่ใช้ (บาท)</th><th class="num">ผลตอบแทน (บาท/เดือน)</th><th class="num">คืนทุน (เดือน)</th><th class="num">เงินรางวัล (บาท)</th></tr></thead>
-      <tbody>${departments.map((x) => `<tr><td>${esc(x.department)}</td><td>${esc([...new Set(x.reps)].join(', ') || '-')}</td><td>${esc([...new Set(x.managers)].join(', ') || '-')}</td><td class="num">${kzNum(x.target, 0)}</td><td class="num">${kzNum(x.count, 0)}</td><td class="num">${kzNum(x.approved, 0)}</td><td class="num">${kzMoney(x.cost)}</td><td class="num">${kzMoney(x.perMonth)}</td>
-        <td class="num">${kzPayback(x.cost, x.perMonth) == null ? '-' : kzNum(kzPayback(x.cost, x.perMonth))}</td><td class="num">${kzNum(x.reward, 0)}</td></tr>`).join('') || '<tr><td colspan="10" class="empty">ยังไม่มีข้อมูลทีมหรือใบ Kaizen</td></tr>'}</tbody></table></div>`)}`;
+    ${chartCard('ตามหน่วยงานและเป้าหมายประจำปี (ปิดจบก่อน 15 พ.ย.)', `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>หน่วยงาน</th><th>ตัวแทนสมาชิก</th><th>ผู้จัดการประเมิน</th><th class="num">เป้า/ปี (ใบ)</th><th class="num">ขั้นต่ำ/เดือน</th><th class="num">ส่งแล้ว (ใบ)</th><th class="num">อนุมัติ (ใบ)</th><th class="num">เงินที่ใช้ (บาท)</th><th class="num">ผลตอบแทน (บาท/เดือน)</th><th class="num">คืนทุน (เดือน)</th><th class="num">เงินรางวัล (บาท)</th></tr></thead>
+      <tbody>${departments.map((x) => `<tr><td>${esc(x.department)}</td><td>${esc([...new Set(x.reps)].join(', ') || '-')}</td><td>${esc([...new Set(x.managers)].join(', ') || '-')}</td><td class="num">${kzNum(x.target, 0)}</td><td class="num">${kzNum(kzMonthlyMin(x.target), 0)}</td><td class="num">${kzNum(x.count, 0)}</td><td class="num">${kzNum(x.approved, 0)}</td><td class="num">${kzMoney(x.cost)}</td><td class="num">${kzMoney(x.perMonth)}</td>
+        <td class="num">${kzPayback(x.cost, x.perMonth) == null ? '-' : kzNum(kzPayback(x.cost, x.perMonth))}</td><td class="num">${kzNum(x.reward, 0)}</td></tr>`).join('') || '<tr><td colspan="11" class="empty">ยังไม่มีข้อมูลทีมหรือใบ Kaizen</td></tr>'}</tbody></table></div>`)}`;
   chartTip('kz-plot', (i) => `<strong>${ACT_MONTHS[i]} ${a5Year}</strong><div class="ch-tip-row"><span>อนุมัติ</span><b>${byMonth(approved)[i]} ใบ</b></div><div class="ch-tip-row"><span>รอพิจารณา</span><b>${byMonth(waiting)[i]} ใบ</b></div>`);
+}
+
+// SVG wreath + crown + rank number (1 = Gold, 2 = Silver, 3 = Bronze) for the Podium.
+function kzPodiumSvg(rank) {
+  const palette = {
+    1: ['#fef08a', '#f59e0b', '#b45309'],
+    2: ['#f8fafc', '#cbd5e1', '#64748b'],
+    3: ['#fed7aa', '#d97706', '#78350f']
+  }[rank];
+  const gid = `kz-g-${rank}`;
+  return `<svg class="kz-pod-badge" viewBox="0 0 120 104" aria-hidden="true">
+    <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${palette[0]}"/><stop offset="55%" stop-color="${palette[1]}"/><stop offset="100%" stop-color="${palette[2]}"/></linearGradient></defs>
+    <path fill="url(#${gid})" d="M48 18 L52 8 L60 15 L68 8 L72 18 Z"/>
+    <path fill="none" stroke="url(#${gid})" stroke-width="3.5" stroke-linecap="round" d="M56 88 C30 82 18 60 24 34 M64 88 C90 82 102 60 96 34"/>
+    <g fill="url(#${gid})">
+      <ellipse cx="22" cy="40" rx="6" ry="3" transform="rotate(-35 22 40)"/><ellipse cx="21" cy="52" rx="6.5" ry="3.2" transform="rotate(-20 21 52)"/><ellipse cx="25" cy="64" rx="6.5" ry="3.2" transform="rotate(-5 25 64)"/><ellipse cx="34" cy="75" rx="6.5" ry="3.2" transform="rotate(15 34 75)"/><ellipse cx="46" cy="83" rx="6" ry="3" transform="rotate(30 46 83)"/>
+      <ellipse cx="98" cy="40" rx="6" ry="3" transform="rotate(35 98 40)"/><ellipse cx="99" cy="52" rx="6.5" ry="3.2" transform="rotate(20 99 52)"/><ellipse cx="95" cy="64" rx="6.5" ry="3.2" transform="rotate(5 95 64)"/><ellipse cx="86" cy="75" rx="6.5" ry="3.2" transform="rotate(-15 86 75)"/><ellipse cx="74" cy="83" rx="6" ry="3" transform="rotate(-30 74 83)"/>
+    </g>
+    <text x="60" y="64" text-anchor="middle" fill="url(#${gid})" font-size="40" font-weight="800" font-family="system-ui,sans-serif">${rank}</text>
+  </svg>`;
+}
+
+// Dashboard > Ranking: Annual Kaizen Podium (Top 1–2–3) + Department / Individual Ranking table & monthly minimum tracker (Jan–Nov, cut-off 15 Nov).
+async function kzDrawRanking(body) {
+  const d = await a5Api(KZ, `kaizen/list?year=${a5Year}`);
+  const sent = d.rows.filter((r) => r.status !== 'DRAFT');
+  const today = new Date();
+  const curYear = today.getFullYear();
+  const curMonth = a5Year < curYear ? 12 : a5Year > curYear ? 0 : today.getMonth() + 1;
+  const pastCutoff = a5Year < curYear || (a5Year === curYear && today.toISOString().slice(0, 10) > kzCutoffDate(a5Year));
+
+  // Build department ranking rows
+  const byDept = {};
+  const ensureDept = (k) => {
+    const key = k || '-';
+    byDept[key] = byDept[key] || {
+      department: key, reps: [], target: 0, sentTotal: 0, sentOnTime: 0, approved: 0, approvedOnTime: 0,
+      perMonth: 0, reward: 0, monthSent: Array(KZ_CUTOFF_MONTHS).fill(0)
+    };
+    return byDept[key];
+  };
+  (d.teamTargets || []).forEach((t) => {
+    const g = ensureDept(t.department);
+    if (t.name || t.employee_id) g.reps.push(t.name || t.employee_id);
+    g.target += Number(t.target_count || 0);
+  });
+  sent.forEach((r) => {
+    const g = ensureDept(r.department);
+    const onTime = kzOnTime(r.submitted_on, a5Year);
+    const m = Number(String(r.submitted_on || '').slice(5, 7));
+    g.sentTotal += 1;
+    if (onTime) {
+      g.sentOnTime += 1;
+      if (m >= 1 && m <= KZ_CUTOFF_MONTHS) g.monthSent[m - 1] += 1;
+    }
+    if (r.status === 'APPROVED') {
+      g.approved += 1;
+      if (onTime) g.approvedOnTime += 1;
+      g.perMonth += Number(r.return_month || 0);
+      g.reward += Number(r.eval_reward || 0);
+    }
+  });
+  const deptRows = Object.values(byDept).map((g) => {
+    const monthlyMin = kzMonthlyMin(g.target);
+    const pct = g.target > 0 ? Math.round((g.approvedOnTime / g.target) * 1000) / 10 : (g.approvedOnTime > 0 ? 100 : 0);
+    const sentPct = g.target > 0 ? Math.round((g.sentOnTime / g.target) * 1000) / 10 : (g.sentOnTime > 0 ? 100 : 0);
+    return { ...g, monthlyMin, pct, sentPct };
+  }).sort((a, b) => b.pct - a.pct || b.reward - a.reward || b.perMonth - a.perMonth || b.sentOnTime - a.sentOnTime || a.department.localeCompare(b.department));
+
+  // Build individual ranking rows
+  const byPerson = {};
+  sent.forEach((r) => {
+    const k = String(r.employee_id || '-');
+    byPerson[k] = byPerson[k] || {
+      employee_id: k, name: r.name || k, department: r.department || '-',
+      sentTotal: 0, sentOnTime: 0, approved: 0, approvedOnTime: 0, perMonth: 0, reward: 0, grades: []
+    };
+    const p = byPerson[k];
+    const onTime = kzOnTime(r.submitted_on, a5Year);
+    p.sentTotal += 1;
+    if (onTime) p.sentOnTime += 1;
+    if (r.status === 'APPROVED') {
+      p.approved += 1;
+      if (onTime) p.approvedOnTime += 1;
+      p.perMonth += Number(r.return_month || 0);
+      p.reward += Number(r.eval_reward || 0);
+      if (r.eval_grade && r.eval_grade !== '-') p.grades.push(r.eval_grade);
+    }
+  });
+  const personRows = Object.values(byPerson)
+    .sort((a, b) => b.approvedOnTime - a.approvedOnTime || b.reward - a.reward || b.perMonth - a.perMonth || b.sentOnTime - a.sentOnTime || a.employee_id.localeCompare(b.employee_id));
+
+  const list = kzRankMode === 'person' ? personRows : deptRows;
+  const podiumSlot = (rank) => {
+    const item = list[rank - 1];
+    const title = item ? (kzRankMode === 'person' ? (item.name || item.employee_id) : item.department) : 'ยังไม่มีผู้ได้รับอันดับ';
+    const sub = item
+      ? (kzRankMode === 'person' ? `${item.employee_id} · ${item.department}` : ([...new Set(item.reps)].join(', ') || 'ตัวแทนแผนก'))
+      : '-';
+    const stat = item
+      ? (kzRankMode === 'person'
+        ? `อนุมัติ ${kzNum(item.approvedOnTime, 0)} เรื่อง · รางวัล ${kzNum(item.reward, 0)}฿`
+        : `สำเร็จ ${kzNum(item.pct, 1)}% (${kzNum(item.approvedOnTime, 0)}/${kzNum(item.target, 0)}) · รางวัล ${kzNum(item.reward, 0)}฿`)
+      : 'รอผลประเมิน';
+    return `<div class="kz-pod-slot is-${rank}" data-x="">
+      ${kzPodiumSvg(rank)}
+      <div class="kz-pod-name" title="${esc(title)}">${esc(title)}</div>
+      <div class="kz-pod-sub" title="${esc(sub)}">${esc(sub)}</div>
+      <div class="kz-pod-stat">${esc(stat)}</div>
+      <div class="kz-pod-step"></div>
+    </div>`;
+  };
+
+  const monthDots = (g) => {
+    let cum = 0;
+    return `<div class="kz-months">${g.monthSent.map((cnt, i) => {
+      cum += cnt;
+      const m = i + 1;
+      const met = (g.monthlyMin > 0 ? cnt >= g.monthlyMin : cnt > 0) || (g.target > 0 && cum >= g.target);
+      const due = m < curMonth || (m === 11 && pastCutoff);
+      const cls = met ? 'is-done' : (due && g.monthlyMin > 0 ? 'is-missing' : '');
+      const tip = `${ACT_MONTHS_SHORT[i]} ${a5Year}: ส่ง ${cnt} เรื่อง (ขั้นต่ำ ${g.monthlyMin} เรื่อง/เดือน · สะสม ${cum}/${g.target} เรื่อง)`;
+      return `<i class="${cls}" title="${esc(tip)}"></i>`;
+    }).join('')}</div>`;
+  };
+
+  const rankCell = (i) => (i < 3 ? `<span class="kz-rank-badge is-${i + 1}">${i + 1}</span>` : `${i + 1}`);
+
+  const tableHtml = kzRankMode === 'person'
+    ? chartCard(`ตารางจัดอันดับรายบุคคล ปี ${a5Year} (ส่งภายใน 15 พ.ย. ${a5Year})`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th class="cfo-c">อันดับ</th><th>รหัส</th><th>ชื่อผู้เสนอ</th><th>หน่วยงาน</th><th class="num">ส่งทัน 15 พ.ย. (ใบ)</th><th class="num">ส่งรวม (ใบ)</th><th class="num">อนุมัติทัน 15 พ.ย. (ใบ)</th><th>เกรดที่ได้</th><th class="num">ผลตอบแทน (บาท/เดือน)</th><th class="num">เงินรางวัลรวม (บาท)</th></tr></thead>
+      <tbody>${personRows.map((p, i) => `<tr><td class="cfo-c">${rankCell(i)}</td><td>${esc(p.employee_id)}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.department)}</td><td class="num">${kzNum(p.sentOnTime, 0)}</td><td class="num">${kzNum(p.sentTotal, 0)}</td><td class="num"><b>${kzNum(p.approvedOnTime, 0)}</b></td><td>${esc([...new Set(p.grades)].join(', ') || '-')}</td><td class="num">${kzMoney(p.perMonth)}</td><td class="num"><b>${kzNum(p.reward, 0)}</b></td></tr>`).join('') || '<tr><td colspan="10" class="empty">ยังไม่มีข้อมูลส่งเรื่อง Kaizen ปีนี้</td></tr>'}</tbody></table></div>`, 'ตัดสินจาก: เรื่องที่อนุมัติทัน 15 พ.ย. → เงินรางวัลรวม → ผลตอบแทน')
+    : chartCard(`ตารางจัดอันดับตามแผนก ปี ${a5Year} (ปิดจบส่งครบก่อน 15 พ.ย. ${a5Year})`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th class="cfo-c">อันดับ</th><th>หน่วยงาน</th><th>ตัวแทนสมาชิก</th><th class="num">เป้า/ปี (เรื่อง)</th><th class="num">ขั้นต่ำ/เดือน (เรื่อง)</th><th class="num">ส่งทัน 15 พ.ย.</th><th class="num">อนุมัติทัน 15 พ.ย.</th><th>ความสำเร็จเทียบเป้า</th><th>รายเดือน (ม.ค.–พ.ย.)</th><th class="num">ผลตอบแทน (บาท/เดือน)</th><th class="num">เงินรางวัลรวม (บาท)</th></tr></thead>
+      <tbody>${deptRows.map((g, i) => `<tr><td class="cfo-c">${rankCell(i)}</td><td><b>${esc(g.department)}</b></td><td>${esc([...new Set(g.reps)].join(', ') || '-')}</td><td class="num">${kzNum(g.target, 0)}</td><td class="num">${kzNum(g.monthlyMin, 0)}</td><td class="num">${kzNum(g.sentOnTime, 0)}${g.sentTotal > g.sentOnTime ? ` <small class="sum-meta">(+${g.sentTotal - g.sentOnTime} หลังกำหนด)</small>` : ''}</td><td class="num"><b>${kzNum(g.approvedOnTime, 0)}</b></td>
+        <td><div class="cfo-prog"><span><i style="width:${Math.min(100, g.pct)}%"></i></span><b>${kzNum(g.pct, 1)}%</b></div></td>
+        <td>${monthDots(g)}</td><td class="num">${kzMoney(g.perMonth)}</td><td class="num"><b>${kzNum(g.reward, 0)}</b></td></tr>`).join('') || '<tr><td colspan="11" class="empty">ยังไม่มีข้อมูลทีมหรือใบ Kaizen ปีนี้</td></tr>'}</tbody></table></div>`, 'ขั้นต่ำ/เดือน = ⌈เป้าต่อปี ÷ 11 เดือน⌉ · ตัดสินจาก: % อนุมัติทัน 15 พ.ย. → เงินรางวัลรวม → ผลตอบแทน');
+
+  body.innerHTML = `
+    <div class="toolbar a5-filters">${a5Seg('data-kzrank', { dept: 'ตามแผนก/หน่วยงาน', person: 'ตามบุคคล (ผู้เสนอ)' }, kzRankMode)}</div>
+    <div class="kz-podium">${[2, 1, 3].map(podiumSlot).join('')}</div>
+    ${tableHtml}`;
+  a5Lift(body);
+  document.querySelectorAll('[data-kzrank]').forEach((node) => {
+    node.onclick = () => {
+      kzRankMode = node.dataset.kzrank;
+      kzDrawRanking(body).catch(onErr);
+    };
+  });
 }
 
 // Dashboard > Team: org chart by level (ประธาน · รองประธาน / ผู้ดูแล · ตัวแทนสมาชิกประจำแผนก) + annual target & manager table.
@@ -174,17 +328,17 @@ async function kzDrawTeam(body, admin) {
     { label: 'รองประธาน , ผู้ดูแล', color: 'var(--cfo-tier-2)', people: [...active.filter((p) => p.role === 'vice'), ...active.filter((p) => p.role === 'admin')] },
     { label: 'ตัวแทนสมาชิก (ประจำแผนก)', color: 'var(--cfo-tier-3)', people: active.filter((p) => p.role === 'member').sort((a, b) => String(a.department).localeCompare(String(b.department))) }
   ];
-  const card = (p) => `<div class="cfo-person${p.role === 'member' ? ' is-wide' : ''}"><span class="material-symbols-rounded">person</span><strong>${esc(p.name ? `คุณ${first(p.name)}` : p.employee_id)}</strong><small>${esc(p.department || '')}</small>${p.role === 'member' ? `<small>เป้า ${kzNum(p.target_count || 0, 0)} เรื่อง/ปี</small><small>ผจก. ${esc(p.manager_name ? `คุณ${first(p.manager_name)}` : p.manager_id || '-')}</small>` : ''}</div>`;
+  const card = (p) => `<div class="cfo-person${p.role === 'member' ? ' is-wide' : ''}"><span class="material-symbols-rounded">person</span><strong>${esc(p.name ? `คุณ${first(p.name)}` : p.employee_id)}</strong><small>${esc(p.department || '')}</small>${p.role === 'member' ? `<small>เป้า ${kzNum(p.target_count || 0, 0)} เรื่อง/ปี (≥ ${kzNum(kzMonthlyMin(p.target_count), 0)}/ด.)</small><small>ผจก. ${esc(p.manager_name ? `คุณ${first(p.manager_name)}` : p.manager_id || '-')}</small>` : ''}</div>`;
   const members = tiers[2].people;
   body.innerHTML = `
     ${admin ? `<div class="action-bar a5-actions">${button('kz-team-edit', 'แก้ไขทีม')}</div>` : ''}
     <section class="card cfo-team">
-      <div class="plan-head"><div class="card-title">โครงสร้างทีม Kaizen · ปี ${a5Year}</div><span class="sum-meta">${kzNum(active.length, 0)} คน</span></div>
+      <div class="plan-head"><div class="card-title">โครงสร้างทีม Kaizen · ปี ${a5Year}</div><span class="sum-meta">${kzNum(active.length, 0)} คน · ปิดจบส่งครบก่อน 15 พ.ย. ${a5Year}</span></div>
       ${tiers.map((t) => `<div class="cfo-tier">${t.people.length ? `<div class="cfo-tier-people">${t.people.map(card).join('')}</div>` : '<p class="empty">ยังไม่มี</p>'}
         <div class="cfo-tier-rule" style="--tier:${t.color}"><span>${esc(t.label)}</span></div></div>`).join('')}
     </section>
-    ${chartCard(`ตัวแทนสมาชิกประจำปี ${a5Year} และผู้จัดการประเมิน`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>แผนกที่ดูแล</th><th>รหัสตัวแทน</th><th>ชื่อตัวแทนสมาชิก</th><th class="num">จำนวนเรื่องที่ต้องส่ง/ปี</th><th>ผู้จัดการประเมิน Kaizen</th></tr></thead>
-      <tbody>${members.map((m) => `<tr><td>${esc(m.department || '-')}</td><td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td class="num">${kzNum(m.target_count || 0, 0)}</td><td>${m.manager_id ? `${esc(m.manager_id)} · ${esc(m.manager_name)}` : '<span class="sum-meta">ยังไม่ระบุ</span>'}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">ยังไม่ได้แต่งตั้งตัวแทนสมาชิกประจำปีนี้</td></tr>'}</tbody></table></div>`)}`;
+    ${chartCard(`ตัวแทนสมาชิกประจำปี ${a5Year} และผู้จัดการประเมิน`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th>แผนกที่ดูแล</th><th>รหัสตัวแทน</th><th>ชื่อตัวแทนสมาชิก</th><th class="num">เป้าส่ง/ปี (เรื่อง)</th><th class="num">ขั้นต่ำ/เดือน (เรื่อง)</th><th class="cfo-c">กำหนดปิดจบ</th><th>ผู้จัดการประเมิน Kaizen</th></tr></thead>
+      <tbody>${members.map((m) => `<tr><td>${esc(m.department || '-')}</td><td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td class="num">${kzNum(m.target_count || 0, 0)}</td><td class="num">${kzNum(kzMonthlyMin(m.target_count), 0)}</td><td class="cfo-c">15 พ.ย. ${a5Year}</td><td>${m.manager_id ? `${esc(m.manager_id)} · ${esc(m.manager_name)}` : '<span class="sum-meta">ยังไม่ระบุ</span>'}</td></tr>`).join('') || '<tr><td colspan="7" class="empty">ยังไม่ได้แต่งตั้งตัวแทนสมาชิกประจำปีนี้</td></tr>'}</tbody></table></div>`, 'ขั้นต่ำ/เดือน = ⌈เป้าต่อปี ÷ 11 เดือน⌉')}`;
   a5Lift(body);
   if (admin) $('kz-team-edit').onclick = () => { kzSetTab = 'team'; openView(`${KZ}-setting`); };
 }
@@ -225,7 +379,7 @@ async function kzEntries(target) {
         ${button('kz-open', 'ดู', 'secondary', 'disabled')}${button('kz-add', 'สร้าง', 'primary')}${button('kz-edit', 'แก้ไข', 'secondary', 'disabled')}${button('kz-del', 'ลบ', 'danger', 'disabled')}</div>
     </div>
     <div class="table-wrap sheet" id="kz-rows"></div>
-    <p class="sum-meta">${kzNum(d.rows.length, 0)} ใบ · ตัวแทนสมาชิกเลือกพนักงานในสังกัดส่งเรื่องได้ (ชื่อเดิมส่งซ้ำได้) · ผู้จัดการประจำแผนกประเมินหลังส่งเรื่อง</p>`;
+    <p class="sum-meta">${kzNum(d.rows.length, 0)} ใบ · ปิดจบส่งครบก่อน 15 พ.ย. ${a5Year} · ตัวแทนสมาชิกเลือกพนักงานในสังกัดส่งเรื่องได้ (ชื่อเดิมส่งซ้ำได้)</p>`;
   $('kz-f-q').value = kzFilter.q;
   draw();
   a5Lift(body);
@@ -416,7 +570,7 @@ async function kzSetting(target) {
   return aplRender(body, KZ, { inPage: true });
 }
 
-// Setting > ทีม: ประธาน · รองประธาน · ผู้ดูแล · ตัวแทนสมาชิก (ประจำแผนก + จำนวนเรื่องที่ต้องส่งต่อปี + ผู้จัดการประเมิน Kaizen).
+// Setting > ทีม: ประธาน · รองประธาน · ผู้ดูแล · ตัวแทนสมาชิก (ประจำแผนก + จำนวนเรื่องที่ต้องส่งต่อปี + ขั้นต่ำต่อเดือน ปิดจบก่อน 15 พ.ย. + ผู้จัดการประเมิน Kaizen).
 async function kzSetTeam(body, admin, rerender) {
   const data = await a5Api(KZ, `team?year=${a5Year}`);
   let picked = null;
@@ -425,22 +579,23 @@ async function kzSetTeam(body, admin, rerender) {
   const rows = listQuery(
     [...data.members].sort((a, b) => keys.indexOf(a.role) - keys.indexOf(b.role) || String(a.department || '').localeCompare(String(b.department || '')) || String(a.employee_id).localeCompare(String(b.employee_id))),
     kzTeamHead,
-    (m, key) => (key === 'role' ? KZ_ROLE_LABEL[m.role] || m.role : m[key] ?? '')
+    (m, key) => (key === 'role' ? KZ_ROLE_LABEL[m.role] || m.role : key === 'monthly_min' ? kzMonthlyMin(m.target_count) : m[key] ?? '')
   );
   body.innerHTML = `
     ${admin ? `<div class="action-bar a5-actions">${button('kz-t-add', 'เพิ่มสมาชิก', 'primary')}${button('kz-t-edit', 'แก้ไข', 'secondary', 'disabled')}${button('kz-t-del', 'ลบ', 'danger', 'disabled')}${button('kz-t-copy', `คัดลอกจากปี ${a5Year - 1}`)}</div>` : ''}
     <div class="table-wrap sheet" id="kz-t-rows"></div>
-    <p class="sum-meta">${kzNum(rows.length, 0)} รายชื่อ · ตัวแทนสมาชิกจะดูแลแผนกตนเอง เลือกสมาชิกในสังกัดส่ง Kaizen และระบุผู้จัดการประเมินหลังส่งเรื่อง</p>`;
+    <p class="sum-meta">${kzNum(rows.length, 0)} รายชื่อ · ปิดจบส่งครบก่อน 15 พ.ย. ของทุกปี (ขั้นต่ำ/เดือน = เป้าต่อปี ÷ 11 เดือน ม.ค.–พ.ย. ปัดเศษขึ้น)</p>`;
   fillTable('kz-t-rows', [
     { label: 'บทบาท', key: 'role' },
     { label: 'รหัส', key: 'employee_id' },
     { label: 'ชื่อ', key: 'name' },
     { label: 'แผนกที่ดูแล', key: 'department' },
     { label: 'เป้าส่ง/ปี (เรื่อง)', key: 'target_count', num: true },
+    { label: 'ขั้นต่ำ/เดือน (เรื่อง)', key: 'monthly_min', num: true },
     { label: 'ผู้จัดการประเมิน Kaizen', key: 'manager_name' },
     { label: 'สถานะ', key: 'status' }
   ], rows.map((m) => `<tr data-pick="${m.id}"><td>${esc(KZ_ROLE_LABEL[m.role] || m.role)}</td><td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td>${esc(m.department || '')}</td>
-    <td class="num">${m.role === 'member' ? kzNum(m.target_count || 0, 0) : '-'}</td><td>${m.role === 'member' ? (m.manager_id ? `${esc(m.manager_id)} · ${esc(m.manager_name)}` : '<span class="sum-meta">ยังไม่ระบุ</span>') : '-'}</td><td>${esc(m.status)}</td></tr>`).join(''),
+    <td class="num">${m.role === 'member' ? kzNum(m.target_count || 0, 0) : '-'}</td><td class="num">${m.role === 'member' ? kzNum(kzMonthlyMin(m.target_count), 0) : '-'}</td><td>${m.role === 'member' ? (m.manager_id ? `${esc(m.manager_id)} · ${esc(m.manager_name)}` : '<span class="sum-meta">ยังไม่ระบุ</span>') : '-'}</td><td>${esc(m.status)}</td></tr>`).join(''),
   `ยังไม่มีทีมปี ${a5Year}`, headFor(kzTeamHead, () => kzSetTeam(body, admin, rerender).catch(onErr)));
   a5Lift(body);
   if (!admin) return;
@@ -459,6 +614,7 @@ async function kzSetTeam(body, admin, rerender) {
       <datalist id="kz-dept-list">${depts.map((d) => `<option value="${esc(d)}">`).join('')}</datalist>
       ${field('แผนกที่ดูแล (เฉพาะตัวแทนสมาชิก)', `<input id="kz-dept" list="kz-dept-list" maxlength="80" value="${esc(m?.department || '')}" placeholder="เช่น PD1">`)}
       ${field('จำนวนเรื่องที่ต้องส่งต่อปี (เฉพาะตัวแทนสมาชิก)', `<input id="kz-target" type="number" min="0" step="1" value="${esc(m?.target_count ?? 0)}">`)}
+      <p class="sum-meta" id="kz-target-note"></p>
       <div id="kz-mgr-wrap">
         ${mgrBlock}
         ${field('ผู้จัดการประเมิน Kaizen หลังส่งเรื่อง', `<input id="kz-mgr-pick" readonly value="${esc(chosenMgr ? `${chosenMgr.employeeId} · ${chosenMgr.name}` : '')}" placeholder="ค้นและเลือกผู้จัดการประเมิน">`)}
@@ -513,11 +669,18 @@ async function kzSetTeam(body, admin, rerender) {
     };
     $('kz-mgr-search').onclick = () => runMgrSearch().catch(onErr);
     onEnter('kz-mgr-q', () => runMgrSearch().catch(onErr));
+    const syncTargetNote = () => {
+      const n = Math.max(0, Math.floor(Number($('kz-target').value) || 0));
+      $('kz-target-note').textContent = `ต้องส่งอย่างน้อย ${kzNum(kzMonthlyMin(n), 0)} เรื่อง/เดือน (หาร ${KZ_CUTOFF_MONTHS} เดือน ม.ค.–พ.ย. ปัดเศษขึ้น · ปิดจบส่งครบก่อน 15 พ.ย. ${a5Year})`;
+    };
+    $('kz-target').oninput = syncTargetNote;
     const syncRole = () => {
       const isMember = $('kz-role').value === 'member';
       $('kz-dept').disabled = !isMember;
       $('kz-target').disabled = !isMember;
+      $('kz-target-note').hidden = !isMember;
       $('kz-mgr-wrap').hidden = !isMember;
+      syncTargetNote();
     };
     $('kz-role').onchange = syncRole;
     syncRole();
