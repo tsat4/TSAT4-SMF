@@ -315,11 +315,12 @@ function kzForm(body, d, row, reload) {
       ${field(textLabel, `<textarea id="${textId}" rows="4" maxlength="2000"${off}>${esc(value || '')}</textarea>`)}
     </section>`;
   const ev = row ? kzEvalCalc(row.saved_hours, row.saved_baht, row.scores) : null;
+  // Buttons sit in the year row (a5Lift moves .a5-actions there).
   body.innerHTML = `
+    <div class="action-bar a5-actions">${button('kz-back', 'กลับ')}${row && row.canReview && row.status !== 'DRAFT' ? button('kz-form-eval', 'ประเมิน Kaizen', 'secondary') : ''}${editable ? `${button('kz-save', 'บันทึกร่าง')}${!row || ['DRAFT', 'REJECTED'].includes(row.status) ? button('kz-send', 'บันทึกและส่งพิจารณา', 'primary') : ''}` : ''}</div>
     <div class="kz-form">
       <div class="kz-head">
         <div><div class="card-title">แบบฟอร์ม Kaizen</div><strong>${row ? esc(row.reg_no || '') : 'ใบใหม่'}</strong> ${row ? kzBadge(row.status) : ''}</div>
-        <div class="action-bar">${button('kz-back', 'กลับ')}${row && row.canReview && row.status !== 'DRAFT' ? button('kz-form-eval', 'ประเมิน Kaizen', 'secondary') : ''}${editable ? `${button('kz-save', 'บันทึกร่าง')}${!row || ['DRAFT', 'REJECTED'].includes(row.status) ? button('kz-send', 'บันทึกและส่งพิจารณา', 'primary') : ''}` : ''}</div>
       </div>
       <section class="card kz-top">
         ${field('เรื่อง', `<input id="kz-title" maxlength="300" value="${esc(row?.title || '')}"${off}>`, 'grow')}

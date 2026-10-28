@@ -309,22 +309,21 @@ function qcProject(body, d, row, reload) {
     '031': () => `<div class="qc-grid3">${field('ผลทางตรง', ta('031.direct', 6))}${field('ผลทางอ้อม', ta('031.indirect', 6))}${field('อุปสรรค', ta('031.obstacles', 6))}</div>${field('แผนงานในอนาคต (หัวข้อกิจกรรมต่อไป)', ta('031.future', 3))}`
   };
 
+  // Buttons sit in the year row (a5Lift moves .a5-actions there); the title heads the group card.
   body.innerHTML = `
-    <div class="kz-form">
-      <div class="kz-head">
-        <div><div class="card-title">โครงการกลุ่ม QCC</div><strong>${row ? esc(`${row.group_name} · ${row.reg_no || 'ยังไม่มีเลขทะเบียน'}`) : 'โครงการใหม่'}</strong> ${row ? qcBadge(row.status) : ''}</div>
-        <div class="action-bar">${button('qc-back', 'กลับ')}${row?.canReview && row.status !== 'DRAFT' ? button('qc-p-review', 'พิจารณา', 'secondary') : ''}${editable ? `${button('qc-save', 'บันทึก')}${!row || ['DRAFT', 'REJECTED'].includes(row.status) ? button('qc-send', 'บันทึกและส่งพิจารณา', 'primary') : ''}` : ''}</div>
-      </div>
+    <div class="action-bar a5-actions">${button('qc-back', 'กลับ')}${row?.canReview && row.status !== 'DRAFT' ? button('qc-p-review', 'พิจารณา', 'secondary') : ''}${editable ? `${button('qc-save', 'บันทึก')}${!row || ['DRAFT', 'REJECTED'].includes(row.status) ? button('qc-send', 'บันทึกและส่งพิจารณา', 'primary') : ''}` : ''}</div>
+    <div class="qc-page">
       <section class="card qc-top">
-        ${field('ชื่อกลุ่ม', `<input id="qc-group" maxlength="120" value="${esc(row?.group_name || '')}"${off}>`)}
-        ${field('เลขทะเบียนกลุ่ม', `<input id="qc-reg" maxlength="60" placeholder="เช่น QCC-TSAT-P4-005" value="${esc(row?.reg_no || '')}"${off}>`)}
-        ${field('ฝ่าย', `<input id="qc-dept" maxlength="80" value="${esc(row?.department || '')}"${off}>`)}
-        ${field('จดทะเบียนกิจกรรมเรื่อง', `<input id="qc-topic" maxlength="300" value="${esc(row?.topic || '')}"${off}>`, 'qc-wide')}
-        ${field('ระยะเวลา ตั้งแต่', `<input id="qc-start" type="month" value="${esc(qcMonth(row?.start_month))}"${off}>`)}
-        ${field('ถึง', `<input id="qc-end" type="month" value="${esc(qcMonth(row?.end_month))}"${off}>`)}
-        ${field('หัวหน้ากลุ่ม', `<div class="qc-pick"><input id="qc-leader" readonly value="${esc(`${leader.employeeId} · ${leader.name || ''}`)}">${editable && d.admin ? button('qc-leader-pick', 'เลือก') : ''}</div>`)}
-        ${field('ผู้จัดการต้นสังกัด', `<div class="qc-pick"><input id="qc-manager" readonly value="${esc(manager ? `${manager.employeeId} · ${manager.name || ''}` : '')}" placeholder="ยังไม่ระบุ">${editable ? button('qc-manager-pick', 'เลือก') : ''}</div>`)}
-        ${field('สมาชิกกลุ่ม', `<input id="qc-members" maxlength="1000" placeholder="ชื่อสมาชิก คั่นด้วย ,"  value="${esc(row?.members || '')}"${off}>`, 'qc-wide')}
+        <div class="qc-title"><span class="card-title">โครงการกลุ่ม QCC</span><strong>${row ? esc(`${row.group_name} · ${row.reg_no || 'ยังไม่มีเลขทะเบียน'}`) : 'โครงการใหม่'}</strong>${row ? qcBadge(row.status) : ''}</div>
+        ${field('ชื่อกลุ่ม', `<input id="qc-group" maxlength="120" value="${esc(row?.group_name || '')}"${off}>`, 'qc-s4')}
+        ${field('เลขทะเบียนกลุ่ม', `<input id="qc-reg" maxlength="60" placeholder="เช่น QCC-TSAT-P4-005" value="${esc(row?.reg_no || '')}"${off}>`, 'qc-s4')}
+        ${field('ฝ่าย', `<input id="qc-dept" maxlength="80" value="${esc(row?.department || '')}"${off}>`, 'qc-s4')}
+        ${field('จดทะเบียนกิจกรรมเรื่อง', `<input id="qc-topic" maxlength="300" value="${esc(row?.topic || '')}"${off}>`, 'qc-s6')}
+        ${field('ระยะเวลา ตั้งแต่', `<input id="qc-start" type="month" value="${esc(qcMonth(row?.start_month))}"${off}>`, 'qc-s3')}
+        ${field('ถึง', `<input id="qc-end" type="month" value="${esc(qcMonth(row?.end_month))}"${off}>`, 'qc-s3')}
+        ${field('หัวหน้ากลุ่ม', `<div class="qc-pick"><input id="qc-leader" readonly value="${esc(`${leader.employeeId} · ${leader.name || ''}`)}">${editable && d.admin ? button('qc-leader-pick', 'เลือก') : ''}</div>`, 'qc-s4')}
+        ${field('ผู้จัดการต้นสังกัด', `<div class="qc-pick"><input id="qc-manager" readonly value="${esc(manager ? `${manager.employeeId} · ${manager.name || ''}` : '')}" placeholder="ยังไม่ระบุ">${editable ? button('qc-manager-pick', 'เลือก') : ''}</div>`, 'qc-s4')}
+        ${field('สมาชิกกลุ่ม', `<input id="qc-members" maxlength="1000" placeholder="ชื่อสมาชิก คั่นด้วย ," value="${esc(row?.members || '')}"${off}>`, 'qc-s4')}
       </section>
       <section class="card qc-form-card">
         <div class="qc-form-bar">
