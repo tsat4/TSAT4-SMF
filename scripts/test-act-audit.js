@@ -247,5 +247,26 @@ const ke = kaizenEval({ saved_hours: 250, saved_baht: 15000, scores: [4, 4, 4, 3
 ok(ke.hourGrade === 'F' && ke.hourReward === 50 && ke.bahtGrade === 'W' && ke.bahtReward === 80 && ke.scoreTotal === 21 && ke.scoreGrade === 'L' && ke.scoreReward === 30 && ke.eval_grade === 'F / W / L' && ke.eval_reward === 160,
   `Kaizen eval: 250h -> F (50) + 15,000฿ -> W (80) + 21pts -> L (30) = F / W / L (160฿)`);
 
+// QCC (db/act/qcc.sql): team + Planner + group projects with the FM-QMR-022…031 forms in jsonb (inbox/QCC.xlsx, group Horse Night).
+ok(fs.readFileSync(path.join(ROOT, 'db', 'act', 'qcc.sql'), 'utf8') === actSql('qcc', { audit: false }), 'db/act/qcc.sql is up to date (node scripts/act-sql.js qcc --no-audit)');
+await db.exec(actSql('qcc', { audit: false }));
+await db.exec(actSql('qcc', { audit: false }));
+await db.exec(`insert into tx_qcc_project (year, reg_no, group_name, department, topic, leader_id, start_month, end_month, created_by)
+  values (2025, 'QCC-TSAT-P4-005', 'Horse Night', 'Planning&Store', 'ลดเวลาสูญเสียในการเปลี่ยนรุ่นผลิต', '2102899', '2025-03-01', '2025-07-01', '2102899')`);
+ok(await throws(db, `insert into tx_qcc_project (year, group_name, topic, leader_id, start_month, end_month, created_by) values (2025, 'x', 'x', '1', '2025-07-01', '2025-03-01', '1')`), 'QCC period: end month is not before the start month');
+ok(await throws(db, `insert into tx_qcc_project (year, group_name, topic, leader_id, status, created_by) values (2025, 'x', 'x', '1', 'DONE', '1')`), 'QCC status is DRAFT / SUBMITTED / APPROVED / REJECTED');
+ok(await throws(db, `insert into tx_qcc_project (year, group_name, topic, leader_id, cost_total, created_by) values (2025, 'x', 'x', '1', -1, '1')`), 'QCC cost is 0 or more');
+const { qccForms, qccScore, qccCost, qccProgress } = await import('../server/modules/act/qcc.js');
+const qf = qccForms({
+  '022': { steps: [{ plan: [0, 1], actual: [0] }, { plan: [2], actual: [99] }] },
+  '023': { rows: [{ problem: 'เสียเวลาในการเปลี่ยนรุ่นผลิต', freq: 2, severity: 3, feasible: 3 }, { problem: '' }, { problem: 'x', freq: 9 }] },
+  '030': { costs: [{ item: 'Gripper Robot', labor: 18000 }, { item: 'Magnet Gripper Dia.40', other: 82000 }, { item: 'Solenoid Valve', other: 13000 }, { item: 'Air Tube', other: 2000 }, { item: 'Create Program Robot', labor: 7500 }, { item: 'Connect Signal', labor: 7500 }], perMonth: -5 },
+  hack: { x: 1 }
+}, 5);
+ok(qf['023'].rows.length === 2 && qccScore(qf['023'].rows[0]) === 18 && qf['023'].rows[1].freq === 0 && qccScore(qf['023'].rows[1]) === 0, 'QCC 023: empty problems dropped, score = 2 × 3 × 3 = 18 (Excel), out-of-range scale = 0');
+ok(qccCost(qf) === 130000 && qf['030'].perMonth === 0, 'QCC 030: cost = labour + other = 130,000, negative return becomes 0');
+ok(qf['022'].steps.length === 11 && JSON.stringify(qf['022'].steps[1].actual) === '[]' && qccProgress(qf) === 9, 'QCC 022: 11 steps, weeks outside the 5-month period dropped, progress = 1 of 11 steps = 9%');
+ok(!('hack' in qf), 'QCC forms keep only the known FM-QMR forms');
+
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

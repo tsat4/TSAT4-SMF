@@ -33,7 +33,8 @@ export function tablesOf(activity) {
     entry: `tx_${k}_entry`,
     entryView: `v_${k}_entry`,
     s3Assess: `mt_${k}_s3_assess`,
-    revision: `tx_${k}_revision`
+    revision: `tx_${k}_revision`,
+    project: `tx_${k}_project` // QCC only (scripts/act-sql.js qccSql)
   };
 }
 

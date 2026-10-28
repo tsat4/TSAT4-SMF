@@ -5,6 +5,7 @@ DELETE /api/act/:activity/cfo/ef/:id auth
 DELETE /api/act/:activity/cfo/entries/:id auth
 DELETE /api/act/:activity/checklist/:id auth
 DELETE /api/act/:activity/kaizen/:id auth
+DELETE /api/act/:activity/qcc/:id auth
 DELETE /api/act/:activity/tasks/:id auth
 DELETE /api/act/:activity/team/:id auth
 DELETE /api/requisitions/:id/lines/:lineId auth sto:2
@@ -30,6 +31,8 @@ GET /api/act/:activity/employees auth
 GET /api/act/:activity/issues auth
 GET /api/act/:activity/kaizen/list auth
 GET /api/act/:activity/me auth
+GET /api/act/:activity/qcc/list auth
+GET /api/act/:activity/qcc/people auth
 GET /api/act/:activity/tasks auth
 GET /api/act/:activity/team auth
 GET /api/act/calendar auth
@@ -58,6 +61,7 @@ PATCH /api/act/:activity/cfo/ef/:id auth
 PATCH /api/act/:activity/checklist/:id auth
 PATCH /api/act/:activity/issues/:id auth
 PATCH /api/act/:activity/kaizen/:id auth
+PATCH /api/act/:activity/qcc/:id auth
 PATCH /api/act/:activity/tasks/:id auth
 PATCH /api/act/:activity/tasks/dates auth
 PATCH /api/act/:activity/team/:id auth
@@ -79,6 +83,9 @@ POST /api/act/:activity/issues/:id/photo auth
 POST /api/act/:activity/kaizen auth
 POST /api/act/:activity/kaizen/:id/photo auth
 POST /api/act/:activity/kaizen/:id/status auth
+POST /api/act/:activity/qcc auth
+POST /api/act/:activity/qcc/:id/photo auth
+POST /api/act/:activity/qcc/:id/status auth
 POST /api/act/:activity/tasks auth
 POST /api/act/:activity/team auth
 POST /api/act/:activity/team/copy auth
