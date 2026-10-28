@@ -195,8 +195,12 @@ function chartKpi({ label, value, unit = '', pill = '', note = '', color = CHART
 }
 
 // Chart card frame: title (left), optional small text (right), then the chart.
+// A card holding a chart has no title (ผู้ใช้กำหนด 2026-10-28): only its small note on the right, if any.
+// Table cards keep their title.
 function chartCard(title, body, meta = '') {
-  return `<section class="card ch-card"><div class="ch-head"><div class="card-title">${title}</div>${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>${body}</section>`;
+  const chart = /class="(ch-plot|sto-donut-wrap)/.test(body);
+  const head = chart ? (meta ? `<div class="ch-head is-meta"><div class="sum-meta">${meta}</div></div>` : '') : `<div class="ch-head"><div class="card-title">${title}</div>${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>`;
+  return `<section class="card ch-card"${chart ? ` aria-label="${esc(String(title).replace(/<[^>]*>/g, ''))}"` : ''}>${head}${body}</section>`;
 }
 
 // Monthly (or any labelled) chart: bars on the left axis — each series one bar per label, a value or a stack

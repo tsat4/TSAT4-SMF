@@ -644,7 +644,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-pill.is-good{color:#15803d;border-color:#16a34a;background:color-mix(in srgb,#16a34a 15%,transparent)}
 .ch-pill.is-bad{color:#b91c1c;border-color:#dc2626;background:color-mix(in srgb,#dc2626 12%,transparent)}
 .ch-card{margin-bottom:8px;padding:12px 14px;min-width:0}
-.ch-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:8px}
+.ch-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:8px}.ch-head.is-meta{justify-content:flex-end}
 .ch-plot{display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto 280px auto;column-gap:6px}
 .ch-plot.has-right{grid-template-columns:44px minmax(0,1fr) 44px}
 .ch-titles{grid-column:1 / -1;display:flex;justify-content:space-between;font-size:11px;color:var(--mo-text-muted);padding-bottom:8px}
