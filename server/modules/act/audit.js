@@ -166,9 +166,13 @@ export function mountAudit(app) {
   route('get', '/api/act/:activity/team', async (req, res, activity) => {
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
-    const rows = await fetchAll(() => tx.from(tablesOf(activity).team).select('*').eq('year', year).neq('role', 'owner').order('role').order('team').order('employee_id'));
-    const names = await namesOf(rows.map((r) => r.employee_id));
-    res.json({ year, members: rows.map((r) => ({ ...r, name: names.get(String(r.employee_id))?.name || '', department: r.department || names.get(String(r.employee_id))?.department || '' })) });
+    const [rows, empDepts] = await Promise.all([
+      fetchAll(() => tx.from(tablesOf(activity).team).select('*').eq('year', year).neq('role', 'owner').order('role').order('team').order('employee_id')),
+      mx.from('mt_main_employee').select('department').eq('status', 'Active')
+    ]);
+    const departments = [...new Set([...(empDepts.data || []).map((r) => String(r.department || '').trim()), ...rows.map((r) => String(r.department || '').trim())].filter(Boolean))].sort();
+    const names = await namesOf([...rows.map((r) => r.employee_id), ...rows.map((r) => r.manager_id).filter(Boolean)]);
+    res.json({ year, departments, members: rows.map((r) => ({ ...r, name: names.get(String(r.employee_id))?.name || '', department: r.department || names.get(String(r.employee_id))?.department || '', manager_name: r.manager_id ? names.get(String(r.manager_id))?.name || '' : '' })) });
   });
 
   route('get', '/api/act/:activity/checklist', async (req, res, activity) => {
@@ -280,13 +284,38 @@ export function mountAudit(app) {
     const role = ROLES.includes(req.body?.role) ? req.body.role : '';
     const team = role === 'auditor' ? String(req.body?.team || '').trim().toUpperCase() : null;
     const department = role === 'member' ? String(req.body?.department || '').trim().slice(0, 80) : '';
+    const targetCount = role === 'member' && req.body?.targetCount != null && req.body.targetCount !== '' ? Math.max(0, Math.floor(Number(req.body.targetCount) || 0)) : undefined;
+    const managerId = role === 'member' && req.body?.managerId ? String(req.body.managerId).trim().slice(0, 20) || null : undefined;
     if (!employeeId || !role) return fail(res, 400, 'เลือกพนักงานและบทบาท');
     if (role === 'auditor' && !/^[A-Z]$/.test(team)) return fail(res, 400, 'ผู้ตรวจต้องเลือกทีม A–Z');
     if (role === 'member' && !department) return fail(res, 400, 'ตัวแทนหน่วยงานต้องระบุหน่วยงาน');
-    const { error } = await tx.from(tablesOf(activity).team).insert({ year, employee_id: employeeId, role, team, ...(department ? { department } : {}), status: 'Active' });
+    const extra = { ...(department ? { department } : {}), ...(targetCount !== undefined ? { target_count: targetCount } : {}), ...(managerId !== undefined ? { manager_id: managerId } : {}) };
+    const { error } = await tx.from(tablesOf(activity).team).insert({ year, employee_id: employeeId, role, team, ...extra, status: 'Active' });
     if (error?.code === '23505') return fail(res, 400, 'คนนี้มีบทบาทนี้อยู่แล้ว');
     throwIf(error);
     res.status(201).json({ ok: true });
+  });
+
+  route('patch', '/api/act/:activity/team/:id', async (req, res, activity) => {
+    const { data: row, error } = await tx.from(tablesOf(activity).team).select('*').eq('id', Number(req.params.id)).maybeSingle();
+    throwIf(error);
+    if (!row) return fail(res, 404, 'ไม่พบรายชื่อ');
+    if (!(await requireAdmin(req, res, activity, row.year))) return;
+    const patch = {};
+    if (req.body?.status) patch.status = req.body.status === 'Inactive' ? 'Inactive' : 'Active';
+    if (row.role === 'member') {
+      if (req.body?.department != null) {
+        const department = String(req.body.department).trim().slice(0, 80);
+        if (!department) return fail(res, 400, 'ตัวแทนหน่วยงานต้องระบุหน่วยงาน');
+        patch.department = department;
+      }
+      if (req.body?.targetCount != null) patch.target_count = Math.max(0, Math.floor(Number(req.body.targetCount) || 0));
+      if (req.body?.managerId !== undefined) patch.manager_id = String(req.body.managerId || '').trim().slice(0, 20) || null;
+    }
+    const upd = await tx.from(tablesOf(activity).team).update(patch).eq('id', row.id);
+    if (upd.error?.code === '23505') return fail(res, 400, 'คนนี้มีบทบาทนี้อยู่แล้ว');
+    throwIf(upd.error);
+    res.json({ ok: true });
   });
 
   route('delete', '/api/act/:activity/team/:id', async (req, res, activity) => {

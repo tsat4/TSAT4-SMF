@@ -6,7 +6,7 @@ import { mountAudit } from './audit.js';
 import { mountTransaction } from './transaction.js';
 import { PLANNER_ON, mountPlanner, plannerEvents } from './planner.js';
 import { CFO_ON, mountCfo } from './cfo.js';
-import { mountKaizen } from './kaizen.js';
+import { KAIZEN_ON, mountKaizen } from './kaizen.js';
 
 // ระบบกิจกรรม (Tx Data): calendar here, Project Planner in planner.js, checklist audit Dashboard/Setting in audit.js,
 // audits and Issues in transaction.js. Each activity has its own tables (db/act/<activity>.sql, scripts/act-sql.js).
@@ -19,7 +19,7 @@ function tablesForSystem() {
   const out = {};
   for (const activity of new Set([...AUDIT_ON, ...PLANNER_ON, ...CFO_ON])) {
     const t = tablesOf(activity);
-    out[t.team] = { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['employee_id', 'text', true], ['role', 'actrole', true], ['team', 'text'], ['area_id', 'int'], ...(CFO_ON.includes(activity) ? [['department', 'text']] : []), ['status', 'status', true]] };
+    out[t.team] = { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['employee_id', 'text', true], ['role', 'actrole', true], ['team', 'text'], ['area_id', 'int'], ...(CFO_ON.includes(activity) || KAIZEN_ON.includes(activity) ? [['department', 'text']] : []), ...(KAIZEN_ON.includes(activity) ? [['target_count', 'int'], ['manager_id', 'text']] : []), ['status', 'status', true]] };
     out[t.setting] = { db: 'tx', pk: ['key'], columns: [['key', 'text', true], ['value', 'text', true]] };
     out[t.task] = { db: 'tx', pk: ['id'], columns: [['id', 'read'], ['year', 'int', true], ['parent_id', 'int'], ['sort_no', 'int', true], ['title', 'text', true], ['start_date', 'date'], ['end_date', 'date'], ['progress', 'int', true], ['owner_id', 'text'], ['color', 'text'], ['note', 'text'], ['created_by', 'read']] };
     if (CFO_ON.includes(activity)) {

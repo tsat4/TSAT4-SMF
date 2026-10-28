@@ -224,18 +224,28 @@ if (!fs.existsSync(cfoFile)) {
     'transport tkm = ตัน × กม., km_fuel = กม. ÷ กม./ลิตร');
 }
 
-// KAIZEN (db/act/kaizen.sql): team + Planner + the Kaizen sheet; payback = (labour + material) ÷ return per month.
+// KAIZEN (db/act/kaizen.sql): team + Planner + the Kaizen sheet; payback = (labour + material) ÷ return per month; back-of-form evaluation.
 ok(fs.readFileSync(path.join(ROOT, 'db', 'act', 'kaizen.sql'), 'utf8') === actSql('kaizen', { audit: false }), 'db/act/kaizen.sql is up to date (node scripts/act-sql.js kaizen --no-audit)');
 await db.exec(actSql('kaizen', { audit: false }));
+await db.exec(actSql('kaizen', { audit: false }));
+await db.exec(`insert into mt_kaizen_team (year, employee_id, role, department, target_count, manager_id) values (2026, '2102899', 'member', 'PD1', 12, '1000001')`);
+ok(await throws(db, `insert into mt_kaizen_team (year, employee_id, role, department, target_count) values (2026, '2102899', 'member', 'PD2', -1)`), 'Kaizen team target_count is 0 or more');
 await db.exec(`insert into tx_kaizen_entry (year, reg_no, title, employee_id, types, cost_labor, cost_material, return_month, created_by)
-  values (2026, 'KZ-2026-0001', 'ลดเวลาอัพเดทฟอร์ม', '2102899', '{C,O}', 1500, 2500, 1000, '2102899')`);
+  values (2026, 'KZ-2026-0001', 'ลดเวลาอัพเดทฟอร์ม', '2102899', '{C,O}', 1500, 2500, 1000, '2102899'),
+         (2026, 'KZ-2026-0002', 'ลดของเสียขั้นตอนตัด', '2102899', '{Q,C}', 500, 500, 2000, '2102899')`);
+ok(true, 'same employee_id may submit multiple Kaizen sheets');
 ok(await throws(db, `insert into tx_kaizen_entry (year, title, employee_id, types, created_by) values (2026, 'x', '1', '{X}', '1')`), 'Kaizen type is Q / C / D / S / M / E / O');
 ok(await throws(db, `insert into tx_kaizen_entry (year, title, employee_id, kind, created_by) values (2026, 'x', '1', 'group', '1')`), 'Kaizen kind is person / team / qcc');
 ok(await throws(db, `insert into tx_kaizen_entry (year, reg_no, title, employee_id, created_by) values (2026, 'KZ-2026-0001', 'x', '1', '1')`), 'registration number is unique');
 ok(await throws(db, `insert into tx_kaizen_entry (year, title, employee_id, cost_labor, created_by) values (2026, 'x', '1', -1, '1')`), 'money is 0 or more');
-const { kaizenMoney } = await import('../server/modules/act/kaizen.js');
+ok(await throws(db, `insert into tx_kaizen_entry (year, title, employee_id, scores, created_by) values (2026, 'x', '1', '{1,2,3}', '1')`), 'Kaizen evaluation scores has 6 items');
+ok(await throws(db, `insert into tx_kaizen_entry (year, title, employee_id, scores, created_by) values (2026, 'x', '1', '{1,2,3,4,5,6}', '1')`), 'each Kaizen evaluation score is 0..5');
+const { kaizenMoney, kaizenEval } = await import('../server/modules/act/kaizen.js');
 const km = kaizenMoney({ cost_labor: 1500, cost_material: 2500, return_month: 1000 });
 ok(km.cost === 4000 && km.payback === 4 && kaizenMoney({ cost_labor: 10, return_month: 0 }).payback === null, 'Kaizen: invested 1,500 + 2,500 = 4,000 · payback 4,000 ÷ 1,000 = 4 months · no return = no payback');
+const ke = kaizenEval({ saved_hours: 250, saved_baht: 15000, scores: [4, 4, 4, 3, 3, 3] });
+ok(ke.hourGrade === 'F' && ke.hourReward === 50 && ke.bahtGrade === 'W' && ke.bahtReward === 80 && ke.scoreTotal === 21 && ke.scoreGrade === 'L' && ke.scoreReward === 30 && ke.eval_grade === 'F / W / L' && ke.eval_reward === 160,
+  `Kaizen eval: 250h -> F (50) + 15,000฿ -> W (80) + 21pts -> L (30) = F / W / L (160฿)`);
 
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

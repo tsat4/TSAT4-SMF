@@ -2,9 +2,7 @@
 
 ## กำลังทำอยู่
 
-- งาน: ไม่มีงานค้างของ Cursor · 2026-10-27 Cursor ติด limit ผู้ใช้ให้ Claude ดูแลทั้งระบบงาน (Store/Usage) และระบบกิจกรรม ทำงานจาก `SMF-act` · โฟลเดอร์ `SMF` มีไฟล์ที่ต่างแค่ CRLF/LF (ไม่มีเนื้อหาเปลี่ยน) ไม่ใช่งานค้าง
-- ที่เก็บรูป `img_5s` สร้างใน Tx Data แล้ว
-- ไฟล์ที่ยังแก้ไม่เสร็จ: ไม่มี
+- (ว่าง)
 <!-- ถ้าเริ่มงานใหญ่ ให้เขียนตามนี้:
 - งาน: ...
 - ใคร / เริ่มเมื่อ: Cursor | Claude, YYYY-MM-DD HH:MM
@@ -15,7 +13,7 @@
 ## SQL ที่รอผู้ใช้รัน
 
 - `db/act/smf.sql` ใน Tx Data (แผนงาน SMF)
-- `db/act/kaizen.sql` ใน Tx Data (KAIZEN ใหม่)
+- `db/act/kaizen.sql` ใน Tx Data (KAIZEN ใหม่ / อัปเกรดคอลัมน์ทีมและการประเมิน)
 
 ## ข้อควรระวัง
 
@@ -23,6 +21,8 @@
 - หน้า PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-28 · Claude · KAIZEN ทีมประจำปี (`mt_kaizen_team` เพิ่ม `target_count` จำนวนเรื่องที่ต้องส่งต่อปี และ `manager_id` ผู้จัดการประเมิน Kaizen หลังส่งเรื่อง, ผังองค์กร 3 ระดับใน Dashboard > Team) · ตัวแทนสมาชิกประจำแผนกเลือกพนักงานในสังกัดสร้างและส่งเรื่อง Kaizen ได้ (ชื่อคนเดิมส่งเรื่องเพิ่มได้ไม่จำกัด) · ประเมินผล Kaizen ด้านหลังฟอร์ม FM-QSM-039 (`tx_kaizen_entry` เพิ่ม `start_on`, `end_on`, `saved_hours` เกรด A–I, `saved_baht` เกรด Q–Z, `scores` 6 หัวข้อ 0–5 คะแนน เกรด J–P, คำนวณ `eval_grade` และ `eval_reward` อัตโนมัติ) · เพิ่ม `PATCH /api/act/:activity/team/:id` · **ผู้ใช้ต้องรัน `db/act/kaizen.sql` ใน Tx Data อีกรอบ**
 
 - 2026-10-28 · Claude · เปิดใช้แผนงาน Project Planner ของ SMF (`PLANNER_ON` / `APL_ON` = `smf`, หน้า SMF > Setting และ Dashboard ดูอย่างเดียว + ปฏิทินรวม) · สร้าง `db/act/smf.sql` (`node scripts/act-sql.js smf --no-audit`) · **ผู้ใช้ต้องรัน `db/act/smf.sql` ใน Tx Data**
 

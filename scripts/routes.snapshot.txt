@@ -60,6 +60,7 @@ PATCH /api/act/:activity/issues/:id auth
 PATCH /api/act/:activity/kaizen/:id auth
 PATCH /api/act/:activity/tasks/:id auth
 PATCH /api/act/:activity/tasks/dates auth
+PATCH /api/act/:activity/team/:id auth
 PATCH /api/requisitions/:id/lines/:lineId auth sto:2
 PATCH /api/system/tables/:name auth creator
 PATCH /api/usage-materials/:material auth sto:3
