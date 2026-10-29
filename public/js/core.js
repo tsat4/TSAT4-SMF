@@ -59,9 +59,11 @@ function options(values, current, labelOf = (value) => value) {
   return values.map((value) => `<option value="${esc(value)}"${String(current) === String(value) ? ' selected' : ''}>${esc(labelOf(value))}</option>`).join('');
 }
 
-function searchSlot(label, inputId, buttonId, { placeholder = '', grow = false } = {}) {
+// value: text already in the box (a pick field showing the current choice). The ค้นหา button stays for the page's code
+// but is hidden: SEARCH_BOXES below runs it while typing.
+function searchSlot(label, inputId, buttonId, { placeholder = '', grow = false, value = '' } = {}) {
   const hint = placeholder ? ` placeholder="${esc(placeholder)}"` : '';
-  return `<div class="search-slot">${field(label, `<input id="${inputId}"${hint}>`, grow ? 'grow' : '')}${button(buttonId, 'ค้นหา')}</div>`;
+  return `<div class="search-slot">${field(label, `<input id="${inputId}"${hint} value="${esc(value)}" autocomplete="off">`, grow ? 'grow' : '')}${button(buttonId, 'ค้นหา')}</div>`;
 }
 
 function searchBlock(slot, listId) {
@@ -515,6 +517,46 @@ function bindHold(button, onDone) {
 }
 
 VIEWS.main = renderMain;
+
+// One search field, no ค้นหา button to press (ผู้ใช้กำหนด 2026-10-29):
+// · .search-slot (filters a list): typing runs the slot's search after a short pause.
+// · .search-block (picks a person / item): results drop down under the field (also when an empty field is clicked);
+//   clicking one runs the page's own pick code, then shows "code · name" in the same field and closes the list.
+//   Emptying the field fires 'pick-clear' on the block so the page can drop its choice.
+const SEARCH_BOXES = (() => {
+  let timer;
+  const run = (input) => input.closest('.search-slot')?.querySelector(':scope > .btn')?.click();
+  const listOf = (block) => block.querySelector(':scope > .search-list');
+  document.addEventListener('input', (e) => {
+    const input = e.target;
+    if (!(input instanceof HTMLInputElement) || !input.closest('.search-slot')) return;
+    const block = input.closest('.search-block');
+    clearTimeout(timer);
+    if (block && !input.value.trim()) {
+      listOf(block).innerHTML = '';
+      block.dispatchEvent(new CustomEvent('pick-clear', { bubbles: true }));
+      return;
+    }
+    timer = setTimeout(() => run(input), 300);
+  });
+  document.addEventListener('focusin', (e) => {
+    const block = e.target.closest?.('.search-block');
+    if (block && e.target.matches('.search-slot input') && !e.target.value.trim() && !listOf(block).innerHTML) run(e.target);
+  });
+  document.addEventListener('click', (e) => {
+    const block = e.target.closest('.search-block');
+    document.querySelectorAll('.search-block').forEach((other) => { if (other !== block) listOf(other).innerHTML = ''; });
+    const row = e.target.closest('.search-block > .search-list tr[data-pick]');
+    if (!row) return;
+    // after the page's row handler (bindRowSelect) has taken the choice
+    setTimeout(() => {
+      const input = block.querySelector('.search-slot input');
+      if (input) input.value = [...row.cells].map((c) => c.textContent.trim()).filter(Boolean).slice(0, 2).join(' · ');
+      listOf(block).innerHTML = '';
+    }, 0);
+  });
+  return { run };
+})();
 
 // Dashboard charts grow to fill the empty height under the page (ผู้ใช้กำหนด 2026-10-29): after each render and on
 // resize, the free space below the card is shared between the chart rows (charts side by side get the same height),

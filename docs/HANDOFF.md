@@ -33,6 +33,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-29 · Claude · ช่องค้นหาช่องเดียวทั้งระบบ (`SEARCH_BOXES` core.js): ค้นขณะพิมพ์ ซ่อนปุ่มค้นหา · ช่องเลือกพนักงาน / ผู้จัดการ / รายการ = dropdown ใต้ช่อง คลิกแล้วค่าลงช่องเดิม · ตัดช่อง "ที่เลือก" ซ้ำ: 5S เจ้าของพื้นที่ / ทีม, KAIZEN ทีม / ผู้จัดการประเมิน, Planner ผู้รับผิดชอบ, Usage รับเข้า / ยืม · `a5EmpField(label, value)` แสดงค่าปัจจุบันในช่อง · ล้างช่อง = `pick-clear` · หมายเหตุทดสอบ: headless ไม่ยิง focus เอง ต้อง dispatch focusin
+
 - 2026-10-29 · Antigravity · เพิ่มหน่วยงาน PLANNING ในระบบงาน (public/js/units.js, server/core/access.js, db/09_planning_user.sql, db/README.md): เมนู PLANNING พร้อมหน้า Dashboard / Transaction / Setting พื้นฐาน และตารางสิทธิ์ mt_planning_user ใน Mx Data
 
 - 2026-10-29 · Claude · CFO Fr-03.2 ตามไฟล์ผู้ใช้: เกณฑ์ 6 ข้อเป็นคะแนน % (0–100, 2 ตำแหน่ง) แทน ✓ / × · Dashboard แสดง 5.00% + แถบแดงตามสัดส่วนคะแนนสูงสุดในคอลัมน์ · Setting ช่องตัวเลข % · มีนัยสำคัญ = P และมีคะแนน > 0 อย่างน้อย 1 เกณฑ์ (กฎเดิม) · `mt_cfo_s3_assess` คอลัมน์ boolean → numeric(6,2) ในแม่แบบ (✓ = 1, × = 0) + test · server ตอบ 503 บอกให้รัน cfo.sql ถ้าฐานยังเป็น boolean

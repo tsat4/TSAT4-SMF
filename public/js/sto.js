@@ -541,7 +541,6 @@ async function openLedgerPopup(kind, onDone) {
   openPopup(kind === 'borrow' ? 'ยืม' : 'รับเข้า', [
     fields,
     searchBlock(searchSlot('รายการ', 'pick-q', 'pick-search', { placeholder: 'หมายเลขหรือชื่อ' }), 'pick-results'),
-    field('รายการที่เลือก', '<input id="pick-name" readonly>'),
     field('จำนวน', '<input id="led-qty" type="number" min="1" step="1" inputmode="numeric" value="1">')
   ].join(''), async () => {
     if (!picked) throw new Error('เลือกรายการ');
@@ -566,7 +565,6 @@ async function openLedgerPopup(kind, onDone) {
     fillTable('pick-results', ['รหัส', 'ชื่อ', 'หน่วย'], materials.map((row) => `<tr data-pick="${esc(row.material)}" data-name="${esc(row.material_description)}"><td>${esc(row.material)}</td><td>${esc(row.material_description)}</td><td>${esc(row.bun)}</td></tr>`).join(''), 'ไม่พบรายการ');
     bindRowSelect($('pick-results'), (id, row) => {
       picked = { material: id, name: row.dataset.name };
-      $('pick-name').value = row.dataset.name || id;
     });
   };
   $('pick-search').onclick = () => search().catch(onErr);

@@ -232,7 +232,9 @@ function a5EmployeeSearch(activity, onPick, year = a5Year) {
   onEnter('a5-emp-q', () => run().catch(onErr));
 }
 
-const A5_EMP_FIELDS = searchBlock(searchSlot('ค้นพนักงาน', 'a5-emp-q', 'a5-emp-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน' }), 'a5-emp-list');
+// One field: type, pick from the list under it (core.js SEARCH_BOXES); value = the current choice shown in the field.
+const a5EmpField = (label = 'ค้นพนักงาน', value = '') => searchBlock(searchSlot(label, 'a5-emp-q', 'a5-emp-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน', value }), 'a5-emp-list');
+const A5_EMP_FIELDS = a5EmpField();
 const a5Heads = { areas: { sort: '', dir: 'asc', filters: {} }, team: { sort: '', dir: 'asc', filters: {} }, check: { sort: '', dir: 'asc', filters: {} } };
 
 async function a5SetAreas(body, activity, admin, rerender) {
@@ -273,14 +275,14 @@ async function a5SetAreas(body, activity, admin, rerender) {
   $('a5-owner').onclick = () => {
     if (!picked) return;
     let chosen = picked.owner ? { employeeId: picked.owner.employeeId, name: picked.owner.name } : null;
-    openPopup(`เจ้าของพื้นที่ ${esc(picked.code)} ปี ${a5Year}`, `${A5_EMP_FIELDS}${field('เจ้าของที่เลือก', `<input id="a5-owner-pick" readonly value="${esc(chosen ? `${chosen.employeeId} · ${chosen.name}` : '')}" placeholder="เลือกจากรายชื่อ (เว้นว่าง = ไม่มีเจ้าของ)">`)}${button('a5-owner-clear', 'ล้าง')}`, async () => {
+    openPopup(`เจ้าของพื้นที่ ${esc(picked.code)} ปี ${a5Year}`, `${a5EmpField('เจ้าของพื้นที่ (ลบข้อความ = ไม่มีเจ้าของ)', chosen ? `${chosen.employeeId} · ${chosen.name}` : '')}`, async () => {
       await a5Api(activity, `areas/${picked.id}/owner`, { method: 'PUT', body: { year: a5Year, employeeId: chosen?.employeeId || '' } });
       toast('บันทึกแล้ว');
       closePopup();
       rerender();
     });
-    a5EmployeeSearch(activity, (p) => { chosen = p; $('a5-owner-pick').value = `${p.employeeId} · ${p.name}`; });
-    $('a5-owner-clear').onclick = () => { chosen = null; $('a5-owner-pick').value = ''; };
+    a5EmployeeSearch(activity, (p) => { chosen = p; });
+    $('a5-emp-q').closest('.search-block').addEventListener('pick-clear', () => { chosen = null; });
   };
 }
 
@@ -302,7 +304,7 @@ async function a5SetTeam(body, activity, admin, rerender, roles = A5_ROLE_LABEL)
   bindRowSelect($('a5-rows'), (id) => { picked = rows.find((m) => String(m.id) === id); $('a5-del').disabled = !picked; });
   $('a5-add').onclick = () => {
     let chosen = null;
-    openPopup(`เพิ่มรายชื่อปี ${a5Year}`, `${A5_EMP_FIELDS}${field('พนักงานที่เลือก', '<input id="a5-team-pick" readonly placeholder="เลือกจากรายชื่อ">')}
+    openPopup(`เพิ่มรายชื่อปี ${a5Year}`, `${a5EmpField('พนักงาน')}
       ${field('บทบาท', `<select id="a5-role">${options(keys, keys.at(-1), (v) => roles[v])}</select>`)}
       ${hasTeam ? field('ทีม (เฉพาะผู้ตรวจ)', `<select id="a5-team">${options(A5_TEAMS, 'A')}</select>`, '') : ''}
       ${keys.includes('member') ? field('หน่วยงาน (เฉพาะสมาชิก)', '<input id="a5-dept" maxlength="80" placeholder="เช่น PD1">') : ''}`, async () => {
@@ -314,7 +316,6 @@ async function a5SetTeam(body, activity, admin, rerender, roles = A5_ROLE_LABEL)
     });
     a5EmployeeSearch(activity, (p) => {
       chosen = p;
-      $('a5-team-pick').value = `${p.employeeId} · ${p.name}`;
       if ($('a5-dept') && !$('a5-dept').value && p.department) $('a5-dept').value = p.department; // สมาชิก: the employee's own department
     });
     const syncTeam = () => {

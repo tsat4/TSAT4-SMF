@@ -359,8 +359,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
     derived ? `<p class="apl-locked">ข้อหลักนี้มีข้อรอง ${kidCount} ข้อ: วันเริ่ม วันจบ และ % คิดจากข้อรองให้อัตโนมัติ · แก้วันหรือ % ที่ข้อรอง (ดับเบิลคลิกแถวข้อรอง) หรือลากแท่งข้อหลักเพื่อเลื่อนทั้งชุด · ที่นี่แก้ได้: ชื่อ ผู้รับผิดชอบ สี รายละเอียด</p>` : '',
     field('ระดับ', `<select id="apl-parent"${derived ? ' disabled' : ''}><option value="">ข้อหลัก</option>${phases.map((p) => `<option value="${p.id}"${p.id === pid ? ' selected' : ''}>ข้อรองของ: ${esc(p.title)}</option>`).join('')}</select>`),
     field('ชื่อรายการ', `<input id="apl-title" maxlength="200" value="${esc(task?.title || '')}">`),
-    field('ผู้รับผิดชอบ', `<div class="apl-owner"><input id="apl-owner" readonly value="${esc(ownerId ? `${ownerId} · ${task.owner_name}` : '')}" placeholder="ค้นจากรายชื่อด้านล่าง">${button('apl-owner-clear', 'ล้าง')}</div>`),
-    A5_EMP_FIELDS,
+    a5EmpField('ผู้รับผิดชอบ', ownerId ? `${ownerId} · ${task.owner_name}` : ''),
     field('วันเริ่ม', `<input id="apl-start" type="date" ${range} value="${esc(start)}"${derived ? ' disabled' : ''}>`),
     field('วันจบ', `<input id="apl-end" type="date" ${range} value="${esc(end)}"${derived ? ' disabled' : ''}>`),
     field(`ความคืบหน้า <span id="apl-pct-v">${task?.progress ?? 0}%</span>`, `<input id="apl-pct" type="range" min="0" max="100" step="5" value="${task?.progress ?? 0}"${derived ? ' disabled' : ''}>`),
@@ -401,8 +400,8 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
   const syncDone = () => { $('apl-done-wrap').hidden = derived || Number($('apl-pct').value) < 100; };
   $('apl-pct').oninput = () => { $('apl-pct-v').textContent = `${$('apl-pct').value}%`; syncDone(); };
   syncDone();
-  $('apl-owner-clear').onclick = () => { ownerId = ''; $('apl-owner').value = ''; };
-  a5EmployeeSearch(activity, (p) => { ownerId = p.employeeId; $('apl-owner').value = `${p.employeeId} · ${p.name}`; }, aplYear);
+  a5EmployeeSearch(activity, (p) => { ownerId = p.employeeId; }, aplYear);
+  $('a5-emp-q').closest('.search-block').addEventListener('pick-clear', () => { ownerId = ''; });
 }
 
 const APL_DASH_TABS = { schedule: 'Schedule', team: 'Team' };

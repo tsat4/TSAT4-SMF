@@ -586,20 +586,18 @@ async function kzSetTeam(body, admin, rerender) {
     $('kz-t-edit').disabled = !picked;
     $('kz-t-del').disabled = !picked;
   });
-  const mgrBlock = searchBlock(searchSlot('ค้นผู้จัดการประเมิน', 'kz-mgr-q', 'kz-mgr-search', { placeholder: 'รหัส ชื่อ หรือแผนก' }), 'kz-mgr-list');
   const openTeamForm = (m) => {
     let chosenEmp = m ? { employeeId: m.employee_id, name: m.name, department: m.department } : null;
     let chosenMgr = m?.manager_id ? { employeeId: m.manager_id, name: m.manager_name } : null;
     openPopup(m ? `แก้ไขทีม · ${esc(m.name || m.employee_id)}` : `เพิ่มสมาชิกทีมปี ${a5Year}`, `
-      ${m ? '' : `${A5_EMP_FIELDS}${field('พนักงานที่เลือก', '<input id="kz-team-pick" readonly placeholder="เลือกจากรายชื่อ">')}`}
+      ${m ? '' : a5EmpField('พนักงาน')}
       ${field('บทบาท', `<select id="kz-role"${m ? ' disabled' : ''}>${options(keys, m?.role || 'member', (v) => KZ_ROLE_LABEL[v])}</select>`)}
       <datalist id="kz-dept-list">${depts.map((d) => `<option value="${esc(d)}">`).join('')}</datalist>
       ${field('แผนกที่ดูแล (เฉพาะตัวแทนสมาชิก)', `<input id="kz-dept" list="kz-dept-list" maxlength="80" value="${esc(m?.department || '')}" placeholder="เช่น PD1">`)}
       ${field('จำนวนเรื่องที่ต้องส่งต่อปี (เฉพาะตัวแทนสมาชิก)', `<input id="kz-target" type="number" min="0" step="1" value="${esc(m?.target_count ?? 0)}">`)}
       <p class="sum-meta" id="kz-target-note"></p>
       <div id="kz-mgr-wrap">
-        ${mgrBlock}
-        ${field('ผู้จัดการประเมิน Kaizen หลังส่งเรื่อง', `<input id="kz-mgr-pick" readonly value="${esc(chosenMgr ? `${chosenMgr.employeeId} · ${chosenMgr.name}` : '')}" placeholder="ค้นและเลือกผู้จัดการประเมิน">`)}
+        ${searchBlock(searchSlot('ผู้จัดการประเมิน Kaizen หลังส่งเรื่อง', 'kz-mgr-q', 'kz-mgr-search', { placeholder: 'รหัส ชื่อ หรือแผนก', value: chosenMgr ? `${chosenMgr.employeeId} · ${chosenMgr.name}` : '' }), 'kz-mgr-list')}
       </div>
       ${m ? field('สถานะ', `<select id="kz-status">${options(['Active', 'Inactive'], m.status || 'Active')}</select>`) : ''}`, async () => {
       const role = $('kz-role').value;
@@ -635,7 +633,6 @@ async function kzSetTeam(body, admin, rerender) {
     if (!m) {
       a5EmployeeSearch(KZ, (p) => {
         chosenEmp = p;
-        $('kz-team-pick').value = `${p.employeeId} · ${p.name}`;
         if ($('kz-role').value === 'member' && !$('kz-dept').value && p.department) $('kz-dept').value = p.department;
       });
     }
@@ -645,10 +642,10 @@ async function kzSetTeam(body, admin, rerender) {
       fillTable('kz-mgr-list', ['รหัส', 'ชื่อ', 'หน่วยงาน'], r.employees.map((p) => `<tr data-pick="${esc(p.employeeId)}" data-name="${esc(p.name)}"><td>${esc(p.employeeId)}</td><td>${esc(p.name)}</td><td>${esc(p.department)}</td></tr>`), 'ไม่พบพนักงาน');
       bindRowSelect($('kz-mgr-list'), (id, row) => {
         chosenMgr = { employeeId: id, name: row.dataset.name };
-        $('kz-mgr-pick').value = `${chosenMgr.employeeId} · ${chosenMgr.name}`;
       });
     };
     $('kz-mgr-search').onclick = () => runMgrSearch().catch(onErr);
+    $('kz-mgr-q').closest('.search-block').addEventListener('pick-clear', () => { chosenMgr = null; });
     onEnter('kz-mgr-q', () => runMgrSearch().catch(onErr));
     const syncTargetNote = () => {
       const n = Math.max(0, Math.floor(Number($('kz-target').value) || 0));
