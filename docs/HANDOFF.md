@@ -12,6 +12,10 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
+- `db/act/e-day.sql` ใน Tx Data (ทีม + แผนงาน E-DAY)
+- `db/act/lean.sql` ใน Tx Data (ทีม + แผนงาน LEAN)
+- `db/act/safety.sql` ใน Tx Data (ทีม + แผนงาน SAFETY)
+- `db/act/100p.sql` ใน Tx Data (ทีม + แผนงาน 100P)
 - `db/act/smf.sql` ใน Tx Data (แผนงาน SMF)
 - `db/act/kaizen.sql` ใน Tx Data (KAIZEN ใหม่ / อัปเกรดคอลัมน์ทีมและการประเมิน)
 - `db/act/qcc.sql` ใน Tx Data (QCC ใหม่: ทีม + แผนงาน + `tx_qcc_project` + bucket `img_qcc`)
@@ -24,6 +28,8 @@
 - หน้า PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-29 · Antigravity · สร้าง Table SQL (e-day, lean, safety) + Dashboard แผน (Schedule) และทีม (Team) ครบทุกกิจกรรม (`server/modules/act/planner.js`, `public/js/act-planner.js`, `db/act/`): ทุกกิจกรรมใน SMF ตอนนี้มีหน้า Dashboard (แท็บ Schedule ดูแผนงาน Gantt และแท็บ Team ผังองค์กรทีม) และหน้า Setting (แท็บ แผนงาน จัดการ Gantt และแท็บ ทีม จัดการรายชื่อทีม เพิ่ม/ลบ/คัดลอกปี) พร้อมรองรับตารางที่ยังไม่ได้รันโดยไม่พัง
 
 - 2026-10-29 · Antigravity · KAIZEN Ranking: ตัดฉากหลังซุ้มโค้งลายทางหลังแท่นอันดับ 1 ออกตามที่ผู้ใช้สั่ง (`public/app.css`, `public/js/act-kaizen.js`) เพื่อให้แท่นอันดับ 1–3 สะอาด คลีน บนพื้นขาวธีมเขียว
 
