@@ -59,7 +59,7 @@ function aplGeometry(tasks) {
 
 // Column span [a, b] of an item, clipped to the view; null when it is outside.
 function aplPlace(task, g) {
-  if (!task.start_date) return null;
+  if (!task.start_date || !task.end_date) return null;
   if (aplView === 'year') {
     const a = Math.max(0, aplWeekCol(task.start_date));
     const b = Math.min(g.cols - 1, aplWeekCol(task.end_date));
@@ -147,6 +147,14 @@ const aplOwner = (name) => String(name || '').replace(/^(นางสาว|น�
 // Plan vs actual (server planStatus): colour key for the % cell and the label beside the bar.
 const APL_PLAN_KEY = [['early', 'เสร็จก่อนแผน'], ['done', 'เสร็จ / ตามแผน'], ['ahead', 'เร็วกว่าแผน'], ['behind', 'ช้ากว่าแผน'], ['overdue', 'เลยกำหนด / เสร็จช้า']];
 
+// Where the dark (actual) bar ends: the done day, today while open (past the end when late), none before the start.
+function aplActualEnd(task) {
+  if (!task.start_date) return null;
+  if (task.progress >= 100) return task.done_on || task.end_date;
+  const today = actIso(new Date());
+  return today < task.start_date ? null : today;
+}
+
 // Dates + plan status beside the bar: on the right when there is room, else on the left, else only in the bar's tooltip.
 function aplDatesLabel(pos, g, text) {
   const room = Math.max(0.18, text.length * 0.0042);
@@ -159,12 +167,16 @@ function aplRow(task, code, color, g, lines, canEdit, phase) {
   const pos = aplPlace(task, g);
   const plan = task.plan || { code: 'none', text: '' };
   const span = task.start_date ? `${actShort(task.start_date)} – ${actShort(task.end_date)}${plan.text ? ` · ${plan.text}` : ''}` : '';
-  // A bar shorter than about 3 weeks (year view) has no room for its %: the % goes beside it with the dates.
-  const narrow = pos && (pos.b - pos.a + 1) / g.cols < 0.06;
-  const bar = pos ? `<div class="apl-bar${canEdit ? ' is-editable' : ''}" data-bar="${task.id}" data-a="${pos.a}" data-b="${pos.b}" style="left:${aplPct(pos.a, g)};width:${aplPct(pos.b - pos.a + 1, g)};--bar:${color}" title="${esc(task.title)} · ${span} · ${task.progress}%">
-      <div class="apl-fill" style="width:${task.progress}%"></div>${narrow ? '' : `<span>${task.progress}%</span>`}
+  // Light bar = plan (start → end, the one you drag). Dark bar = actual, from the start to the day it was done,
+  // or to today while open — so it stops short when done early and runs past the end when late (ผู้ใช้กำหนด 2026-10-29).
+  const act = pos ? aplPlace({ start_date: task.start_date, end_date: aplActualEnd(task) }, g) : null;
+  const tip = `${esc(task.title)} · ${span} · ${task.progress}%`;
+  const bar = pos ? `<div class="apl-bar${canEdit ? ' is-editable' : ''}" data-bar="${task.id}" data-a="${pos.a}" data-b="${pos.b}" style="left:${aplPct(pos.a, g)};width:${aplPct(pos.b - pos.a + 1, g)};--bar:${color}" title="${tip}">
       ${canEdit && !task.derived ? '<div class="apl-handle is-l" data-h="l"></div><div class="apl-handle is-r" data-h="r"></div>' : ''}</div>
-    ${aplDatesLabel(pos, g, `${span}${narrow ? ` · ${task.progress}%` : ''}`)}` : '';
+    ${act ? `<div class="apl-act" style="left:${aplPct(act.a, g)};width:${aplPct(Math.min(act.b, pos.b) - act.a + 1, g)};--bar:${color}"></div>
+    ${act.b > pos.b ? `<div class="apl-act is-over" style="left:${aplPct(pos.b + 1, g)};width:${aplPct(act.b - pos.b, g)}" title="เลยกำหนด"></div>` : ''}
+    <div class="apl-act-pct" style="${act.b + 1 > g.cols * 0.94 ? `right:calc(${aplPct(g.cols - act.b - 1, g)} + 4px);color:#fff` : `left:calc(${aplPct(act.b + 1, g)} + 4px)`}">${task.progress}%</div>` : ''}
+    ${aplDatesLabel({ a: pos.a, b: Math.max(pos.b, act ? act.b : pos.b) + (act ? 2 : 0) }, g, span)}` : '';
   const title = phase
     ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(task.title)}</span></div>`
     : `<div class="apl-title is-sub"><span>${esc(task.title)}</span></div>`;
@@ -221,7 +233,7 @@ async function aplRender(target, activity, opts = {}) {
       <div class="apl-row apl-head"><div class="apl-left"><div>ลำดับ</div><div>รายการ</div><div>ผู้รับผิดชอบ</div><div class="apl-pct">%</div></div><div class="apl-track">${aplHead(g)}</div></div>
       ${rows}
     </div></div>
-    ${tasks.length ? `<div class="apl-key">${APL_PLAN_KEY.map(([k, label]) => `<span><i class="apl-pct is-${k}"></i>${label}</span>`).join('')}<span class="sum-meta">เทียบ % จริงกับ % ที่ควรได้ถึงวันนี้ (เส้นแดง) · ต่างไม่เกิน 10% = ตามแผน${canEdit ? ' · เพิ่มข้อรอง: เลือกข้อหลักแล้วกด "สร้าง"' : ''}</span></div>` : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}`;
+    ${tasks.length ? `<div class="apl-key">${APL_PLAN_KEY.map(([k, label]) => `<span><i class="apl-pct is-${k}"></i>${label}</span>`).join('')}<span class="sum-meta">แถบอ่อน = แผน · แถบเข้ม = ดำเนินการจริง (ถึงวันเสร็จ / วันนี้) · แดง = เลยกำหนด · สถานะเทียบ % จริงกับ % ที่ควรได้ถึงวันนี้ ต่างไม่เกิน 10% = ตามแผน${canEdit ? ' · เพิ่มข้อรอง: เลือกข้อหลักแล้วกด "สร้าง"' : ''}</span></div>` : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}`;
   if (inPage) {
     $('a5-tools').innerHTML = tools;
     target.innerHTML = content;
