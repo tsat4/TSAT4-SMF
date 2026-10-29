@@ -452,7 +452,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-grid{min-width:calc(384px + var(--apl-tl))}
 .apl-row{display:grid;grid-template-columns:384px minmax(var(--apl-tl),1fr);border-bottom:1px solid var(--mo-border)}
 .apl-row:last-child{border-bottom:0}
-.apl-left{position:sticky;left:0;z-index:3;display:grid;grid-template-columns:40px 200px 104px 40px;align-items:center;background:var(--mo-surface);border-right:1px solid var(--mo-border)}
+.apl-left{position:sticky;left:0;z-index:5;display:grid;grid-template-columns:36px 196px 100px 52px;align-items:center;background:var(--mo-surface);border-right:1px solid var(--mo-border)}
 .apl-left > div{padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .apl-head{position:sticky;top:0;z-index:4}
 .apl-head .apl-left,.apl-head .apl-track{background:var(--th-bg);color:var(--th-ink);font-size:11px}
@@ -464,13 +464,14 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-ticks > div.is-month{border-left-color:var(--mo-border)}
 .apl-months > div.is-year,.apl-ticks > div.is-year,.apl-lines > div.is-year{border-left:2px solid var(--mo-text-muted)}
 .apl-ticks > div.is-weekend{background:var(--mo-input)}
-.apl-track{position:relative;height:36px;overflow:clip}
+.apl-track{position:relative;height:28px;overflow:clip}
 .apl-lines{position:absolute;inset:0;display:grid;pointer-events:none}
 .apl-lines > div{border-left:1px solid color-mix(in srgb,var(--mo-border) 45%,transparent)}
 .apl-lines > div.is-month{border-left-color:var(--mo-border)}
 .apl-lines > div.is-weekend{background:var(--mo-surface-2)}
-.apl-today{position:absolute;top:0;bottom:0;width:0;border-left:2px solid var(--mo-danger);z-index:1;pointer-events:none}
-.apl-row.is-phase .apl-left{font-weight:600}
+/* today line above the bars (ผู้ใช้กำหนด 2026-10-29) */
+.apl-today{position:absolute;top:0;bottom:0;width:0;border-left:2px solid var(--mo-danger);z-index:4;pointer-events:none}
+.apl-left{font-size:12px}.apl-row.is-phase .apl-left{font-weight:400}
 .apl-row[data-task]{cursor:default}
 .apl-row.is-selected .apl-left,.apl-row.is-selected .apl-track{background:var(--mo-row)}
 .apl-code{color:var(--mo-text-muted);font-variant-numeric:tabular-nums}
@@ -480,15 +481,20 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-tog{border:0;background:none;color:var(--mo-text-muted);width:16px;padding:0;flex:0 0 16px}
 .apl-add{margin-left:auto;flex:0 0 auto;border:1px dashed var(--mo-border);background:none;color:var(--mo-primary);border-radius:4px;padding:0 6px;line-height:18px}
 .apl-pct{text-align:right;font-variant-numeric:tabular-nums}
-.apl-bar{position:absolute;top:6px;height:24px;border-radius:12px;background:var(--mo-surface);border:1px solid var(--bar);overflow:hidden;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font-size:11px;z-index:2;touch-action:none}
-.apl-row.is-phase .apl-bar{border-width:2px}
+/* plan vs actual (planner.js planStatus): coloured % with a dot */
+.apl-left .apl-pct[class*="is-"]:not(.is-none):not(.is-waiting)::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:1px;background:var(--st)}
+.apl-pct.is-early,.apl-pct.is-done{--st:#16a34a}.apl-pct.is-ahead,.apl-pct.is-ontrack{--st:#2563eb}.apl-pct.is-behind{--st:#d97706}.apl-pct.is-overdue,.apl-pct.is-late{--st:#dc2626}
+.apl-left .apl-pct.is-behind,.apl-left .apl-pct.is-overdue,.apl-left .apl-pct.is-late{color:var(--st);font-weight:600}
+.apl-key{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:6px 2px 0;font-size:11.5px}.apl-key > span{display:inline-flex;align-items:center;gap:5px}
+.apl-key i.apl-pct{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--st)}
+.apl-bar{position:absolute;top:4px;height:20px;border-radius:10px;background:var(--mo-surface);border:1px solid var(--bar);overflow:hidden;display:flex;align-items:center;justify-content:flex-end;padding:0 8px;font-size:11px;z-index:2;touch-action:none}
 .apl-bar.is-editable{cursor:grab}
 .apl-bar.is-dragging{cursor:grabbing;box-shadow:0 0 0 2px var(--mo-primary)}
 .apl-fill{position:absolute;inset:0 auto 0 0;background:color-mix(in srgb,var(--bar) 40%,transparent)}
-.apl-bar > span{position:relative;font-weight:600;color:var(--mo-text)}
+.apl-bar > span{position:relative;font-weight:500;color:var(--mo-text)}
 .apl-handle{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:1}
 .apl-handle.is-l{left:0}.apl-handle.is-r{right:0}
-.apl-dates{position:absolute;top:10px;font-size:11px;color:var(--mo-text-muted);white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums;z-index:2}
+.apl-dates{position:absolute;top:7px;font-size:11px;color:var(--mo-text-muted);white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums;z-index:2}
 .apl-link{border:0;background:none;color:var(--mo-primary);padding:0}
 .apl-owner{display:flex;gap:4px}.apl-owner input{flex:1 1 auto;min-width:0;width:auto}.popup-fields .apl-owner > .btn{flex:0 0 auto;width:auto}
 .apl-swatches{display:flex;gap:6px}
@@ -496,7 +502,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-swatch span{display:block;width:24px;height:24px;border-radius:50%;background:var(--bar);border:2px solid transparent;cursor:pointer}
 .apl-swatch input:checked + span{border-color:var(--mo-text)}
 .apl-swatch input:focus-visible + span{outline:2px solid var(--mo-primary);outline-offset:1px}
-@media (max-width:640px){.apl-grid{min-width:calc(260px + var(--apl-tl))}.apl-row{grid-template-columns:260px minmax(var(--apl-tl),1fr)}.apl-left{grid-template-columns:36px 184px 40px}.apl-left > div:nth-child(3){display:none}}
+@media (max-width:640px){.apl-grid{min-width:calc(260px + var(--apl-tl))}.apl-row{grid-template-columns:260px minmax(var(--apl-tl),1fr)}.apl-left{grid-template-columns:36px 172px 52px}.apl-left > div:nth-child(3){display:none}}
 
 /* Usage transaction catalog: group select, item list, order summary. */
 .view-body:has(.tx-board){overflow:hidden}

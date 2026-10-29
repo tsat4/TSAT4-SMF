@@ -12,6 +12,38 @@ const COLORS = ['p1', 'p2', 'p3', 'p4', 'p5'];
 const COLUMNS = 'id,year,parent_id,sort_no,title,start_date,end_date,progress,owner_id,color,note';
 
 const daysOf = (start, end) => Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;
+const todayIso = () => new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10); // Thailand date
+
+// Plan vs actual for one item (ผู้ใช้สั่ง 2026-10-29): done early / on time / late (needs done_on, the day it reached 100%),
+// or, still open: overdue after its end date, else ahead / on plan / behind against the straight-line % expected today
+// (10 points either way counts as on plan). -> { code, text, expected }
+export const PLAN_SLACK = 10;
+export function planStatus(row, today = todayIso()) {
+  if (!row.start_date || !row.end_date) return { code: 'none', text: '' };
+  if (row.progress >= 100) {
+    if (!row.done_on) return { code: 'done', text: 'เสร็จแล้ว' };
+    const late = daysOf(row.end_date, row.done_on) - 1;
+    if (late < 0) return { code: 'early', text: `เสร็จก่อนแผน ${-late} วัน` };
+    return late === 0 ? { code: 'done', text: 'เสร็จตามแผน' } : { code: 'late', text: `เสร็จช้า ${late} วัน` };
+  }
+  if (today > row.end_date) return { code: 'overdue', text: `เลยกำหนด ${daysOf(row.end_date, today) - 1} วัน` };
+  if (today < row.start_date) return { code: 'waiting', text: 'ยังไม่ถึงกำหนด' };
+  const expected = Math.round((daysOf(row.start_date, today) / daysOf(row.start_date, row.end_date)) * 100);
+  if (row.progress < expected - PLAN_SLACK) return { code: 'behind', text: `ช้ากว่าแผน (ควรได้ ${expected}%)`, expected };
+  if (row.progress > expected + PLAN_SLACK) return { code: 'ahead', text: `เร็วกว่าแผน (แผน ${expected}%)`, expected };
+  return { code: 'ontrack', text: `ตามแผน (แผน ${expected}%)`, expected };
+}
+
+// done_on follows progress: the date given in the form (not in the future), else today when it first reaches 100%;
+// an item already at 100% keeps its date (unknown stays unknown); cleared when it drops below 100%.
+function doneOn(progress, current, raw) {
+  if (progress == null) return undefined;
+  if (progress < 100) return null;
+  const given = dateOf(raw);
+  if (given && given <= todayIso()) return given;
+  if (current?.progress >= 100) return current.done_on ?? undefined;
+  return todayIso();
+}
 
 // Main item dates = span of its sub items, % = sub items' % weighted by their days.
 export function withSpans(rows) {
@@ -26,7 +58,9 @@ export function withSpans(rows) {
       derived: true,
       start_date: list.map((k) => k.start_date).sort()[0],
       end_date: list.map((k) => k.end_date).sort().at(-1),
-      progress: Math.round(list.reduce((s, k) => s + daysOf(k.start_date, k.end_date) * k.progress, 0) / total)
+      progress: Math.round(list.reduce((s, k) => s + daysOf(k.start_date, k.end_date) * k.progress, 0) / total),
+      // done when every sub item is done, on the day the last one was
+      done_on: list.every((k) => k.progress >= 100 && k.done_on) ? list.map((k) => k.done_on).sort().at(-1) : null
     };
   });
 }
@@ -64,8 +98,16 @@ function input(body, year, hasKids) {
 
 export function mountPlanner(app) {
   const route = actRoute(app, { only: PLANNER_ON, sqlOf: (activity) => PLANNER_SQL[activity] });
-  const rowsOf = (table, year) => fetchAll(() => tx.from(table).select(COLUMNS).eq('year', year).order('sort_no').order('id'));
-  const oneOf = async (table, id) => must(await tx.from(table).select(COLUMNS).eq('id', id).maybeSingle());
+  // select * so done_on comes along once db/act/<act>.sql has added it (older databases simply lack it).
+  const rowsOf = (table, year) => fetchAll(() => tx.from(table).select('*').eq('year', year).order('sort_no').order('id'));
+  const oneOf = async (table, id) => must(await tx.from(table).select('*').eq('id', id).maybeSingle());
+  // Write with done_on; a database without the column yet (PGRST204 / 42703) gets the same write without it.
+  const write = async (query, row) => {
+    const first = await query(row);
+    if (!first.error || !('done_on' in row) || !['PGRST204', '42703'].includes(first.error.code)) return must(first);
+    const { done_on: _skip, ...rest } = row;
+    return must(await query(rest));
+  };
   const kidCount = async (table, id) => {
     const { count, error } = await tx.from(table).select('id', { count: 'exact', head: true }).eq('parent_id', id);
     if (error) throw error;
@@ -93,7 +135,7 @@ export function mountPlanner(app) {
     res.json({
       year,
       canEdit: (await accessOf(req, activity, year)).admin,
-      tasks: withSpans(rows).map((row) => ({ ...row, owner_name: row.owner_id ? names.get(String(row.owner_id))?.name || row.owner_id : '' }))
+      tasks: withSpans(rows).map((row) => ({ ...row, plan: planStatus(row), owner_name: row.owner_id ? names.get(String(row.owner_id))?.name || row.owner_id : '' }))
     });
   });
 
@@ -103,8 +145,10 @@ export function mountPlanner(app) {
     const { row, error: invalid } = input(req.body || {}, year, false);
     const bad = invalid || await badParent(t.task, year, row.parent_id, null);
     if (bad) return fail(res, 400, bad);
-    const created = must(await tx.from(t.task)
-      .insert({ ...row, year, sort_no: await nextSort(t.task, year, row.parent_id), created_by: req.user.employeeId }).select('id').single());
+    const insert = { ...row, year, sort_no: await nextSort(t.task, year, row.parent_id), created_by: req.user.employeeId };
+    const done = doneOn(row.progress, null, req.body?.doneOn);
+    if (done !== undefined) insert.done_on = done;
+    const created = await write((r) => tx.from(t.task).insert(r).select('id').single(), insert);
     res.status(201).json({ ok: true, id: created.id });
   });
 
@@ -138,7 +182,10 @@ export function mountPlanner(app) {
     const bad = invalid || await badParent(t.task, current.year, row.parent_id, current.id);
     if (bad) return fail(res, 400, bad);
     if (row.parent_id !== current.parent_id) row.sort_no = await nextSort(t.task, current.year, row.parent_id);
-    must(await tx.from(t.task).update({ ...row, updated_at: new Date().toISOString() }).eq('id', current.id));
+    const patch = { ...row, updated_at: new Date().toISOString() };
+    const done = doneOn(row.progress, current, req.body?.doneOn);
+    if (done !== undefined) patch.done_on = done;
+    await write((r) => tx.from(t.task).update(r).eq('id', current.id), patch);
     res.json({ ok: true });
   });
 

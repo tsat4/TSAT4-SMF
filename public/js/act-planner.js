@@ -142,20 +142,34 @@ function aplLines(g) {
   return `<div class="apl-lines" style="grid-template-columns:repeat(${g.cols}, 1fr)">${cells}</div>${today == null ? '' : `<div class="apl-today" style="left:${aplPct(today, g)}"></div>`}`;
 }
 
+// Owner without the title (นาย / นาง / นางสาว ...) to keep the column short.
+const aplOwner = (name) => String(name || '').replace(/^(นางสาว|นาง|นาย|Mr\.?|Mrs\.?|Ms\.?|Miss)\s*/, '');
+// Plan vs actual (server planStatus): colour key for the % cell and the label beside the bar.
+const APL_PLAN_KEY = [['early', 'เสร็จก่อนแผน'], ['done', 'เสร็จ / ตามแผน'], ['ahead', 'เร็วกว่าแผน'], ['behind', 'ช้ากว่าแผน'], ['overdue', 'เลยกำหนด / เสร็จช้า']];
+
+// Dates + plan status beside the bar: on the right when there is room, else on the left, else only in the bar's tooltip.
+function aplDatesLabel(pos, g, text) {
+  const room = Math.max(0.18, text.length * 0.0042);
+  if ((g.cols - pos.b - 1) / g.cols >= room) return `<div class="apl-dates" style="left:calc(${aplPct(pos.b + 1, g)} + 6px)">${text}</div>`;
+  if (pos.a / g.cols >= room) return `<div class="apl-dates" style="right:calc(${aplPct(g.cols - pos.a, g)} + 6px)">${text}</div>`;
+  return '';
+}
+
 function aplRow(task, code, color, g, lines, canEdit, phase) {
   const pos = aplPlace(task, g);
-  const span = task.start_date ? `${actShort(task.start_date)} – ${actShort(task.end_date)}` : '';
+  const plan = task.plan || { code: 'none', text: '' };
+  const span = task.start_date ? `${actShort(task.start_date)} – ${actShort(task.end_date)}${plan.text ? ` · ${plan.text}` : ''}` : '';
   // A bar shorter than about 3 weeks (year view) has no room for its %: the % goes beside it with the dates.
   const narrow = pos && (pos.b - pos.a + 1) / g.cols < 0.06;
   const bar = pos ? `<div class="apl-bar${canEdit ? ' is-editable' : ''}" data-bar="${task.id}" data-a="${pos.a}" data-b="${pos.b}" style="left:${aplPct(pos.a, g)};width:${aplPct(pos.b - pos.a + 1, g)};--bar:${color}" title="${esc(task.title)} · ${span} · ${task.progress}%">
       <div class="apl-fill" style="width:${task.progress}%"></div>${narrow ? '' : `<span>${task.progress}%</span>`}
       ${canEdit && !task.derived ? '<div class="apl-handle is-l" data-h="l"></div><div class="apl-handle is-r" data-h="r"></div>' : ''}</div>
-    <div class="apl-dates" style="${pos.b + 1 > g.cols * 0.8 ? `right:calc(${aplPct(g.cols - pos.a, g)} + 6px)` : `left:calc(${aplPct(pos.b + 1, g)} + 6px)`}">${span}${narrow ? ` · ${task.progress}%` : ''}</div>` : '';
+    ${aplDatesLabel(pos, g, `${span}${narrow ? ` · ${task.progress}%` : ''}`)}` : '';
   const title = phase
-    ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(task.title)}</span>${canEdit ? `<button class="apl-add" type="button" data-add="${task.id}" title="เพิ่มข้อรอง" aria-label="เพิ่มข้อรองใต้ ${esc(task.title)}">+</button>` : ''}</div>`
+    ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(task.title)}</span></div>`
     : `<div class="apl-title is-sub"><span>${esc(task.title)}</span></div>`;
   return `<div class="apl-row${phase ? ' is-phase' : ''}${aplSelected === task.id ? ' is-selected' : ''}" data-task="${task.id}">
-    <div class="apl-left"><div class="apl-code">${code}</div>${title}<div title="${esc(task.owner_name)}">${esc(task.owner_name)}</div><div class="apl-pct">${task.progress}</div></div>
+    <div class="apl-left"><div class="apl-code">${code}</div>${title}<div title="${esc(task.owner_name)}">${esc(aplOwner(task.owner_name))}</div><div class="apl-pct is-${plan.code}" title="${esc(plan.text)}">${task.progress}</div></div>
     <div class="apl-track">${lines}${bar}</div></div>`;
 }
 
@@ -207,7 +221,7 @@ async function aplRender(target, activity, opts = {}) {
       <div class="apl-row apl-head"><div class="apl-left"><div>ลำดับ</div><div>รายการ</div><div>ผู้รับผิดชอบ</div><div class="apl-pct">%</div></div><div class="apl-track">${aplHead(g)}</div></div>
       ${rows}
     </div></div>
-    ${tasks.length ? '' : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}`;
+    ${tasks.length ? `<div class="apl-key">${APL_PLAN_KEY.map(([k, label]) => `<span><i class="apl-pct is-${k}"></i>${label}</span>`).join('')}<span class="sum-meta">เทียบ % จริงกับ % ที่ควรได้ถึงวันนี้ (เส้นแดง) · ต่างไม่เกิน 10% = ตามแผน${canEdit ? ' · เพิ่มข้อรอง: เลือกข้อหลักแล้วกด "สร้าง"' : ''}</span></div>` : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}`;
   if (inPage) {
     $('a5-tools').innerHTML = tools;
     target.innerHTML = content;
@@ -250,9 +264,9 @@ async function aplRender(target, activity, opts = {}) {
     if (canEdit) row.ondblclick = (e) => { if (!e.target.closest('[data-add],[data-tog]')) aplOpenForm(activity, tasks, byId(row.dataset.task), null, rerender); };
   });
   if (!canEdit) return;
-  target.querySelectorAll('[data-add]').forEach((node) => { node.onclick = (e) => { e.stopPropagation(); aplOpenForm(activity, tasks, null, Number(node.dataset.add), rerender); }; });
   $('apl-add-phase').onclick = () => aplOpenForm(activity, tasks, null, null, rerender);
-  $('apl-new').onclick = () => aplOpenForm(activity, tasks, null, null, rerender);
+  // With a main item selected, "สร้าง" adds a sub item under it (the + button per row was removed for space).
+  $('apl-new').onclick = () => { const sel = byId(aplSelected); aplOpenForm(activity, tasks, null, sel ? (sel.parent_id ?? sel.id) : null, rerender); };
   $('apl-edit').onclick = () => { const task = byId(aplSelected); if (task) aplOpenForm(activity, tasks, task, null, rerender); };
   $('apl-del').onclick = () => {
     const task = byId(aplSelected);
@@ -330,6 +344,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
     field('วันเริ่ม', `<input id="apl-start" type="date" ${range} value="${esc(start)}"${derived ? ' disabled' : ''}>`),
     field('วันจบ', `<input id="apl-end" type="date" ${range} value="${esc(end)}"${derived ? ' disabled' : ''}>`),
     field(`ความคืบหน้า <span id="apl-pct-v">${task?.progress ?? 0}%</span>`, `<input id="apl-pct" type="range" min="0" max="100" step="5" value="${task?.progress ?? 0}"${derived ? ' disabled' : ''}>`),
+    `<div id="apl-done-wrap">${field('วันที่ทำเสร็จ (100%)', `<input id="apl-done" type="date" value="${esc(task?.done_on || actIso(new Date()))}">`)}<p class="sum-meta">ใช้เทียบกับวันจบ: เสร็จก่อนแผน / ตามแผน / เสร็จช้า</p></div>`,
     `<div id="apl-color-wrap">${field('สีข้อหลัก', `<div class="apl-swatches">${Object.entries(APL_COLORS).map(([key, hex]) => `<label class="apl-swatch" style="--bar:${hex}"><input type="radio" name="apl-color" value="${key}"${key === color ? ' checked' : ''}><span></span></label>`).join('')}</div>`)}</div>`,
     field('รายละเอียด', `<textarea id="apl-note" rows="2" maxlength="2000">${esc(task?.note || '')}</textarea>`),
     derived ? '<p class="sum-meta">ข้อหลักที่มีข้อรอง: ช่วงวันและ % คิดจากข้อรองให้อัตโนมัติ</p>' : `<p class="sum-meta">วางแผนได้ถึง ธ.ค. ${aplYear + 1} · ข้อหลักเว้นวันว่างได้ ข้อรองต้องมีวันเริ่มและวันจบ</p>`
@@ -345,7 +360,8 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
       color: document.querySelector('[name="apl-color"]:checked')?.value,
       startDate: $('apl-start').value,
       endDate: $('apl-end').value,
-      progress: Number($('apl-pct').value)
+      progress: Number($('apl-pct').value),
+      doneOn: Number($('apl-pct').value) >= 100 ? $('apl-done').value : ''
     };
     if (!body.title) throw new Error('ระบุชื่อรายการ');
     if (body.parentId && (!body.startDate || !body.endDate)) throw new Error('ข้อรองต้องมีวันเริ่มและวันจบ');
@@ -361,7 +377,9 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
   const syncColor = () => { $('apl-color-wrap').hidden = Boolean($('apl-parent').value); };
   $('apl-parent').onchange = syncColor;
   syncColor();
-  $('apl-pct').oninput = () => { $('apl-pct-v').textContent = `${$('apl-pct').value}%`; };
+  const syncDone = () => { $('apl-done-wrap').hidden = derived || Number($('apl-pct').value) < 100; };
+  $('apl-pct').oninput = () => { $('apl-pct-v').textContent = `${$('apl-pct').value}%`; syncDone(); };
+  syncDone();
   $('apl-owner-clear').onclick = () => { ownerId = ''; $('apl-owner').value = ''; };
   a5EmployeeSearch(activity, (p) => { ownerId = p.employeeId; $('apl-owner').value = `${p.employeeId} · ${p.name}`; }, aplYear);
 }
@@ -402,8 +420,14 @@ async function aplDashboard(target, activity) {
 }
 
 async function aplDrawTeam(body, activity, admin) {
-  const data = await a5Api(activity, `team?year=${a5Year}`);
-  const active = data.members.filter((m) => m.status === 'Active');
+  let data;
+  try {
+    data = await a5Api(activity, `team?year=${a5Year}`);
+  } catch (err) {
+    body.innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+    return;
+  }
+  const active = (data.members || []).filter((m) => m.status === 'Active');
   const person = (m) => `<div class="a5-person">${esc(m.employee_id)} · ${esc(m.name || '-')}<span>${esc(m.department || (m.team ? `ทีม ${m.team}` : ''))}</span></div>`;
   const actName = actLabel(activity);
   body.innerHTML = `
@@ -435,7 +459,14 @@ async function aplSetting(target, activity) {
   });
   if ($('a5-year')) $('a5-year').onchange = () => { a5Year = Number($('a5-year').value); rerender(); };
   const body = $('a5-body');
-  if (tab === 'team') return a5SetTeam(body, activity, admin, rerender, APL_ROLE_LABEL);
+  if (tab === 'team') {
+    try {
+      return await a5SetTeam(body, activity, admin, rerender, APL_ROLE_LABEL);
+    } catch (err) {
+      body.innerHTML = `<p class="empty">${esc(err.message)}</p>`;
+      return;
+    }
+  }
   return aplRender(body, activity, { inPage: true });
 }
 

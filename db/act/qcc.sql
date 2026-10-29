@@ -67,6 +67,8 @@ create table if not exists public.mt_qcc_task (
   constraint mt_qcc_task_sub_has_dates check (parent_id is null or start_date is not null)
 );
 create index if not exists mt_qcc_task_year on public.mt_qcc_task (year, parent_id, sort_no);
+-- วันที่ทำครบ 100% (server ใส่ให้) ใช้บอกเสร็จก่อนแผน / ตามแผน / ช้า เทียบกับ end_date · เพิ่มทีหลัง จึงใช้ add column (รันซ้ำได้)
+alter table public.mt_qcc_task add column if not exists done_on date;
 
 -- ===== qcc: โครงการกลุ่ม QCC (1 แถว = 1 กลุ่ม 1 เรื่อง) =====
 

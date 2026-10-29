@@ -93,6 +93,19 @@ ok(await throws(db, `insert into mt_100p_task (year, title, progress, created_by
 await db.exec(`delete from mt_100p_task where parent_id is null`);
 ok((await one(db, `select count(*)::int n from mt_100p_task`)).n === 0, 'deleting a main item removes its sub items');
 {
+  // Plan vs actual: done early / on time / late, overdue, behind / on plan / ahead of the straight-line % for today
+  const { planStatus, withSpans: spans } = await import('../server/modules/act/planner.js');
+  const t = { start_date: '2026-01-01', end_date: '2026-11-30' };
+  ok(planStatus({ ...t, progress: 100, done_on: '2026-10-20' }, '2026-10-29').code === 'early' && planStatus({ ...t, progress: 100, done_on: '2026-10-20' }).text === 'เสร็จก่อนแผน 41 วัน', 'done 41 days before the end = early');
+  ok(planStatus({ ...t, progress: 100, done_on: '2026-11-30' }).code === 'done' && planStatus({ ...t, progress: 100, done_on: '2026-12-03' }).text === 'เสร็จช้า 3 วัน', 'done on the end day = on time, after = late');
+  ok(planStatus({ ...t, progress: 60 }, '2026-12-05').text === 'เลยกำหนด 5 วัน', 'open after the end day = overdue');
+  ok(planStatus({ ...t, progress: 40 }, '2026-10-29').code === 'behind' && planStatus({ ...t, progress: 40 }, '2026-10-29').expected === 90, 'Oct 29 of a Jan–Nov plan should be 90%: 40% is behind');
+  ok(planStatus({ ...t, progress: 85 }, '2026-10-29').code === 'ontrack' && planStatus({ ...t, progress: 30 }, '2026-02-01').code === 'ahead', 'within 10 points = on plan, more = ahead');
+  ok(planStatus({ ...t, progress: 0 }, '2025-12-01').code === 'waiting' && planStatus({ progress: 0 }).code === 'none', 'not started yet / no dates');
+  const parent = spans([{ id: 1, parent_id: null, progress: 0 }, { id: 2, parent_id: 1, start_date: '2026-01-01', end_date: '2026-01-10', progress: 100, done_on: '2026-01-08' }, { id: 3, parent_id: 1, start_date: '2026-02-01', end_date: '2026-02-10', progress: 100, done_on: '2026-02-05' }])[0];
+  ok(parent.done_on === '2026-02-05' && planStatus(parent).code === 'early', 'a main item is done when all sub items are, on the last one\'s day');
+}
+{
   const { withSpans } = await import('../server/modules/act/planner.js');
   const rows = withSpans([
     { id: 1, parent_id: null, start_date: null, end_date: null, progress: 0 },

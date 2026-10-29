@@ -21,6 +21,7 @@
 - `db/act/qcc.sql` ใน Tx Data (QCC ใหม่: ทีม + แผนงาน + `tx_qcc_project` + bucket `img_qcc`)
 - `db/06_main_user_access.sql` ใน **Mx Data** (ระดับสิทธิ์ภาพรวม executive / admin_of) ถ้ายังไม่ได้รัน
 - `db/08_employee_level.sql` ใน **Mx Data** (level M1–M3 / G1–G3 รองรับทั้ง enum และ text + check) **ต้องรันก่อนเพิ่มพนักงานระดับ M / G**
+- `db/act/<กิจกรรม>.sql` ที่มี Planner (kaizen, qcc, smf, 100p, 5s → `5s_task.sql`) ใน Tx Data อีกรอบ: เพิ่ม `mt_<act>_task.done_on` (ไม่รันก็ใช้ได้ แต่จะไม่รู้วันเสร็จ จึงไม่บอก "เสร็จก่อนแผน")
 - `db/07_sto_integrity.sql` ใน **Mx Data** (FK ผู้บันทึก Usage + check รับคืน ↔ ใบยืม แบบ NOT VALID + index) · ขั้นที่ 1 ตรวจ ขั้นที่ 3 VALIDATE ไม่บังคับ
 
 ## ข้อควรระวัง
@@ -29,6 +30,8 @@
 - หน้า PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-29 · Claude · Project Planner (ผู้ใช้ทดสอบ KAIZEN แผนงาน): ขอบแท่ง 1px · รายการ / ผู้รับผิดชอบไม่หนา 12px ตัดคำนำหน้า · ตัดปุ่ม + (เพิ่มข้อรอง = เลือกข้อหลักแล้ว "สร้าง") · เส้นวันนี้อยู่บนแท่ง · แถว 36 → 28px · **เทียบแผน**: `done_on` + `planStatus` (เสร็จก่อนแผน / ตามแผน / เสร็จช้า / เลยกำหนด / ช้า-ตาม-เร็วกว่าแผน) จุดสีหน้า % + ข้อความข้างแท่ง + คำอธิบายสี · ฟอร์มมีช่องวันที่ทำเสร็จเมื่อ 100% · spec `docs/specs/act-planner.md` · commit นี้รวมงานค้างของ Antigravity ใน act-planner.js (try/catch แท็บทีม แสดง error แทนหน้าค้าง) ที่อยู่ในไฟล์เดียวกัน · `server/modules/act/audit.js` + `scripts/tmp-update-handoff.cjs` ของ Antigravity ยังไม่ commit
 
 - 2026-10-29 · Claude · ลำดับแท็บ Setting ทุกกิจกรรม: ตารางของกิจกรรม → ทีม → แผนงาน (5S/Safety, CFO, KAIZEN, QCC, 100P/SMF ผ่าน act-planner.js) แท็บแรกเปิดก่อน + กฎใน AGENTS.md · act-planner.js commit เฉพาะ 3 บรรทัดนี้ งานค้างของ Antigravity ในไฟล์เดียวกัน (try/catch ทีม) ยังไม่ commit
 

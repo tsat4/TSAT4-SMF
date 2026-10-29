@@ -67,6 +67,8 @@ create table if not exists public.mt_smf_task (
   constraint mt_smf_task_sub_has_dates check (parent_id is null or start_date is not null)
 );
 create index if not exists mt_smf_task_year on public.mt_smf_task (year, parent_id, sort_no);
+-- วันที่ทำครบ 100% (server ใส่ให้) ใช้บอกเสร็จก่อนแผน / ตามแผน / ช้า เทียบกับ end_date · เพิ่มทีหลัง จึงใช้ add column (รันซ้ำได้)
+alter table public.mt_smf_task add column if not exists done_on date;
 
 -- server ใช้ service key ซึ่งข้าม RLS ได้ เปิด RLS ไว้กันการเข้าถึงด้วย anon key
 alter table public.mt_smf_team enable row level security;
