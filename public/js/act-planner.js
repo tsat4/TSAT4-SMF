@@ -152,7 +152,8 @@ function aplActualEnd(task) {
   if (!task.start_date) return null;
   if (task.progress >= 100) return task.done_on || task.end_date;
   const today = actIso(new Date());
-  return today < task.start_date ? null : today;
+  // nothing done yet = no actual bar (like an empty A row in the Excel plan)
+  return today < task.start_date || task.progress <= 0 ? null : today;
 }
 
 // Dates + plan status beside the bar: on the right when there is room, else on the left, else only in the bar's tooltip.
@@ -175,8 +176,8 @@ function aplRow(task, code, color, g, lines, canEdit, phase) {
       ${canEdit && !task.derived ? '<div class="apl-handle is-l" data-h="l"></div><div class="apl-handle is-r" data-h="r"></div>' : ''}</div>
     ${act ? `<div class="apl-act" style="left:${aplPct(act.a, g)};width:${aplPct(Math.min(act.b, pos.b) - act.a + 1, g)};--bar:${color}"></div>
     ${act.b > pos.b ? `<div class="apl-act is-over" style="left:${aplPct(pos.b + 1, g)};width:${aplPct(act.b - pos.b, g)}" title="เลยกำหนด"></div>` : ''}
-    <div class="apl-act-pct" style="${act.b + 1 > g.cols * 0.94 ? `right:calc(${aplPct(g.cols - act.b - 1, g)} + 4px);color:#fff` : `left:calc(${aplPct(act.b + 1, g)} + 4px)`}">${task.progress}%</div>` : ''}
-    ${aplDatesLabel({ a: pos.a, b: Math.max(pos.b, act ? act.b : pos.b) + (act ? 2 : 0) }, g, span)}` : '';
+    <div class="apl-act-pct" style="${act.b + 1 > g.cols * 0.95 ? 'right:4px' : `left:calc(${aplPct(act.b + 1, g)} + 4px)`}">${task.progress}%</div>` : ''}
+    ${aplDatesLabel(pos, g, span)}` : '';
   const title = phase
     ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(task.title)}</span></div>`
     : `<div class="apl-title is-sub"><span>${esc(task.title)}</span></div>`;
@@ -233,7 +234,7 @@ async function aplRender(target, activity, opts = {}) {
       <div class="apl-row apl-head"><div class="apl-left"><div>ลำดับ</div><div>รายการ</div><div>ผู้รับผิดชอบ</div><div class="apl-pct">%</div></div><div class="apl-track">${aplHead(g)}</div></div>
       ${rows}
     </div></div>
-    ${tasks.length ? `<div class="apl-key">${APL_PLAN_KEY.map(([k, label]) => `<span><i class="apl-pct is-${k}"></i>${label}</span>`).join('')}<span class="sum-meta">แถบอ่อน = แผน · แถบเข้ม = ดำเนินการจริง (ถึงวันเสร็จ / วันนี้) · แดง = เลยกำหนด · สถานะเทียบ % จริงกับ % ที่ควรได้ถึงวันนี้ ต่างไม่เกิน 10% = ตามแผน${canEdit ? ' · เพิ่มข้อรอง: เลือกข้อหลักแล้วกด "สร้าง"' : ''}</span></div>` : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}`;
+    ${tasks.length ? `<div class="apl-key">${APL_PLAN_KEY.map(([k, label]) => `<span><i class="apl-pct is-${k}"></i>${label}</span>`).join('')}<span class="sum-meta">แถบบน (อ่อน) = แผน · แถบล่าง (เข้ม) = ทำจริง ถึงวันเสร็จ / วันนี้ · แดง = เลยกำหนด · สถานะเทียบ % จริงกับ % ที่ควรได้ถึงวันนี้ ต่างไม่เกิน 10% = ตามแผน${canEdit ? ' · เพิ่มข้อรอง: เลือกข้อหลักแล้วกด "สร้าง"' : ''}</span></div>` : `<p class="empty">ยังไม่มีแผนปี ${aplYear}${canEdit ? ' กด "สร้าง" หรือ "+ เพิ่มข้อหลัก"' : ''}</p>`}`;
   if (inPage) {
     $('a5-tools').innerHTML = tools;
     target.innerHTML = content;
