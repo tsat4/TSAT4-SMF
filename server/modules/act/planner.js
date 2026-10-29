@@ -8,7 +8,7 @@ import { accessOf, actRoute, dateOf, fetchAll, must, namesOf, requireAdmin, tabl
 export const PLANNER_ON = ['100p', '5s', 'e-day', 'kaizen', 'lean', 'qcc', 'safety', 'smf'];
 // A running activity got the Planner table from an add-on file; a new one gets it with its tables.
 const PLANNER_SQL = { '5s': 'db/act/5s_task.sql' };
-const COLORS = ['p1', 'p2', 'p3', 'p4', 'p5'];
+const COLORS = Array.from({ length: 12 }, (_, i) => `p${i + 1}`); // act-planner.js APL_COLORS
 const COLUMNS = 'id,year,parent_id,sort_no,title,start_date,end_date,progress,owner_id,color,note';
 
 const daysOf = (start, end) => Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1;

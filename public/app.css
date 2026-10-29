@@ -510,7 +510,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-link{border:0;background:none;color:var(--mo-primary);padding:0}
 .apl-locked{margin:0 0 4px;padding:8px 10px;border-radius:var(--mo-radius);background:color-mix(in srgb,#d97706 10%,var(--mo-surface));border:1px solid color-mix(in srgb,#d97706 45%,transparent);font-size:12.5px}
 .apl-owner{display:flex;gap:4px}.apl-owner input{flex:1 1 auto;min-width:0;width:auto}.popup-fields .apl-owner > .btn{flex:0 0 auto;width:auto}
-.apl-swatches{display:flex;gap:6px}
+.apl-swatches{display:flex;flex-wrap:wrap;gap:6px}
 .apl-swatch input{position:absolute;opacity:0;pointer-events:none}
 .apl-swatch span{display:block;width:24px;height:24px;border-radius:50%;background:var(--bar);border:2px solid transparent;cursor:pointer}
 .apl-swatch input:checked + span{border-color:var(--mo-text)}

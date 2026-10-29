@@ -58,7 +58,7 @@ create table if not exists public.mt_qcc_task (
   end_date date,
   progress integer not null default 0 check (progress between 0 and 100),
   owner_id text,                                          -- employee_id (Mx Data)
-  color text,                                             -- สีของข้อหลัก p1–p5
+  color text,                                             -- สีของข้อหลัก p1–p12
   note text,
   created_by text not null,
   created_at timestamptz not null default now(),

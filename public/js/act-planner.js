@@ -4,7 +4,11 @@
 // 100P: its own Setting page (APL_ON). 5S: a tab inside Setting (edit) and Dashboard (read only), see act-5s.js.
 // Turn it on for another activity by adding its id to PLANNER_ON in planner.js and here (or calling aplRender from a tab).
 const APL_ON = ['100p', 'smf', 'e-day', 'lean', 'safety'];
-const APL_COLORS = { p1: '#ec6f73', p2: '#3fbfbf', p3: '#e3a52f', p4: '#8b6fd8', p5: '#4b8bea' };
+// Main item colours (ผู้ใช้ขอเพิ่ม 2026-10-29: 5 → 12); keys are stored in mt_<act>_task.color, server COLORS lists the same keys.
+const APL_COLORS = {
+  p1: '#ec6f73', p2: '#3fbfbf', p3: '#e3a52f', p4: '#8b6fd8', p5: '#4b8bea', p6: '#2fa36b',
+  p7: '#f08a3c', p8: '#e46aa8', p9: '#8d6e52', p10: '#5f7488', p11: '#1f8a99', p12: '#a8b236'
+};
 // Narrowest column in px; wider screens stretch the columns so the last month ends at the right edge.
 const APL_COL = { year: 15, month: 26 };
 const APL_LEFT = 384; // left columns, app.css .apl-row (260 on phones)
@@ -213,7 +217,7 @@ async function aplRender(target, activity, opts = {}) {
     const kids = kidsOf(p.id);
     const shownKids = q ? kids.filter(match) : kids;
     if (!match(p) && !shownKids.length) return;
-    const color = APL_COLORS[p.color] || Object.values(APL_COLORS)[pi % 5];
+    const color = APL_COLORS[p.color] || Object.values(APL_COLORS)[pi % Object.keys(APL_COLORS).length];
     rows += aplRow(p, `${pi + 1}`, color, g, lines, canEdit, { kids: kids.length });
     if (!aplCollapsed.has(p.id)) shownKids.forEach((k) => { rows += aplRow(k, `${pi + 1}.${kids.indexOf(k) + 1}`, color, g, lines, canEdit, null); });
   });
