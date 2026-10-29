@@ -641,12 +641,11 @@ async function kzSetTeam(body, admin, rerender) {
     }
     const runMgrSearch = async () => {
       const r = await a5Api(KZ, `employees?year=${a5Year}&q=${encodeURIComponent($('kz-mgr-q').value.trim())}`);
-      $('kz-mgr-list').innerHTML = r.employees.map((p) => `<button type="button" class="emp-item" data-id="${esc(p.employeeId)}" data-name="${esc(p.name)}"><strong>${esc(p.employeeId)}</strong><span>${esc(p.name)}</span><small>${esc(p.department)}</small></button>`).join('') || '<div class="empty">ไม่พบพนักงาน</div>';
-      $('kz-mgr-list').querySelectorAll('.emp-item').forEach((node) => {
-        node.onclick = () => {
-          chosenMgr = { employeeId: node.dataset.id, name: node.dataset.name };
-          $('kz-mgr-pick').value = `${chosenMgr.employeeId} · ${chosenMgr.name}`;
-        };
+      // Same pick table as the employee search above (fillTable + bindRowSelect).
+      fillTable('kz-mgr-list', ['รหัส', 'ชื่อ', 'หน่วยงาน'], r.employees.map((p) => `<tr data-pick="${esc(p.employeeId)}" data-name="${esc(p.name)}"><td>${esc(p.employeeId)}</td><td>${esc(p.name)}</td><td>${esc(p.department)}</td></tr>`), 'ไม่พบพนักงาน');
+      bindRowSelect($('kz-mgr-list'), (id, row) => {
+        chosenMgr = { employeeId: id, name: row.dataset.name };
+        $('kz-mgr-pick').value = `${chosenMgr.employeeId} · ${chosenMgr.name}`;
       });
     };
     $('kz-mgr-search').onclick = () => runMgrSearch().catch(onErr);

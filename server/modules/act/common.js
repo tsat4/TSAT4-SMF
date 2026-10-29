@@ -60,8 +60,11 @@ export function actRoute(app, { only, sqlOf = () => null } = {}) {
     try {
       await handler(req, res, activity, tablesOf(activity));
     } catch (err) {
+      const sql = sqlOf(activity) || tablesOf(activity).sql;
+      // PGRST204 / 42703 = a column added to the template later (e.g. mt_kaizen_team.target_count) that this database does not have yet.
+      if (err?.code === 'PGRST204' || err?.code === '42703') return fail(res, 503, `ตารางของกิจกรรมนี้ยังไม่มีคอลัมน์ใหม่ ต้องรัน ${sql} ใน Tx Data อีกรอบ`);
       if (err?.code !== 'PGRST205') throw err;
-      fail(res, 503, `ยังไม่ได้สร้างตารางของกิจกรรมนี้ใน Tx Data (${sqlOf(activity) || tablesOf(activity).sql})`);
+      fail(res, 503, `ยังไม่ได้สร้างตารางของกิจกรรมนี้ใน Tx Data (${sql})`);
     }
   }));
 }
