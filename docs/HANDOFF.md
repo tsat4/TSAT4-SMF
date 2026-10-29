@@ -20,6 +20,7 @@
 - `db/act/kaizen.sql` ใน Tx Data (KAIZEN ใหม่ / อัปเกรดคอลัมน์ทีมและการประเมิน)
 - `db/act/qcc.sql` ใน Tx Data (QCC ใหม่: ทีม + แผนงาน + `tx_qcc_project` + bucket `img_qcc`)
 - `db/06_main_user_access.sql` ใน **Mx Data** (ระดับสิทธิ์ภาพรวม executive / admin_of) ถ้ายังไม่ได้รัน
+- `db/08_employee_level.sql` ใน **Mx Data** (level M1–M3 / G1–G3 รองรับทั้ง enum และ text + check) **ต้องรันก่อนเพิ่มพนักงานระดับ M / G**
 - `db/07_sto_integrity.sql` ใน **Mx Data** (FK ผู้บันทึก Usage + check รับคืน ↔ ใบยืม แบบ NOT VALID + index) · ขั้นที่ 1 ตรวจ ขั้นที่ 3 VALIDATE ไม่บังคับ
 
 ## ข้อควรระวัง
@@ -28,6 +29,8 @@
 - หน้า PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-29 · Claude · System > Setting `mt_main_employee`: prefix เป็นตัวเลือก (นาย / นาง / นางสาว / Mr. / Mrs. / Ms.) · level เพิ่ม M1–M3 ผู้จัดการ, G1–G3 ผู้จัดการโรงงาน (`db/08_employee_level.sql`) · department (และ `mt_sto_user.department`) เป็นตัวเลือกจากหน่วยงานใน `mt_main_costcenter` (`GET /api/system/choices`, server ตรวจ) · ค่าเดิมที่ไม่อยู่ในรายการยังบันทึกได้ถ้าไม่แก้ช่องนั้น
 
 - 2026-10-29 · Claude · กราฟทุกหน้า: เส้นเป้า (เส้นประค่าเดียว) เหลือป้ายเดียว `Target : xx%` บนเส้นชิดขวา (`chartPlot` ทำให้เอง, `unit`) · ระยะซ้าย-ขวาของกราฟเท่ากัน · ตาราง: แถบสีหัวตารางมุมขวาบน (ที่ไว้ให้ scrollbar) สูงเท่าหัวตารางจริงใน Dashboard (26px) และ CFO บัญชีก๊าซ (58px) จึงไม่เห็นเป็นก้อนสีใต้หัวตารางแล้ว
 

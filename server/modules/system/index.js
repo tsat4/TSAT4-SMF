@@ -7,7 +7,9 @@ import { MAIN_TABLES } from '../../core/tables.js';
 
 const CHOICES = {
   status: ['Active', 'Inactive'],
-  level: ['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8'],
+  // M = ผู้จัดการ, G = ผู้จัดการโรงงาน (ผู้ใช้เพิ่ม 2026-10-29)
+  level: ['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'M1', 'M2', 'M3', 'G1', 'G2', 'G3'],
+  prefix: ['นาย', 'นาง', 'นางสาว', 'Mr.', 'Mrs.', 'Ms.'],
   group: ['Factory', 'Non', 'Center'],
   usage: ['viewer', 'user', 'admin'],
   req: ['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'],
@@ -15,7 +17,16 @@ const CHOICES = {
   actrole: ['admin', 'chairman', 'vice', 'auditor', 'owner', 'member']
 };
 
-function adminValue(column, raw, { insert }) {
+// Department names come from mt_main_costcenter (there is no department master table on purpose).
+async function departmentsOf() {
+  const { data, error } = await mx.from('mt_main_costcenter').select('department').range(0, 4999);
+  if (error) throw error;
+  return [...new Set((data || []).map((row) => String(row.department || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+}
+
+// current = the row being edited: a choice / department left as it was stays valid even if it is no longer in the list.
+function adminValue(column, raw, { insert, current, departments }) {
+  const kept = current && raw != null && raw !== '' && String(raw) === String(current[column.name] ?? '');
   if (column.type === 'read') return undefined;
   if (column.type === 'password') {
     const password = String(raw ?? '');
@@ -40,12 +51,14 @@ function adminValue(column, raw, { insert }) {
     if (!Number.isFinite(n)) return null;
     return Math.round(n * 1000) / 1000;
   }
-  if (CHOICES[column.type] && !CHOICES[column.type].includes(raw)) return null;
+  if (CHOICES[column.type] && !CHOICES[column.type].includes(raw) && !kept) return null;
+  if (column.type === 'dept' && !departments.includes(String(raw).trim()) && !kept) return null;
   return String(raw).trim();
 }
 
-async function adminPayload(spec, body, { insert }) {
+async function adminPayload(spec, body, { insert, current = null }) {
   const out = {};
+  const departments = spec.columns.some((column) => column.type === 'dept') ? await departmentsOf() : [];
   for (const column of spec.columns) {
     if (column.type === 'read') continue;
     if (column.type === 'password') {
@@ -55,8 +68,8 @@ async function adminPayload(spec, body, { insert }) {
       if (password && !insert) out.password_changed_at = new Date().toISOString();
       continue;
     }
-    const value = adminValue(column, body[column.name], { insert });
-    if (value === null) return { error: `ข้อมูล ${column.name} ไม่ถูกต้อง` };
+    const value = adminValue(column, body[column.name], { insert, current, departments });
+    if (value === null) return { error: column.type === 'dept' ? `${column.name} ต้องเป็นหน่วยงานที่มีใน mt_main_costcenter` : `ข้อมูล ${column.name} ไม่ถูกต้อง` };
     if (value !== undefined) out[column.name] = value;
   }
   return { out };
@@ -99,6 +112,11 @@ export default defineModule({
       });
     });
 
+    // Choices loaded from other tables (department <- mt_main_costcenter) for the row popup.
+    app.get('/api/system/choices', wrap(requireUser), creatorOnly, wrap(async (_req, res) => {
+      res.json({ dept: await departmentsOf() });
+    }));
+
     app.get('/api/system/tables/:name', wrap(requireUser), creatorOnly, wrap(async (req, res) => {
       const opened = open(req.params.name);
       if (!opened) return fail(res, 404, 'ไม่พบตาราง');
@@ -119,7 +137,7 @@ export default defineModule({
       const sort = readable.includes(req.query.sort) ? req.query.sort : spec.pk[0];
       query = query.order(sort, { ascending: req.query.sort ? req.query.dir !== 'desc' : true, nullsFirst: false });
       if (term) {
-        const filters = spec.columns.filter((column) => column.type === 'text' || CHOICES[column.type]).map((column) => `${column.name}.ilike.%${term}%`);
+        const filters = spec.columns.filter((column) => ['text', 'dept'].includes(column.type) || CHOICES[column.type]).map((column) => `${column.name}.ilike.%${term}%`);
         if (filters.length) query = query.or(filters.join(','));
       }
       const { data, error, count } = await query;
@@ -153,7 +171,13 @@ export default defineModule({
       const { spec, client } = opened;
       const key = req.body?.key || {};
       if (!hasKey(spec, key)) return fail(res, 400, 'ไม่พบแถวที่แก้');
-      const { out, error: invalid } = await adminPayload(spec, req.body?.values || {}, { insert: false });
+      let current = null;
+      if (spec.columns.some((column) => CHOICES[column.type] || column.type === 'dept')) {
+        let read = client.from(req.params.name).select('*');
+        for (const column of spec.pk) read = read.eq(column, key[column]);
+        current = (await read.maybeSingle()).data || null;
+      }
+      const { out, error: invalid } = await adminPayload(spec, req.body?.values || {}, { insert: false, current });
       if (invalid) return fail(res, 400, invalid);
       if (req.params.name === 'mt_main_user' && String(key.employee_id) === CREATOR_ID && out.creator === false) return fail(res, 400, 'ปิดผู้สร้างระบบไม่ได้');
       if (memberTables.has(req.params.name) && String(key.employee_id) === CREATOR_ID && (out.role && out.role !== 'admin' || out.status === 'Inactive')) return fail(res, 400, 'ผู้สร้างระบบเป็น Admin เสมอ');

@@ -99,7 +99,7 @@ scripts/
 
 | ตาราง | db | หน้าที่ |
 |---|---|---|
-| mt_main_employee | mx | พนักงาน (level S1–S3, T1–T3, T6–T8) |
+| mt_main_employee | mx | พนักงาน (level S1–S3, T1–T3, T6–T8, M1–M3 ผู้จัดการ, G1–G3 ผู้จัดการโรงงาน · prefix เลือกจากรายการ · department เลือกจากหน่วยงานใน mt_main_costcenter) |
 | mt_main_costcenter | mx | costcenter + department + group_name (Factory/Non/Center) |
 | mt_main_user | mx | บัญชี login, password_hash, creator |
 | mt_sto_user | mx | สมาชิก Usage และ role |

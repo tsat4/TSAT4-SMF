@@ -49,6 +49,7 @@ GET /api/requisitions/:id auth
 GET /api/reserves auth sto:1
 GET /api/stock auth sto:1
 GET /api/summary auth sto:1
+GET /api/system/choices auth creator
 GET /api/system/tables auth creator
 GET /api/system/tables/:name auth creator
 GET /api/usage-dashboard auth sto:1

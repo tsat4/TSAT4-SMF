@@ -5,7 +5,7 @@ export const STO_TABLES = {
     ['price', 'money', true], ['crcy', 'text', true], ['usage_group', 'text'], ['img', 'text'], ['status', 'status', true]
   ] },
   mt_sto_user: { db: 'mx', pk: ['employee_id'], columns: [
-    ['employee_id', 'text', true], ['department', 'text', true], ['role', 'usage', true], ['status', 'status', true]
+    ['employee_id', 'text', true], ['department', 'dept', true], ['role', 'usage', true], ['status', 'status', true]
   ] },
   mt_sto_buyer: { db: 'mx', pk: ['costcenter'], columns: [
     ['costcenter', 'text', true], ['status', 'status', true]
