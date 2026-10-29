@@ -13,8 +13,10 @@ const settingKey = (k) => SETTING_KEYS.includes(k) || /^production_\d{4}$/.test(
 const EF_NUMBERS = ['kgco2e', 'co2', 'ch4_fossil', 'ch4', 'n2o', 'sf6', 'nf3', 'hfc', 'hfc_gwp', 'pfc', 'pfc_gwp', 'other', 'other_gwp', 'co2_bio'];
 const EF_VALUES = [...EF_NUMBERS, 'unit', 'scope_code', 'separate'];
 const EF_SOURCES = ['self', 'supplier', 'th_lci', 'tgo', 'thai_res', 'int_db', 'other'];
-// TGO Fr-03.2 criteria (✓ / ×): significant = has a source and meets at least one.
+// TGO Fr-03.2 criteria as % scores (e.g. 5.00), like the user's sheet: significant = has a source and scores on at least one.
 export const S3_CRITERIA = ['magnitude', 'influence', 'risk', 'sector', 'outsourcing', 'engagement'];
+// 0–100 with 2 decimals (an old ✓ / × column reads true / false = 1 / 0).
+export const s3Score = (v) => Math.min(100, Math.max(0, Math.round((Number(v) || 0) * 100) / 100));
 
 const text = (v, max = 500) => String(v ?? '').trim().slice(0, max) || null;
 const numOrNull = (v) => (v === '' || v == null ? null : Number.isFinite(Number(v)) ? Number(v) : NaN);
@@ -358,9 +360,9 @@ export function mountCfo(app) {
       year, fromYear, admin: access.admin, criteria: S3_CRITERIA,
       rows: sorted.map((s) => {
         const r = byCode.get(s.code) || { has_source: true };
-        const marks = Object.fromEntries(S3_CRITERIA.map((k) => [k, Boolean(r[k])]));
+        const marks = Object.fromEntries(S3_CRITERIA.map((k) => [k, s3Score(r[k])]));
         return { scope_code: s.code, name: s.name, name_th: s.name_th, has_source: r.has_source !== false, ...marks, remark: r.remark || '',
-          significant: r.has_source !== false && S3_CRITERIA.some((k) => marks[k]), updated_by: r.updated_by || null, updated_at: r.updated_at || null };
+          significant: r.has_source !== false && S3_CRITERIA.some((k) => marks[k] > 0), updated_by: r.updated_by || null, updated_at: r.updated_at || null };
       })
     });
   });
@@ -371,11 +373,14 @@ export function mountCfo(app) {
     const list = Array.isArray(req.body?.rows) ? req.body.rows : [];
     const rows = list.filter((r) => /^3-\d{1,2}$/.test(String(r?.scope_code))).map((r) => ({
       year, scope_code: r.scope_code, has_source: r.has_source !== false, remark: text(r.remark, 1000),
-      ...Object.fromEntries(S3_CRITERIA.map((k) => [k, r[k] === true])), updated_by: req.user.employeeId, updated_at: new Date().toISOString()
+      ...Object.fromEntries(S3_CRITERIA.map((k) => [k, s3Score(r[k])])), updated_by: req.user.employeeId, updated_at: new Date().toISOString()
     }));
     if (!rows.length) return fail(res, 400, 'ไม่มีข้อมูลให้บันทึก');
     const before = new Map((await fetchAll(() => tx.from(t.s3Assess).select('*').eq('year', year))).map((r) => [r.scope_code, r]));
-    must(await tx.from(t.s3Assess).upsert(rows, { onConflict: 'year,scope_code' }));
+    const saved = await tx.from(t.s3Assess).upsert(rows, { onConflict: 'year,scope_code' });
+    // 22P02: the criteria columns are still ✓ / × (boolean) until db/act/cfo.sql is run again
+    if (saved.error?.code === '22P02') return fail(res, 503, 'เกณฑ์ Fr-03.2 เป็นคะแนน % แล้ว ต้องรัน db/act/cfo.sql ใน Tx Data อีกรอบก่อนบันทึก');
+    must(saved);
     const changed = rows.map((r) => {
       const d = changes(before.get(r.scope_code), r, ['has_source', ...S3_CRITERIA, 'remark']);
       return d && `${r.scope_code} ${d}`;

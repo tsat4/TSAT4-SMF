@@ -188,23 +188,32 @@ create table if not exists public.tx_${k}_entry (
 );
 create index if not exists tx_${k}_entry_month on public.tx_${k}_entry (month);
 
--- TGO Fr-03.2 ประเมินความมีนัยสำคัญ Scope 3: 1 แถว = ปี × หมวด 3-1…3-15 · เกณฑ์ 6 ข้อเป็น ✓ / ×
--- มีนัยสำคัญ = มีแหล่งปล่อย และเข้าเกณฑ์อย่างน้อย 1 ข้อ (คำนวณตอนแสดง ไม่เก็บ)
+-- TGO Fr-03.2 ประเมินความมีนัยสำคัญ Scope 3: 1 แถว = ปี × หมวด 3-1…3-15 · เกณฑ์ 6 ข้อเป็นคะแนน % (เช่น 5.00) ตามไฟล์ผู้ใช้
+-- มีนัยสำคัญ = มีแหล่งปล่อย และมีคะแนนอย่างน้อย 1 เกณฑ์ (คำนวณตอนแสดง ไม่เก็บ)
 create table if not exists public.mt_${k}_s3_assess (
   year integer not null check (year between 2000 and 2100),
   scope_code text not null references public.mt_${k}_scope (code) check (scope_code like '3-%'),
   has_source boolean not null default true,
-  magnitude boolean not null default false,
-  influence boolean not null default false,
-  risk boolean not null default false,
-  sector boolean not null default false,
-  outsourcing boolean not null default false,
-  engagement boolean not null default false,
+  magnitude numeric(6, 2) not null default 0,
+  influence numeric(6, 2) not null default 0,
+  risk numeric(6, 2) not null default 0,
+  sector numeric(6, 2) not null default 0,
+  outsourcing numeric(6, 2) not null default 0,
+  engagement numeric(6, 2) not null default 0,
   remark text,
   updated_by text,
   updated_at timestamptz,
   primary key (year, scope_code)
 );
+
+-- ฐานที่สร้างตอนเกณฑ์ยังเป็น ✓ / × (boolean): เปลี่ยนเป็นคะแนน % · ✓ = 1.00, × = 0 (รันซ้ำได้)
+do $$ declare c text; begin
+  foreach c in array array['magnitude', 'influence', 'risk', 'sector', 'outsourcing', 'engagement'] loop
+    if (select data_type from information_schema.columns where table_schema = 'public' and table_name = 'mt_${k}_s3_assess' and column_name = c) = 'boolean' then
+      execute format('alter table public.mt_${k}_s3_assess alter column %I drop default, alter column %I type numeric(6, 2) using (case when %I then 1 else 0 end), alter column %I set default 0', c, c, c, c);
+    end if;
+  end loop;
+end $$;
 
 -- บันทึกการปรับปรุง (ฟอร์ม TGO): server เขียนให้เองเมื่อผู้จัดทำแก้ master / ค่าตั้งต้น / ยืนยันเดือน · เพิ่มเองได้ ไม่มีการลบ
 create table if not exists public.tx_${k}_revision (

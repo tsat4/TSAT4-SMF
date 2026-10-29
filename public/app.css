@@ -649,7 +649,10 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-fr01 .ch-plot{grid-template-rows:auto 200px auto}
 @media(max-width:900px){.fr01-grid{grid-template-columns:1fr}}
 .cfo-c{text-align:center}
-.cfo-explain{margin:0 0 8px;font-size:12px}.cfo-explain summary{cursor:pointer;color:var(--mo-text-muted)}.cfo-explain dl{display:grid;grid-template-columns:160px 1fr;gap:4px 12px;margin:8px 0}.cfo-explain dt{font-weight:600}.cfo-explain dd{margin:0;color:var(--mo-text-muted)}
+.cfo-explain{margin:0 0 8px;font-size:12px}.cfo-explain summary{cursor:pointer;color:var(--mo-text-muted)}.cfo-explain dl{display:grid;grid-template-columns:160px 1fr;gap:4px 12px;margin:8px 0}/* Fr-03.2 % scores: red data bar (length = score ÷ the column's largest) like the user's sheet; Setting inputs with a % sign */
+.cfo-s3 td.cfo-bar[style*="--w"]{background:linear-gradient(90deg,color-mix(in srgb,#ef4444 55%,transparent) 0,color-mix(in srgb,#ef4444 12%,transparent) var(--w),transparent var(--w)) no-repeat;font-variant-numeric:tabular-nums}
+.cfo-s3-pct{display:inline-flex;align-items:center;gap:3px}.cfo-s3-pct input{width:70px;min-width:0;text-align:right}
+.cfo-explain dt{font-weight:600}.cfo-explain dd{margin:0;color:var(--mo-text-muted)}
 .cfo-s3 table{width:100%}.cfo-s3 th{white-space:normal;line-height:1.25}.cfo-s3 td{white-space:normal}.cfo-s3 td:last-child{min-width:140px}.cfo-s3 td:last-child input{width:100%;height:26px}
 .cfo-s3 input[type=checkbox]{width:16px;height:16px;margin:0;vertical-align:middle;accent-color:var(--ch-1)}.cfo-s3 tr.is-significant td{background:color-mix(in srgb,var(--ch-1) 8%,transparent)}
 .cfo-inv{max-height:calc(100vh - 260px)}.cfo-inv table{font-size:12px}.cfo-inv td,.cfo-inv th{padding:0 6px}.cfo-inv td{height:26px}

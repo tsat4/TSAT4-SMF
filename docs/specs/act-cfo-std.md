@@ -103,7 +103,7 @@
 
 - 1 ปี × Scope 3 ทั้ง 15 หมวด · คอลัมน์: มีแหล่งปล่อยหรือไม่ (P / ×), Magnitude, Level of influence, Risk or opportunity, Sector guidance, Outsourcing, Employee engagement, หมายเหตุ + ผล: มีนัยสำคัญ → นำไปคำนวณ
 - คำอธิบายเกณฑ์ 6 ข้อแสดงหัวตาราง (ข้อความจากฟอร์ม · ที่มา หัวข้อ 12 ข้อกำหนดการคำนวณและรายงาน CFO)
-- ตาราง `mt_cfo_s3_assess` (`year`, `scope_code` 3-1…3-15, `has_source` bool, `magnitude` / `influence` / `risk` / `sector` / `outsourcing` / `engagement` (✓ หรือคะแนน — ยืนยันกับผู้ใช้), `significant` bool, `remark`) · unique (year, scope_code) · คัดลอกจากปีก่อนได้
+- ตาราง `mt_cfo_s3_assess` (`year`, `scope_code` 3-1…3-15, `has_source` bool, `magnitude` / `influence` / `risk` / `sector` / `outsourcing` / `engagement` (**คะแนน %** เช่น 5.00 — ผู้ใช้ยืนยัน 2026-10-29 ตามไฟล์ของผู้ใช้ · แสดงแถบสีแดงยาวตามสัดส่วนคะแนนสูงสุดของคอลัมน์), `significant` bool, `remark`) · unique (year, scope_code) · คัดลอกจากปีก่อนได้
 - แก้ใน Setting > Scope 3 · หมวดที่ไม่มีนัยสำคัญ เตือนเมื่อมีกิจกรรมใช้หมวดนั้น
 
 ### Fr-04.1 บัญชีรายการก๊าซเรือนกระจก (และ Fr-04.2 ปีฐาน = ฟอร์มเดียวกัน เลือกปีฐาน)

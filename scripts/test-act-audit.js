@@ -224,6 +224,20 @@ if (!fs.existsSync(cfoFile)) {
   await db.exec('rollback');
   ok(Math.abs(sep.s1 + sep.sep - 188.863) < 0.01 && sep.other > 0, `separately reported EF leaves Scope 1 (${sep.s1} + ${sep.sep}) and carries its non-Kyoto tCO2e`);
   ok(await throws(db, `insert into mt_cfo_s3_assess (year, scope_code) values (2026, '1-1')`), 'Fr-03.2 rows are Scope 3 categories only');
+  {
+    // Fr-03.2 criteria were ✓ / × (boolean) and are now % scores: ✓ = 1.00, × = 0, and the file runs again cleanly
+    const old = new PGlite();
+    await old.exec(`create table mt_cfo_s3_assess (year integer, scope_code text, has_source boolean not null default true, magnitude boolean not null default false,
+      influence boolean not null default false, risk boolean not null default false, sector boolean not null default false, outsourcing boolean not null default false,
+      engagement boolean not null default false, remark text, updated_by text, updated_at timestamptz, primary key (year, scope_code));
+      insert into mt_cfo_s3_assess (year, scope_code, magnitude, risk) values (2025, '3-1', true, false);`);
+    const cfo = actSql('cfo', { audit: false, planner: false }).replace(/notify pgrst[^;]*;/, '');
+    await old.exec(cfo);
+    await old.exec(cfo);
+    const r = await one(old, `select magnitude::float m, risk::float r, (select data_type from information_schema.columns where table_name = 'mt_cfo_s3_assess' and column_name = 'sector') t from mt_cfo_s3_assess`);
+    await old.exec(`update mt_cfo_s3_assess set magnitude = 5.25`);
+    ok(r.m === 1 && r.r === 0 && r.t === 'numeric', 'Fr-03.2 old ✓ / × become 1.00 / 0 % scores (numeric), run twice');
+  }
   ok(await throws(db, `insert into mt_cfo_ef (scope_code, name, unit, source_type) values ('1-1', 'x', 'L', 'web')`), 'EF data source is one of the Fr-04.1 types');
   // B7 (EF TGO AR5 V2): Scope 1 total + biogenic CO2 reported apart, both per liter of the blend.
   await db.exec(`begin; update mt_cfo_ef set co2_bio = 0.11507832 where id = (select ef_id from tx_cfo_entry where qty > 0 order by id limit 1)`);

@@ -214,48 +214,52 @@ function cfoDownload(name, rows) {
 
 // ---------- TGO forms ----------
 
-const cfoMark = (v) => (v ? '✓' : '×');
+// Fr-03.2 criteria are % scores (e.g. 5.00%) shown with a data bar as long as the column's largest score, like the user's sheet.
+const cfoS3Pct = (v) => (Number(v) > 0 ? `${Number(v).toFixed(2)}%` : '');
+const cfoS3Bar = (v, max) => (Number(v) > 0 ? ` style="--w:${Math.round((Number(v) / (max || 1)) * 100)}%"` : '');
 const cfoS3Name = (r) => `${esc(r.name)}${r.name_th ? `<div class="sum-meta">${esc(r.name_th)}</div>` : ''}`;
 const cfoS3Explain = () => `<details class="cfo-explain"><summary>อธิบายหลักเกณฑ์ในการประเมินความมีนัยสำคัญ</summary><dl>
   <dt>Source of GHG</dt><dd>องค์กรมีแหล่งปล่อยก๊าซเรือนกระจกนี้หรือไม่</dd>
   ${CFO_S3_CRITERIA.map(([, label, text]) => `<dt>${label}</dt><dd>${text}</dd>`).join('')}</dl>
-  <p class="sum-meta">มีนัยสำคัญ = มีแหล่งปล่อย และเข้าเกณฑ์อย่างน้อย 1 ข้อ → นำไปคำนวณ · ที่มา: หัวข้อที่ 12 ข้อกำหนดในการคำนวณและรายงานคาร์บอนฟุตพริ้นท์ขององค์กร</p></details>`;
+  <p class="sum-meta">แต่ละเกณฑ์ให้คะแนนเป็น % · มีนัยสำคัญ = มีแหล่งปล่อย (P) และมีคะแนนอย่างน้อย 1 เกณฑ์ → นำไปคำนวณ · ที่มา: หัวข้อที่ 12 ข้อกำหนดในการคำนวณและรายงานคาร์บอนฟุตพริ้นท์ขององค์กร</p></details>`;
 const cfoS3Head = `<tr><th>No</th><th>Category</th><th class="cfo-c">Source of GHG</th>${CFO_S3_CRITERIA.map(([, label]) => `<th class="cfo-c">${label}</th>`).join('')}<th class="cfo-c">มีนัยสำคัญ</th><th>Remark</th></tr>`;
 
 // Dashboard > Fr-03.2 ประเมินความมีนัยสำคัญ Scope 3 (read only; Setting > Scope 3 edits).
 async function cfoDrawS3(body) {
   const d = await a5Api(CFO, `cfo/s3?year=${a5Year}`);
   const note = d.fromYear === d.year ? '' : d.fromYear ? `ยังไม่ได้ประเมินปี ${d.year} · แสดงผลของปี ${d.fromYear}` : `ยังไม่ได้ประเมินปี ${d.year}`;
+  const max = Object.fromEntries(CFO_S3_CRITERIA.map(([k]) => [k, Math.max(0, ...d.rows.filter((r) => r.has_source).map((r) => Number(r[k]) || 0))]));
   body.innerHTML = chartCard(`ประเมินความมีนัยสำคัญของการปล่อยก๊าซเรือนกระจกทางอ้อม (Scope 3) ปี ${d.year}`, `${cfoS3Explain()}
     <div class="table-wrap cfo-s3"><table class="mo-data-table"><thead>${cfoS3Head}</thead><tbody>${d.rows.map((r, i) => `<tr class="${r.significant ? 'is-significant' : 'is-muted'}">
-      <td>${i + 1}</td><td>${cfoS3Name(r)}</td><td class="cfo-c">${r.has_source ? 'P' : '×'}</td>${CFO_S3_CRITERIA.map(([k]) => `<td class="cfo-c">${r.has_source ? cfoMark(r[k]) : ''}</td>`).join('')}
+      <td>${i + 1}</td><td>${cfoS3Name(r)}</td><td class="cfo-c">${r.has_source ? 'P' : '×'}</td>${CFO_S3_CRITERIA.map(([k]) => (r.has_source ? `<td class="num cfo-bar"${cfoS3Bar(r[k], max[k])}>${cfoS3Pct(r[k])}</td>` : '<td></td>')).join('')}
       <td class="cfo-c"><b>${r.significant ? 'มี' : '-'}</b></td><td>${esc(r.remark)}</td></tr>`).join('')}</tbody></table></div>`,
     `${note ? `${note} · ` : ''}มีนัยสำคัญ ${d.rows.filter((r) => r.significant).length} / ${d.rows.length} หมวด`);
 }
 
-// Setting > Scope 3 (Fr-03.2): tick the criteria per category, then save the year.
+// Setting > Scope 3 (Fr-03.2): P / × per category and a % score per criterion, then save the year.
 async function cfoSetS3(body, rerender) {
   const d = await a5Api(CFO, `cfo/s3?year=${a5Year}`);
   const box = (i, k, on, disabled = false) => `<input type="checkbox" data-s3="${i}" data-k="${k}"${on ? ' checked' : ''}${d.admin && !disabled ? '' : ' disabled'}>`;
+  const pct = (i, k, v, disabled = false) => `<span class="cfo-s3-pct"><input type="number" min="0" max="100" step="0.01" data-s3="${i}" data-k="${k}" value="${Number(v) > 0 ? Number(v) : ''}" placeholder="0"${d.admin && !disabled ? '' : ' disabled'}>%</span>`;
   body.innerHTML = `
     ${d.admin ? `<div class="action-bar a5-actions">${button('cfo-s3-save', 'บันทึก', 'primary')}</div>` : ''}
     ${d.fromYear !== d.year ? `<p class="sum-meta">${d.fromYear ? `ยังไม่ได้ประเมินปี ${d.year} · ตั้งต้นจากปี ${d.fromYear} กดบันทึกเพื่อใช้เป็นของปีนี้` : `ยังไม่ได้ประเมินปี ${d.year}`}</p>` : ''}
     ${cfoS3Explain()}
     <div class="table-wrap cfo-s3"><table class="mo-data-table"><thead>${cfoS3Head}</thead><tbody>${d.rows.map((r, i) => `<tr>
       <td>${i + 1}</td><td>${cfoS3Name(r)}</td><td class="cfo-c">${box(i, 'has_source', r.has_source)}</td>
-      ${CFO_S3_CRITERIA.map(([k]) => `<td class="cfo-c">${box(i, k, r[k], !r.has_source)}</td>`).join('')}
+      ${CFO_S3_CRITERIA.map(([k]) => `<td class="cfo-c">${pct(i, k, r[k], !r.has_source)}</td>`).join('')}
       <td class="cfo-c" id="cfo-s3-sig-${i}"></td><td><input data-s3-remark="${i}" maxlength="1000" value="${esc(r.remark)}"${d.admin ? '' : ' readonly'}></td></tr>`).join('')}</tbody></table></div>`;
   a5Lift(body);
   const read = (i) => ({ ...d.rows[i], has_source: body.querySelector(`[data-s3="${i}"][data-k="has_source"]`).checked,
-    ...Object.fromEntries(CFO_S3_CRITERIA.map(([k]) => [k, body.querySelector(`[data-s3="${i}"][data-k="${k}"]`).checked])),
+    ...Object.fromEntries(CFO_S3_CRITERIA.map(([k]) => [k, Number(body.querySelector(`[data-s3="${i}"][data-k="${k}"]`).value) || 0])),
     remark: body.querySelector(`[data-s3-remark="${i}"]`).value });
   const mark = (i) => {
     const r = read(i);
     CFO_S3_CRITERIA.forEach(([k]) => { body.querySelector(`[data-s3="${i}"][data-k="${k}"]`).disabled = !d.admin || !r.has_source; });
-    $(`cfo-s3-sig-${i}`).innerHTML = r.has_source && CFO_S3_CRITERIA.some(([k]) => r[k]) ? '<b>มี</b>' : '-';
+    $(`cfo-s3-sig-${i}`).innerHTML = r.has_source && CFO_S3_CRITERIA.some(([k]) => r[k] > 0) ? '<b>มี</b>' : '-';
   };
   d.rows.forEach((_, i) => mark(i));
-  body.querySelectorAll('[data-s3]').forEach((node) => { node.onchange = () => mark(Number(node.dataset.s3)); });
+  body.querySelectorAll('[data-s3]').forEach((node) => { node.onchange = () => mark(Number(node.dataset.s3)); node.oninput = node.onchange; });
   if (!d.admin) return;
   $('cfo-s3-save').onclick = async () => {
     await a5Api(CFO, 'cfo/s3', { method: 'PUT', body: { year: a5Year, rows: d.rows.map((_, i) => read(i)) } });
