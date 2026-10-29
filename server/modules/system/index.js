@@ -7,8 +7,8 @@ import { MAIN_TABLES } from '../../core/tables.js';
 
 const CHOICES = {
   status: ['Active', 'Inactive'],
-  // M = ผู้จัดการ, G = ผู้จัดการโรงงาน (ผู้ใช้เพิ่ม 2026-10-29)
-  level: ['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'M1', 'M2', 'M3', 'G1', 'G2', 'G3'],
+  // G = ผู้จัดการโรงงาน (ผู้ใช้เพิ่ม 2026-10-29)
+  level: ['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'G1', 'G2', 'G3'],
   prefix: ['นาย', 'นาง', 'นางสาว', 'Mr.', 'Mrs.', 'Ms.'],
   group: ['Factory', 'Non', 'Center'],
   usage: ['viewer', 'user', 'admin'],

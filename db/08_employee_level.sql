@@ -1,4 +1,4 @@
--- Mx Data · mt_main_employee.level เพิ่ม M1–M3 (ผู้จัดการ) และ G1–G3 (ผู้จัดการโรงงาน) · รันซ้ำได้
+-- Mx Data · mt_main_employee.level เพิ่ม G1–G3 (ผู้จัดการโรงงาน) · รันซ้ำได้
 -- ใช้ได้ทั้งกรณีคอลัมน์เป็น enum, domain และเป็น text ที่มี check constraint (ถ้าไม่มี constraint จะเพิ่มให้แบบ NOT VALID ไม่ตรวจข้อมูลเดิม)
 
 -- ===== ขั้นที่ 1: ดูของเดิม (อ่านอย่างเดียว) =====
@@ -18,7 +18,7 @@ declare
 begin
   select a.atttypid into t from pg_attribute a where a.attrelid = 'public.mt_main_employee'::regclass and a.attname = 'level';
   if (select typtype from pg_type where oid = t) = 'e' then
-    foreach lv in array array['M1', 'M2', 'M3', 'G1', 'G2', 'G3'] loop
+    foreach lv in array array['G1', 'G2', 'G3'] loop
       execute format('alter type %s add value if not exists %L', t::regtype, lv);
     end loop;
   elsif (select typtype from pg_type where oid = t) = 'd' then
@@ -27,14 +27,14 @@ begin
       execute format('alter domain %s drop constraint %I', t::regtype, c.conname);
     end loop;
     execute format('alter domain %s add constraint mt_main_employee_level_domain_check check (value in (%s)) not valid', t::regtype,
-      $q$'S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'M1', 'M2', 'M3', 'G1', 'G2', 'G3'$q$);
+      $q$'S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'G1', 'G2', 'G3'$q$);
   else
     for c in select conname from pg_constraint
       where conrelid = 'public.mt_main_employee'::regclass and contype = 'c' and pg_get_constraintdef(oid) ilike '%level%' loop
       execute format('alter table public.mt_main_employee drop constraint %I', c.conname);
     end loop;
     alter table public.mt_main_employee add constraint mt_main_employee_level_check
-      check (level in ('S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'M1', 'M2', 'M3', 'G1', 'G2', 'G3')) not valid;
+      check (level in ('S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'G1', 'G2', 'G3')) not valid;
   end if;
 end $$;
 

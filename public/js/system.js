@@ -3,7 +3,7 @@ const CHOICES = {
   status: ['Active', 'Inactive'],
   group: ['Factory', 'Non', 'Center'],
   usage: ['viewer', 'user', 'admin'],
-  level: ['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'M1', 'M2', 'M3', 'G1', 'G2', 'G3'],
+  level: ['S1', 'S2', 'S3', 'T1', 'T2', 'T3', 'T6', 'T7', 'T8', 'G1', 'G2', 'G3'],
   prefix: ['นาย', 'นาง', 'นางสาว', 'Mr.', 'Mrs.', 'Ms.'],
   req: Object.keys(STATUS),
   areatype: ['โรงงาน', 'สำนักงาน'],
@@ -11,7 +11,7 @@ const CHOICES = {
 };
 
 TITLES.system = ['Setting', 'ตารางทั้งระบบ'];
-const SYS_LEVEL_NAMES = { M: 'ผู้จัดการ', G: 'ผู้จัดการโรงงาน' };
+const SYS_LEVEL_NAMES = { G: 'ผู้จัดการโรงงาน' };
 let sysDepts = null; // department choices = departments in mt_main_costcenter (GET /api/system/choices)
 // mt_main_user.admin_of choices: Store + ระบบงาน + ระบบกิจกรรม (server: ADMIN_SCOPES in server/core/access.js).
 const SYS_SCOPES = [['sto', 'Store / Usage'], ...PLANTS.map(([id, label]) => [id, label]), ...ACTIVITIES.map(([id, label]) => [id, label])];

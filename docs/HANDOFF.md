@@ -20,7 +20,7 @@
 - `db/act/kaizen.sql` ใน Tx Data (KAIZEN ใหม่ / อัปเกรดคอลัมน์ทีมและการประเมิน)
 - `db/act/qcc.sql` ใน Tx Data (QCC ใหม่: ทีม + แผนงาน + `tx_qcc_project` + bucket `img_qcc`)
 - `db/06_main_user_access.sql` ใน **Mx Data** (ระดับสิทธิ์ภาพรวม executive / admin_of) ถ้ายังไม่ได้รัน
-- `db/08_employee_level.sql` ใน **Mx Data** (level M1–M3 / G1–G3 รองรับทั้ง enum และ text + check) **ต้องรันก่อนเพิ่มพนักงานระดับ M / G**
+- `db/08_employee_level.sql` ใน **Mx Data** (level G1–G3 รองรับทั้ง enum และ text + check) **ต้องรันก่อนเพิ่มพนักงานระดับ G**
 - `db/07_sto_integrity.sql` ใน **Mx Data** (FK ผู้บันทึก Usage + check รับคืน ↔ ใบยืม แบบ NOT VALID + index) · ขั้นที่ 1 ตรวจ ขั้นที่ 3 VALIDATE ไม่บังคับ
 
 ## ข้อควรระวัง
@@ -30,11 +30,13 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-29 · Claude · ผู้ใช้ตัด level M1–M3 ออก เหลือ S1–S3, T1–T3, T6–T8, G1–G3 (ผู้จัดการโรงงาน) · `db/08_employee_level.sql` แก้ตาม (ถ้ารันรุ่นเดิมไปแล้วให้รันซ้ำ: check จะไม่มี M · ถ้าเป็น enum ค่า M ค้างใน type แต่หน้าจอไม่ให้เลือก)
+
 - 2026-10-29 · Claude · เส้นเป้าลากเต็มความกว้างกราฟ (`ch-target-line`) · แถวเครื่องมือ: ชื่อช่องอยู่บรรทัดเดียวกับช่องเลือกทุกหน้า · ตาราง 5S Summary / CFO ประวัติรายการ / Usage รายเดือน ใช้ชื่อเดือนเต็ม + กฎใน AGENTS.md
 
 - 2026-10-29 · Claude · สัญลักษณ์กราฟย้ายจากมุมบนขวามาอยู่แถวชื่อแกน (ตรงกลางระหว่างชื่อแกนซ้าย-ขวา) ทุกกราฟ · `chartCard` ไม่ย้าย legend แล้ว
 
-- 2026-10-29 · Claude · System > Setting `mt_main_employee`: prefix เป็นตัวเลือก (นาย / นาง / นางสาว / Mr. / Mrs. / Ms.) · level เพิ่ม M1–M3 ผู้จัดการ, G1–G3 ผู้จัดการโรงงาน (`db/08_employee_level.sql`) · department (และ `mt_sto_user.department`) เป็นตัวเลือกจากหน่วยงานใน `mt_main_costcenter` (`GET /api/system/choices`, server ตรวจ) · ค่าเดิมที่ไม่อยู่ในรายการยังบันทึกได้ถ้าไม่แก้ช่องนั้น
+- 2026-10-29 · Claude · System > Setting `mt_main_employee`: prefix เป็นตัวเลือก (นาย / นาง / นางสาว / Mr. / Mrs. / Ms.) · level เพิ่ม G1–G3 ผู้จัดการโรงงาน (`db/08_employee_level.sql`) · department (และ `mt_sto_user.department`) เป็นตัวเลือกจากหน่วยงานใน `mt_main_costcenter` (`GET /api/system/choices`, server ตรวจ) · ค่าเดิมที่ไม่อยู่ในรายการยังบันทึกได้ถ้าไม่แก้ช่องนั้น
 
 - 2026-10-29 · Claude · กราฟทุกหน้า: เส้นเป้า (เส้นประค่าเดียว) เหลือป้ายเดียว `Target : xx%` บนเส้นชิดขวา (`chartPlot` ทำให้เอง, `unit`) · ระยะซ้าย-ขวาของกราฟเท่ากัน · ตาราง: แถบสีหัวตารางมุมขวาบน (ที่ไว้ให้ scrollbar) สูงเท่าหัวตารางจริงใน Dashboard (26px) และ CFO บัญชีก๊าซ (58px) จึงไม่เห็นเป็นก้อนสีใต้หัวตารางแล้ว
 
