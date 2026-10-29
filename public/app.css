@@ -704,20 +704,29 @@ body[data-zone="work"]{--ch-1:#ea580c}
 /* System > Setting: mt_main_user ผู้ดูแลระบบ (admin_of) checklist */
 .sys-scope-field{grid-column:1/-1}.sys-scopes{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px 12px;margin-top:4px}
 .sys-scopes .check{display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer}.sys-scopes .check input{width:auto;height:auto;margin:0}
-/* Dashboard pages (ผู้ใช้กำหนด 2026-10-28): compact KPI cards, a lower chart and smaller table text */
-:where(body[data-dash]) .ch-kpi{min-height:60px;padding:7px 10px;gap:8px}
-:where(body[data-dash]) .ch-pie,:where(body[data-dash]) .ch-icon{width:34px;height:34px;font-size:18px}
-:where(body[data-dash]) .ch-kpi-label{font-size:11px}
-:where(body[data-dash]) .ch-kpi-value strong{font-size:16px}:where(body[data-dash]) .ch-kpi-value small{font-size:10.5px}
-:where(body[data-dash]) .ch-kpi-foot{font-size:10.5px;min-height:16px}:where(body[data-dash]) .ch-pill{font-size:10px;padding:0 6px}
-:where(body[data-dash]) .ch-card{padding:8px 12px}
-:where(body[data-dash]) .ch-plot{grid-template-rows:auto 210px auto}
-:where(body[data-dash]) .ch-titles,:where(body[data-dash]) .ch-yaxis,:where(body[data-dash]) .ch-xaxis{font-size:10px}
-:where(body[data-dash]) .ch-legend{font-size:10.5px;margin-top:6px}
-:where(body[data-dash]) .ch-val,:where(body[data-dash]) .ch-lv{font-size:9px}
-:where(body[data-dash]) .card-title{font-size:13px}
-:where(body[data-dash]) td{height:26px;font-size:12px;padding:0 8px}
-:where(body[data-dash]) table.mo-data-table thead th{height:30px;font-size:10.5px}
+/* Dashboard pages (ผู้ใช้กำหนด 2026-10-28, เล็กลงอีกขั้น 2026-10-29): compact KPI cards, a lower chart, smaller table text and toolbar */
+:where(body[data-dash]) .ch-kpis{gap:8px}
+:where(body[data-dash]) .ch-kpi{min-height:48px;padding:5px 9px;gap:7px}
+:where(body[data-dash]) .ch-pie,:where(body[data-dash]) .ch-icon{width:28px;height:28px;font-size:15px}
+:where(body[data-dash]) .ch-kpi-label{font-size:10.5px}
+:where(body[data-dash]) .ch-kpi-value strong{font-size:14px}:where(body[data-dash]) .ch-kpi-value small{font-size:10px}
+:where(body[data-dash]) .ch-kpi-foot{font-size:10px;min-height:14px}:where(body[data-dash]) .ch-pill{font-size:9.5px;padding:0 5px}
+:where(body[data-dash]) .ch-card{padding:6px 10px}
+:where(body[data-dash]) .ch-plot{grid-template-rows:auto 180px auto}
+:where(body[data-dash]) .ch-titles,:where(body[data-dash]) .ch-yaxis,:where(body[data-dash]) .ch-xaxis{font-size:9.5px}
+:where(body[data-dash]) .ch-legend{font-size:10px;margin-top:4px}
+:where(body[data-dash]) .ch-val,:where(body[data-dash]) .ch-lv{font-size:8.5px}
+:where(body[data-dash]) .card-title{font-size:12px}
+:where(body[data-dash]) td{height:22px;font-size:11px;padding:0 7px}
+:where(body[data-dash]) table.mo-data-table thead th{height:26px;font-size:10px}
+:where(body[data-dash]) .seg-btn{min-height:26px;padding:0 10px;font-size:11.5px}
+:where(body[data-dash]) .page-bar select,:where(body[data-dash]) .page-bar input{min-height:28px;height:28px;font-size:12px}
+:where(body[data-dash]) .page-bar label{font-size:10.5px}
+:where(body[data-dash]) .kz-podium{grid-template-columns:repeat(3,minmax(0,180px));gap:12px;padding:14px 14px 10px}
+:where(body[data-dash]) .kz-pod-badge{width:70px;height:62px}:where(body[data-dash]) .kz-pod-slot.is-1 .kz-pod-badge{width:82px;height:74px}
+:where(body[data-dash]) .kz-pod-name{font-size:12.5px}:where(body[data-dash]) .kz-pod-slot.is-1 .kz-pod-name{font-size:13.5px}
+:where(body[data-dash]) .kz-pod-sub,:where(body[data-dash]) .kz-pod-stat{font-size:10.5px}
+:where(body[data-dash]) .kz-pod-slot.is-1 .kz-pod-step{height:40px}:where(body[data-dash]) .kz-pod-slot.is-2 .kz-pod-step{height:28px}:where(body[data-dash]) .kz-pod-slot.is-3 .kz-pod-step{height:20px}
 /* Hover preview of a list thumbnail (core.js ZOOM_THUMBS) */
 .img-zoom-box{position:fixed;z-index:200;padding:6px;background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.22);pointer-events:none}
 .img-zoom-box[hidden]{display:none}.img-zoom-box img{width:100%;height:100%;object-fit:contain;display:block;border-radius:6px}
