@@ -386,7 +386,8 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
     const saved = await api(path, { method: task ? 'PATCH' : 'POST', body });
     if (!task && saved?.id) aplSelected = saved.id;
     if (body.parentId) aplCollapsed.delete(Number(body.parentId));
-    toast('บันทึกแล้ว');
+    // The finish date needs mt_<act>_task.done_on: the server says which SQL to run when it is missing.
+    toast(saved?.warn || 'บันทึกแล้ว', saved?.warn ? 'error' : undefined);
     closePopup();
     rerender();
   });

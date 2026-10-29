@@ -101,12 +101,14 @@ export function mountPlanner(app) {
   // select * so done_on comes along once db/act/<act>.sql has added it (older databases simply lack it).
   const rowsOf = (table, year) => fetchAll(() => tx.from(table).select('*').eq('year', year).order('sort_no').order('id'));
   const oneOf = async (table, id) => must(await tx.from(table).select('*').eq('id', id).maybeSingle());
-  // Write with done_on; a database without the column yet (PGRST204 / 42703) gets the same write without it.
-  const write = async (query, row) => {
+  // Write with done_on; a database without the column yet (PGRST204 / 42703) gets the same write without it, and the
+  // answer says which SQL to run, so the finish date is not lost silently. -> { data, warn }
+  const write = async (query, row, activity) => {
     const first = await query(row);
-    if (!first.error || !('done_on' in row) || !['PGRST204', '42703'].includes(first.error.code)) return must(first);
+    if (!first.error || !('done_on' in row) || !['PGRST204', '42703'].includes(first.error.code)) return { data: must(first) };
     const { done_on: _skip, ...rest } = row;
-    return must(await query(rest));
+    const sql = PLANNER_SQL[activity] || tablesOf(activity).sql;
+    return { data: must(await query(rest)), warn: row.done_on ? `บันทึกแล้ว แต่ยังเก็บวันที่ทำเสร็จไม่ได้ ต้องรัน ${sql} ใน Tx Data ก่อน` : undefined };
   };
   const kidCount = async (table, id) => {
     const { count, error } = await tx.from(table).select('id', { count: 'exact', head: true }).eq('parent_id', id);
@@ -148,8 +150,8 @@ export function mountPlanner(app) {
     const insert = { ...row, year, sort_no: await nextSort(t.task, year, row.parent_id), created_by: req.user.employeeId };
     const done = doneOn(row.progress, null, req.body?.doneOn);
     if (done !== undefined) insert.done_on = done;
-    const created = await write((r) => tx.from(t.task).insert(r).select('id').single(), insert);
-    res.status(201).json({ ok: true, id: created.id });
+    const { data: created, warn } = await write((r) => tx.from(t.task).insert(r).select('id').single(), insert, activity);
+    res.status(201).json({ ok: true, id: created.id, warn });
   });
 
   // Drag: new dates for one or more items at once (dragging a main item moves all its sub items).
@@ -185,8 +187,8 @@ export function mountPlanner(app) {
     const patch = { ...row, updated_at: new Date().toISOString() };
     const done = doneOn(row.progress, current, req.body?.doneOn);
     if (done !== undefined) patch.done_on = done;
-    await write((r) => tx.from(t.task).update(r).eq('id', current.id), patch);
-    res.json({ ok: true });
+    const { warn } = await write((r) => tx.from(t.task).update(r).eq('id', current.id), patch, activity);
+    res.json({ ok: true, warn });
   });
 
   route('delete', '/api/act/:activity/tasks/:id', async (req, res, activity, t) => {
