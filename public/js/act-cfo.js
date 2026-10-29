@@ -484,7 +484,7 @@ async function cfoDrawCompany(body, admin, rerender) {
       <div class="fr01-grid">
         <section class="card fr01-org">
           <div class="card-title">รูปขององค์กร</div>
-          <div class="fr01-photos">${img(s.company_photo1, 'fr01-logo')}${img(s.company_photo2, 'fr01-building')}${s.company_photo1 || s.company_photo2 ? '' : '<p class="empty">ยังไม่มีรูป</p>'}</div>
+          <div class="fr01-photos">${img(s.company_photo2 || s.company_photo1, 'fr01-building') || '<p class="empty">ยังไม่มีรูป</p>'}</div>
           <div class="card-title">ข้อมูลองค์กร</div>
           <ol class="fr01-info">${info.map(([label, value]) => `<li><span>${label}</span><b>${esc(value || '-')}</b></li>`).join('')}</ol>
           <dl class="fr01-more"><dt>สถานที่ติดต่อ</dt><dd>${esc(s.company_address || '-')}</dd><dt>วันที่ขอขึ้นทะเบียน</dt><dd>${esc(day(s.company_register) || '-')}</dd></dl>
@@ -504,19 +504,16 @@ async function cfoDrawCompany(body, admin, rerender) {
     const fields = CFO_COMPANY.filter(([key]) => key.startsWith('company_') && !key.startsWith('company_photo'))
       .map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(s[key] ?? '')}"${['company_updated', 'company_register'].includes(key) ? ' type="date"' : ''}>`)).join('');
     openPopup('แก้ไข Fr-01 รายละเอียดขององค์กร', `${fields}
-      ${field('รูปโลโก้ / องค์กร (รูป 1)', '<input id="cfo-s-photo1" type="file" accept="image/*">')}
-      ${field('รูปอาคาร (รูป 2)', '<input id="cfo-s-photo2" type="file" accept="image/*">')}
+      ${field('รูปองค์กร (เต็มกรอบ 16:9)', '<input id="cfo-s-photo2" type="file" accept="image/*">')}
       <p class="sum-meta">ไม่เลือกรูป = ใช้รูปเดิม · ผลผลิตและปีฐานแก้ที่ Setting > บริษัท</p>`, async () => {
-      for (const slot of [1, 2]) if (picked[slot]) await a5Api(CFO, 'cfo/photo', { method: 'POST', body: { slot, image: picked[slot] } });
+      if (picked[2]) await a5Api(CFO, 'cfo/photo', { method: 'POST', body: { slot: 2, image: picked[2] } });
       const values = Object.fromEntries(CFO_COMPANY.filter(([key]) => $(`cfo-s-${key}`)).map(([key]) => [key, $(`cfo-s-${key}`).value]));
       await a5Api(CFO, 'cfo/settings', { method: 'PUT', body: values });
       toast('บันทึกแล้ว');
       closePopup();
       rerender();
     });
-    [1, 2].forEach((slot) => {
-      $(`cfo-s-photo${slot}`).onchange = (e) => { const f = e.target.files[0]; if (f) cfoJpeg(f).then((data) => { picked[slot] = data; }).catch(onErr); };
-    });
+    $('cfo-s-photo2').onchange = (e) => { const f = e.target.files[0]; if (f) cfoJpeg(f).then((data) => { picked[2] = data; }).catch(onErr); };
   };
 }
 
