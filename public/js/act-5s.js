@@ -183,9 +183,9 @@ async function a5DrawSchedule(body, activity) {
 }
 
 async function a5DrawTeam(body, activity) {
-  const [data, areasData] = await Promise.all([
-    a5Api(activity, `team?year=${a5Year}`),
-    a5Api(activity, `areas?year=${a5Year}`).catch(() => ({ areas: [] }))
+  const [data, areasData] = await Promise.all([ a5Api(activity, `team?year=${a5Year}`),
+//
+    (typeof roles !== 'undefined' && roles.owner) ? a5Api(activity, `areas?year=${a5Year}`).catch(() => ({ areas: [] })) : Promise.resolve({ areas: [] })
   ]);
   const areasList = (areasData.areas || []).filter((a) => a.status === 'Active');
   const active = data.members.filter((m) => m.status === 'Active');
@@ -299,9 +299,9 @@ async function a5SetAreas(body, activity, admin, rerender) {
 
 // roles: { role: label } this activity uses (5S: admin / chairman / auditor + team · CFO: + vice / member + department).
 async function a5SetTeam(body, activity, admin, rerender, roles = A5_ROLE_LABEL) {
-  const [data, areasData] = await Promise.all([
-    a5Api(activity, `team?year=${a5Year}`),
-    a5Api(activity, `areas?year=${a5Year}`).catch(() => ({ areas: [] }))
+  const [data, areasData] = await Promise.all([ a5Api(activity, `team?year=${a5Year}`),
+//
+    (typeof roles !== 'undefined' && roles.owner) ? a5Api(activity, `areas?year=${a5Year}`).catch(() => ({ areas: [] })) : Promise.resolve({ areas: [] })
   ]);
   const areasList = (areasData.areas || []).filter((a) => a.status === 'Active');
   let picked = null;

@@ -170,7 +170,7 @@ export function mountAudit(app) {
     const [rows, empDepts, areas] = await Promise.all([
       fetchAll(() => tx.from(t.team).select('*').eq('year', year).order('role').order('team').order('employee_id')),
       mx.from('mt_main_employee').select('department').eq('status', 'Active'),
-      t.area ? fetchAll(() => tx.from(t.area).select('id,code,name,area_type')) : []
+      activity === '5s' ? fetchAll(() => tx.from(t.area).select('id,code,name,area_type')) : []
     ]);
     const areaMap = new Map((areas || []).map((a) => [Number(a.id), a]));
     const departments = [...new Set([...(empDepts.data || []).map((r) => String(r.department || '').trim()), ...rows.map((r) => String(r.department || '').trim())].filter(Boolean))].sort();
@@ -200,6 +200,7 @@ export function mountAudit(app) {
   });
 
   route('get', '/api/act/:activity/areas', async (req, res, activity) => {
+    if (activity !== '5s') return res.json({ year: yearOf(req.query.year) || new Date().getFullYear(), areas: [] });
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
     const areas = await areasOf(activity);
