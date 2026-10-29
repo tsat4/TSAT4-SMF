@@ -488,15 +488,15 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-key{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:6px 2px 0;font-size:11.5px}.apl-key > span{display:inline-flex;align-items:center;gap:5px}
 .apl-key i.apl-pct{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--st)}
 /* plan = light bar, actual = dark bar on top (ผู้ใช้กำหนด 2026-10-29) */
-.apl-bar{position:absolute;top:8px;height:12px;border-radius:6px;background:color-mix(in srgb,var(--bar) 22%,var(--mo-surface));border:1px solid color-mix(in srgb,var(--bar) 60%,transparent);z-index:2;touch-action:none}
-.apl-act{position:absolute;top:8px;height:12px;border-radius:6px;background:var(--bar);z-index:3;pointer-events:none}
-.apl-act.is-over{background:var(--mo-danger);border-radius:0 6px 6px 0}
-.apl-act-pct{position:absolute;top:7px;font-size:10.5px;line-height:14px;font-weight:600;color:var(--mo-text);white-space:nowrap;z-index:3;pointer-events:none;font-variant-numeric:tabular-nums}
+.apl-bar{position:absolute;top:6px;height:16px;border-radius:8px;background:color-mix(in srgb,var(--bar) 22%,var(--mo-surface));border:1px solid color-mix(in srgb,var(--bar) 60%,transparent);z-index:2;touch-action:none}
+.apl-act{position:absolute;top:6px;height:16px;border-radius:8px;background:var(--bar);z-index:3;pointer-events:none}
+.apl-act.is-over{background:var(--mo-danger);border-radius:0 8px 8px 0}
+.apl-act-pct{position:absolute;top:6px;font-size:11px;line-height:16px;font-weight:600;color:var(--mo-text);white-space:nowrap;z-index:3;pointer-events:none;font-variant-numeric:tabular-nums}
 .apl-bar.is-editable{cursor:grab}
 .apl-bar.is-dragging{cursor:grabbing;box-shadow:0 0 0 2px var(--mo-primary)}
 .apl-handle{position:absolute;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:1}
 .apl-handle.is-l{left:0}.apl-handle.is-r{right:0}
-.apl-dates{position:absolute;top:7px;line-height:14px;font-size:11px;color:var(--mo-text-muted);white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums;z-index:2}
+.apl-dates{position:absolute;top:6px;line-height:16px;font-size:11px;color:var(--mo-text-muted);white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums;z-index:2}
 .apl-link{border:0;background:none;color:var(--mo-primary);padding:0}
 .apl-owner{display:flex;gap:4px}.apl-owner input{flex:1 1 auto;min-width:0;width:auto}.popup-fields .apl-owner > .btn{flex:0 0 auto;width:auto}
 .apl-swatches{display:flex;gap:6px}
