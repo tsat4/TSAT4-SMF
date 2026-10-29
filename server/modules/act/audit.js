@@ -104,8 +104,8 @@ export function mountAudit(app) {
       tx.from(tablesOf(activity).team).select('year'),
       tx.from(tablesOf(activity).audit).select('year')
     ]);
-    // Activities without audit tables (CFO, 100P) have no tx_<act>_audit.
-    throwIf(team.error, audits.error?.code === 'PGRST205' ? null : audits.error);
+    // Activities without audit tables (CFO, 100P) have no tx_<act>_audit; uncreated activities have no mt_<act>_team yet.
+    throwIf(team.error?.code === 'PGRST205' ? null : team.error, audits.error?.code === 'PGRST205' ? null : audits.error);
     const years = [...new Set([new Date().getFullYear(), year, ...(team.data || []).map((r) => r.year), ...(audits.data || []).map((r) => r.year)].map(Number))].sort();
     res.json({ year, years, access });
   });

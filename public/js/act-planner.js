@@ -396,14 +396,8 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
   a5EmployeeSearch(activity, (p) => { ownerId = p.employeeId; $('apl-owner').value = `${p.employeeId} · ${p.name}`; }, aplYear);
 }
 
-const APL_DASH_TABS = [
-  ['schedule', 'Schedule'],
-  ['team', 'Team']
-];
-const APL_SET_TABS = [
-  ['team', 'ทีม'],
-  ['planner', 'แผนงาน']
-];
+const APL_DASH_TABS = { schedule: 'Schedule', team: 'Team' };
+const APL_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' };
 const APL_ROLE_LABEL = {
   admin: 'Admin ผู้ดูแลกิจกรรม',
   chairman: 'ประธาน',

@@ -32,7 +32,8 @@ function a5TeamColor(team) {
 }
 
 function a5Seg(attr, tabs, active) {
-  return `<div class="seg" role="group">${Object.entries(tabs).map(([key, name]) => `<button class="seg-btn${key === active ? ' is-active' : ''}" type="button" ${attr}="${esc(key)}" aria-pressed="${key === active}">${esc(name)}</button>`).join('')}</div>`;
+  const entries = Array.isArray(tabs) ? tabs : Object.entries(tabs);
+  return `<div class="seg" role="group">${entries.map(([key, name]) => `<button class="seg-btn${key === active ? ' is-active' : ''}" type="button" ${attr}="${esc(key)}" aria-pressed="${key === active}">${esc(name)}</button>`).join('')}</div>`;
 }
 
 function a5YearSelect(years) {

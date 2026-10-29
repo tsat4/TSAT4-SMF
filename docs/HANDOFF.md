@@ -31,6 +31,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-29 · Antigravity · ปรับแท็บ Setting และ Dashboard ของกิจกรรมที่ใช้ act-planner ให้เป็นมาตรฐานตามกฎ (APL_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' }, APL_DASH_TABS = { schedule: 'Schedule', team: 'Team' }) แก้บั๊ก a5Seg แสดงชื่อปุ่ม "team,ทีม" และ "planner,แผนงาน" พร้อมให้ a5Seg รองรับทั้ง Array และ Object (`public/js/act-planner.js`, `public/js/act-5s.js`, `server/modules/act/audit.js`)
+
 - 2026-10-29 · Claude · Planner แท่งแบบแผน/จริง: แถบอ่อน = แผน, แถบเข้ม = ทำจริงถึงวันเสร็จหรือวันนี้, ส่วนเลยวันจบสีแดง, % ท้ายแถบเข้ม, แท่งบางลง 20 → 12px (ผู้ใช้สั่ง)
 
 - 2026-10-29 · Claude · Project Planner (ผู้ใช้ทดสอบ KAIZEN แผนงาน): ขอบแท่ง 1px · รายการ / ผู้รับผิดชอบไม่หนา 12px ตัดคำนำหน้า · ตัดปุ่ม + (เพิ่มข้อรอง = เลือกข้อหลักแล้ว "สร้าง") · เส้นวันนี้อยู่บนแท่ง · แถว 36 → 28px · **เทียบแผน**: `done_on` + `planStatus` (เสร็จก่อนแผน / ตามแผน / เสร็จช้า / เลยกำหนด / ช้า-ตาม-เร็วกว่าแผน) จุดสีหน้า % + ข้อความข้างแท่ง + คำอธิบายสี · ฟอร์มมีช่องวันที่ทำเสร็จเมื่อ 100% · spec `docs/specs/act-planner.md` · commit นี้รวมงานค้างของ Antigravity ใน act-planner.js (try/catch แท็บทีม แสดง error แทนหน้าค้าง) ที่อยู่ในไฟล์เดียวกัน · `server/modules/act/audit.js` + `scripts/tmp-update-handoff.cjs` ของ Antigravity ยังไม่ commit
