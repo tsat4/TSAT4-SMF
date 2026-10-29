@@ -514,6 +514,67 @@ function bindHold(button, onDone) {
 
 VIEWS.main = renderMain;
 
+// Every <input type="date"> is typed as วัน/เดือน/ปี (dd/mm/yyyy) whatever the browser language (ผู้ใช้กำหนด 2026-10-29).
+// A text box shows dd/mm/yyyy (slashes added while typing) and keeps the real date input — hidden, still holding the
+// id — in step, so pages keep reading and writing .value as YYYY-MM-DD; the calendar button opens the browser's picker.
+const DMY = (() => {
+  const valueOf = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  const disabledOf = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'disabled');
+  const toDmy = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? `${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '');
+  const toIso = (text) => {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(String(text).trim());
+    if (!m) return null;
+    const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    const date = new Date(`${iso}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : null;
+  };
+  const wrap = (input) => {
+    if (input.dataset.dmy) return;
+    input.dataset.dmy = '1';
+    const box = document.createElement('span');
+    box.className = 'dmy';
+    const text = document.createElement('input');
+    Object.assign(text, { type: 'text', inputMode: 'numeric', placeholder: 'วว/ดด/ปปปป', maxLength: 10, autocomplete: 'off' });
+    const pick = document.createElement('button');
+    Object.assign(pick, { type: 'button', className: 'dmy-pick', tabIndex: -1, innerHTML: '<span class="material-symbols-rounded">calendar_month</span>' });
+    pick.setAttribute('aria-label', 'เลือกจากปฏิทิน');
+    input.parentNode.insertBefore(box, input);
+    box.append(text, pick, input);
+    input.classList.add('dmy-real');
+    input.tabIndex = -1;
+    const show = () => {
+      text.value = toDmy(valueOf.get.call(input));
+      text.disabled = pick.disabled = disabledOf.get.call(input);
+      text.classList.remove('is-bad');
+    };
+    // Code that sets .value / .disabled on the real input updates the text box too.
+    Object.defineProperty(input, 'value', { configurable: true, get() { return valueOf.get.call(this); }, set(v) { valueOf.set.call(this, v); show(); } });
+    Object.defineProperty(input, 'disabled', { configurable: true, get() { return disabledOf.get.call(this); }, set(v) { disabledOf.set.call(this, v); show(); } });
+    text.addEventListener('input', () => {
+      const digits = text.value.replace(/\D/g, '').slice(0, 8);
+      text.value = digits.length > 4 ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}` : digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+      const iso = toIso(text.value);
+      text.classList.toggle('is-bad', text.value.length === 10 && !iso);
+      if (!iso && text.value) return;
+      valueOf.set.call(input, iso || '');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    text.addEventListener('blur', show);
+    pick.onclick = () => { try { input.showPicker(); } catch { input.focus(); } };
+    input.addEventListener('change', () => { if (document.activeElement !== text) show(); });
+    show();
+  };
+  const scan = (root) => root.querySelectorAll?.('input[type="date"]:not([data-dmy])').forEach(wrap);
+  new MutationObserver((list) => list.forEach((m) => m.addedNodes.forEach((node) => {
+    if (node.nodeType !== 1) return;
+    if (node.matches('input[type="date"]')) wrap(node);
+    scan(node);
+  }))).observe(document.documentElement, { childList: true, subtree: true });
+  scan(document);
+  return { toDmy, toIso };
+})();
+
 // Hovering a list thumbnail shows it large next to the pointer (ผู้ใช้กำหนด 2026-10-28). One floating box for the
 // whole app, fixed position so table cells that clip overflow do not cut it. New thumbnails: add class img-zoom.
 const ZOOM_THUMBS = 'img.tx-card-img, img.usage-thumb, img.img-zoom';

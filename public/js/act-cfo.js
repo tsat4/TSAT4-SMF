@@ -8,7 +8,7 @@ const CFO_SCOPE_COLORS = CHART_THEMES.cool.series.slice(0, 3);
 const CFO_BASE_COLORS = CHART_THEMES.cool.base;
 const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
 const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Fr-01', team: 'Fr-03.1', fr032: 'Fr-03.2', fr041: 'Fr-04.1', revision: 'บันทึกการปรับปรุง' };
-const CFO_SET_TABS = { activities: 'กิจกรรม', ef: 'Emission Factor', s3: 'Scope 3 (Fr-03.2)', company: 'บริษัท', team: 'ทีม' };
+const CFO_SET_TABS = { team: 'ทีม', activities: 'กิจกรรม', ef: 'Emission Factor', s3: 'Scope 3 (Fr-03.2)', company: 'บริษัท' };
 // TGO Fr-03.2 criteria (server S3_CRITERIA) and their explanation from the form (หัวข้อ 12 ข้อกำหนด CFO)
 const CFO_S3_CRITERIA = [
   ['magnitude', 'Magnitude', 'ขนาด: สันนิษฐานว่ามีปริมาณการปล่อยหรือดูดกลับในปริมาณมากอย่างมีนัยสำคัญ'],
@@ -32,7 +32,7 @@ const CFO_COMPANY = [['company_name', 'ชื่อธุรกิจ'], ['compa
 const CFO_EF_GAS = [['co2', 'CO₂'], ['ch4_fossil', 'Fossil CH₄'], ['ch4', 'CH₄'], ['n2o', 'N₂O'], ['sf6', 'SF₆'], ['nf3', 'NF₃'], ['hfc', 'HFCs'], ['hfc_gwp', 'GWP HFCs'], ['pfc', 'PFCs'], ['pfc_gwp', 'GWP PFCs'],
   ['other', 'GHG นอกข้อกำหนด'], ['other_gwp', 'GWP นอกข้อกำหนด'], ['co2_bio', 'CO₂ ชีวมวล (รายงานแยก)']];
 let cfoDashTab = 'summary';
-let cfoSetTab = 'activities';
+let cfoSetTab = 'team';
 const cfoFilter = { scope: '', department: '', q: '', status: '' };
 // page: Summary หน้า 1 (monthly accumulation) / หน้า 2 (summary by Scope), picked in the dropdown before the year
 const cfoDash = { department: '', chartScope: '', scope: '1', page: '1' };

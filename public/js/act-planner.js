@@ -348,7 +348,10 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
   const end = task ? task.end_date || '' : actIso(actAddDays(base, 13));
   let ownerId = task?.owner_id || '';
   const color = task?.color || 'p5';
+  const kidCount = task ? tasks.filter((t) => t.parent_id === task.id).length : 0;
   const fields = [
+    // Said first: a main item with sub items takes its dates and % from them, so those fields are locked here.
+    derived ? `<p class="apl-locked">ข้อหลักนี้มีข้อรอง ${kidCount} ข้อ: วันเริ่ม วันจบ และ % คิดจากข้อรองให้อัตโนมัติ · แก้วันหรือ % ที่ข้อรอง (ดับเบิลคลิกแถวข้อรอง) หรือลากแท่งข้อหลักเพื่อเลื่อนทั้งชุด · ที่นี่แก้ได้: ชื่อ ผู้รับผิดชอบ สี รายละเอียด</p>` : '',
     field('ระดับ', `<select id="apl-parent"${derived ? ' disabled' : ''}><option value="">ข้อหลัก</option>${phases.map((p) => `<option value="${p.id}"${p.id === pid ? ' selected' : ''}>ข้อรองของ: ${esc(p.title)}</option>`).join('')}</select>`),
     field('ชื่อรายการ', `<input id="apl-title" maxlength="200" value="${esc(task?.title || '')}">`),
     field('ผู้รับผิดชอบ', `<div class="apl-owner"><input id="apl-owner" readonly value="${esc(ownerId ? `${ownerId} · ${task.owner_name}` : '')}" placeholder="ค้นจากรายชื่อด้านล่าง">${button('apl-owner-clear', 'ล้าง')}</div>`),
@@ -359,7 +362,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
     `<div id="apl-done-wrap">${field('วันที่ทำเสร็จ (100%)', `<input id="apl-done" type="date" value="${esc(task?.done_on || actIso(new Date()))}">`)}<p class="sum-meta">ใช้เทียบกับวันจบ: เสร็จก่อนแผน / ตามแผน / เสร็จช้า</p></div>`,
     `<div id="apl-color-wrap">${field('สีข้อหลัก', `<div class="apl-swatches">${Object.entries(APL_COLORS).map(([key, hex]) => `<label class="apl-swatch" style="--bar:${hex}"><input type="radio" name="apl-color" value="${key}"${key === color ? ' checked' : ''}><span></span></label>`).join('')}</div>`)}</div>`,
     field('รายละเอียด', `<textarea id="apl-note" rows="2" maxlength="2000">${esc(task?.note || '')}</textarea>`),
-    derived ? '<p class="sum-meta">ข้อหลักที่มีข้อรอง: ช่วงวันและ % คิดจากข้อรองให้อัตโนมัติ</p>' : `<p class="sum-meta">วางแผนได้ถึง ธ.ค. ${aplYear + 1} · ข้อหลักเว้นวันว่างได้ ข้อรองต้องมีวันเริ่มและวันจบ</p>`
+    derived ? '' : `<p class="sum-meta">วางแผนได้ถึง ธ.ค. ${aplYear + 1} · ข้อหลักเว้นวันว่างได้ ข้อรองต้องมีวันเริ่มและวันจบ</p>`
   ].join('');
   const title = task ? 'แก้ไขรายการ' : pid ? 'เพิ่มข้อรอง' : 'สร้างข้อหลัก';
   openPopup(title, fields, async () => {

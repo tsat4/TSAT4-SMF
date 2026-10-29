@@ -104,6 +104,15 @@ html[data-theme="dark"] .btn-primary:hover{background:#2a1e0a;color:#f0b429;bord
 .btn-secondary{background:var(--mo-input);color:var(--mo-primary);border-color:var(--mo-line)}
 .btn-danger{background:var(--mo-danger);color:#fff}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+/* locked fields look locked (e.g. a Planner main item's dates / %, worked out from its sub items) */
+input:disabled,select:disabled,textarea:disabled{opacity:.55;cursor:not-allowed}
+/* dd/mm/yyyy date box (core.js DMY): text box + calendar button, the real date input hidden underneath */
+.dmy{position:relative;display:flex;align-items:center;gap:4px;width:100%;min-width:0}
+.dmy > input[type="text"]{flex:1 1 auto;min-width:0;width:auto;font-variant-numeric:tabular-nums}
+.dmy > input.is-bad{border-color:var(--mo-danger);color:var(--mo-danger)}
+.dmy-pick{flex:0 0 auto;display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid var(--mo-border);border-radius:var(--mo-radius);background:var(--mo-input);color:var(--mo-text-muted);cursor:pointer}
+.dmy-pick .material-symbols-rounded{font-size:18px}.dmy-pick:disabled{opacity:.5;cursor:not-allowed}
+.dmy > input.dmy-real{position:absolute;left:0;bottom:0;width:1px;height:1px;padding:0;border:0;opacity:0;pointer-events:none}
 .form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center;justify-content:flex-end}
 .popup-back{position:fixed;inset:0;z-index:80;background:rgba(23,23,23,.45);display:grid;place-items:center;padding:16px}
 .popup{width:min(380px,100%);max-height:min(88vh,760px);overflow:auto;background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:var(--mo-radius);padding:16px 16px 12px;box-shadow:0 16px 40px rgba(0,0,0,.2)}
@@ -498,6 +507,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-handle.is-l{left:0}.apl-handle.is-r{right:0}
 .apl-dates{position:absolute;top:6px;line-height:16px;font-size:11px;color:var(--mo-text-muted);white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums;z-index:2}
 .apl-link{border:0;background:none;color:var(--mo-primary);padding:0}
+.apl-locked{margin:0 0 4px;padding:8px 10px;border-radius:var(--mo-radius);background:color-mix(in srgb,#d97706 10%,var(--mo-surface));border:1px solid color-mix(in srgb,#d97706 45%,transparent);font-size:12.5px}
 .apl-owner{display:flex;gap:4px}.apl-owner input{flex:1 1 auto;min-width:0;width:auto}.popup-fields .apl-owner > .btn{flex:0 0 auto;width:auto}
 .apl-swatches{display:flex;gap:6px}
 .apl-swatch input{position:absolute;opacity:0;pointer-events:none}
