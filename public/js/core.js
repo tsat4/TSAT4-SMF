@@ -514,6 +514,39 @@ function bindHold(button, onDone) {
 
 VIEWS.main = renderMain;
 
+// Dashboard charts grow to fill the empty height under the page (ผู้ใช้กำหนด 2026-10-29): after each render and on
+// resize, the free space below the card is shared between the chart rows (charts side by side get the same height),
+// up to DASH_FIT_MAX px of plot per chart. Report pages laid out for one sheet (.cfo-report-page) keep their size.
+const DASH_FIT_MAX = 520;
+(() => {
+  const view = document.getElementById('app-view');
+  if (!view) return;
+  let timer;
+  const fit = () => {
+    const box = view.querySelector(':scope > .view-body');
+    const plots = box ? [...box.querySelectorAll('.ch-plot')].filter((p) => p.offsetParent && !p.closest('.cfo-report-page')) : [];
+    plots.forEach((p) => p.style.removeProperty('grid-template-rows'));
+    if (!document.body.dataset.dash || !plots.length) return;
+    const card = box.lastElementChild;
+    const last = card.lastElementChild || card;
+    const free = box.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - parseFloat(getComputedStyle(card).paddingBottom) - 10;
+    if (free < 24) return;
+    const rows = new Set(plots.map((p) => Math.round(p.getBoundingClientRect().top)));
+    const extra = free / rows.size;
+    plots.forEach((p) => {
+      const now = p.querySelector('.ch-area').getBoundingClientRect().height;
+      p.style.gridTemplateRows = `auto ${Math.round(Math.min(DASH_FIT_MAX, now + extra))}px auto`;
+    });
+  };
+  const later = () => { clearTimeout(timer); timer = setTimeout(fit, 120); };
+  window.addEventListener('resize', later);
+  // Fonts change line heights after the first render.
+  document.fonts?.ready.then(later);
+  window.addEventListener('load', later);
+  // Re-fit when the page content changes, not when a chart's hover tip does.
+  new MutationObserver((list) => { if (list.some((m) => !m.target.closest?.('.ch-tip'))) later(); }).observe(view, { childList: true, subtree: true });
+})();
+
 // Every <input type="date"> is typed as วัน/เดือน/ปี (dd/mm/yyyy) whatever the browser language (ผู้ใช้กำหนด 2026-10-29).
 // A text box shows dd/mm/yyyy (slashes added while typing) and keeps the real date input — hidden, still holding the
 // id — in step, so pages keep reading and writing .value as YYYY-MM-DD; the calendar button opens the browser's picker.
