@@ -25,7 +25,8 @@ const KZ_CRITERIA = [
 const KZ_CUTOFF_MONTHS = 11;
 let kzDashTab = 'summary';
 let kzSetTab = 'plan';
-let kzRankMode = 'dept';
+let kzRankMode = 'result';
+let kzRankDept = '';
 const kzFilter = { status: '', department: '', q: '' };
 const kzHead = { sort: '', dir: 'asc', filters: {} };
 const kzTeamHead = { sort: '', dir: 'asc', filters: {} };
@@ -171,17 +172,17 @@ async function kzDrawSummary(body) {
   chartTip('kz-plot', (i) => `<strong>${ACT_MONTHS[i]} ${a5Year}</strong><div class="ch-tip-row"><span>อนุมัติ</span><b>${byMonth(approved)[i]} ใบ</b></div><div class="ch-tip-row"><span>รอพิจารณา</span><b>${byMonth(waiting)[i]} ใบ</b></div>`);
 }
 
-// SVG wreath + crown + rank number (1 = Gold, 2 = Silver, 3 = Bronze) for the Podium.
+// SVG wreath + crown + rank number (green theme on white background: 1 = Deep Green + Gold Crown, 2 = Medium Green, 3 = Fresh Green).
 function kzPodiumSvg(rank) {
   const palette = {
-    1: ['#fef08a', '#f59e0b', '#b45309'],
-    2: ['#f8fafc', '#cbd5e1', '#64748b'],
-    3: ['#fed7aa', '#d97706', '#78350f']
+    1: ['#2E7D32', '#1B5E20', '#0d3b10', '#f59e0b'],
+    2: ['#43A047', '#2E7D32', '#1B5E20', '#2E7D32'],
+    3: ['#66BB6A', '#43A047', '#2E7D32', '#43A047']
   }[rank];
   const gid = `kz-g-${rank}`;
   return `<svg class="kz-pod-badge" viewBox="0 0 120 104" aria-hidden="true">
     <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${palette[0]}"/><stop offset="55%" stop-color="${palette[1]}"/><stop offset="100%" stop-color="${palette[2]}"/></linearGradient></defs>
-    <path fill="url(#${gid})" d="M48 18 L52 8 L60 15 L68 8 L72 18 Z"/>
+    <path fill="${palette[3]}" d="M48 18 L52 8 L60 15 L68 8 L72 18 Z"/>
     <path fill="none" stroke="url(#${gid})" stroke-width="3.5" stroke-linecap="round" d="M56 88 C30 82 18 60 24 34 M64 88 C90 82 102 60 96 34"/>
     <g fill="url(#${gid})">
       <ellipse cx="22" cy="40" rx="6" ry="3" transform="rotate(-35 22 40)"/><ellipse cx="21" cy="52" rx="6.5" ry="3.2" transform="rotate(-20 21 52)"/><ellipse cx="25" cy="64" rx="6.5" ry="3.2" transform="rotate(-5 25 64)"/><ellipse cx="34" cy="75" rx="6.5" ry="3.2" transform="rotate(15 34 75)"/><ellipse cx="46" cy="83" rx="6" ry="3" transform="rotate(30 46 83)"/>
@@ -191,125 +192,106 @@ function kzPodiumSvg(rank) {
   </svg>`;
 }
 
-// Dashboard > Ranking: Annual Kaizen Podium (Top 1–2–3) + Department / Individual Ranking table & monthly minimum tracker (Jan–Nov, cut-off 15 Nov).
+// Dashboard > Ranking: 2-column layout — Left: Top 1–3 Podium (white background, green theme) · Right: Kaizen Ranking table filtered by ผลที่ได้รับ or จำนวนเรื่องต่อคน.
 async function kzDrawRanking(body) {
   const d = await a5Api(KZ, `kaizen/list?year=${a5Year}`);
-  const sent = d.rows.filter((r) => r.status !== 'DRAFT');
-  const today = new Date();
-  const curYear = today.getFullYear();
-  const curMonth = a5Year < curYear ? 12 : a5Year > curYear ? 0 : today.getMonth() + 1;
-  const pastCutoff = a5Year < curYear || (a5Year === curYear && today.toISOString().slice(0, 10) > kzCutoffDate(a5Year));
+  const departments = [...new Set([...(d.departments || []), ...d.rows.map((r) => r.department)].filter(Boolean))].sort();
+  const sent = d.rows.filter((r) => r.status !== 'DRAFT' && (!kzRankDept || r.department === kzRankDept));
 
-  // Build department ranking rows
-  const byDept = {};
-  const ensureDept = (k) => {
-    const key = k || '-';
-    byDept[key] = byDept[key] || {
-      department: key, reps: [], target: 0, sentTotal: 0, sentOnTime: 0, approved: 0, approvedOnTime: 0,
-      perMonth: 0, reward: 0, monthSent: Array(KZ_CUTOFF_MONTHS).fill(0)
-    };
-    return byDept[key];
-  };
-  (d.teamTargets || []).forEach((t) => {
-    const g = ensureDept(t.department);
-    if (t.name || t.employee_id) g.reps.push(t.name || t.employee_id);
-    g.target += Number(t.target_count || 0);
-  });
-  sent.forEach((r) => {
-    const g = ensureDept(r.department);
-    const onTime = kzOnTime(r.submitted_on, a5Year);
-    const m = Number(String(r.submitted_on || '').slice(5, 7));
-    g.sentTotal += 1;
-    if (onTime) {
-      g.sentOnTime += 1;
-      if (m >= 1 && m <= KZ_CUTOFF_MONTHS) g.monthSent[m - 1] += 1;
-    }
-    if (r.status === 'APPROVED') {
-      g.approved += 1;
-      if (onTime) g.approvedOnTime += 1;
-      g.perMonth += Number(r.return_month || 0);
-      g.reward += Number(r.eval_reward || 0);
-    }
-  });
-  const deptRows = Object.values(byDept).map((g) => {
-    const monthlyMin = kzMonthlyMin(g.target);
-    const pct = g.target > 0 ? Math.round((g.approvedOnTime / g.target) * 1000) / 10 : (g.approvedOnTime > 0 ? 100 : 0);
-    const sentPct = g.target > 0 ? Math.round((g.sentOnTime / g.target) * 1000) / 10 : (g.sentOnTime > 0 ? 100 : 0);
-    return { ...g, monthlyMin, pct, sentPct };
-  }).sort((a, b) => b.pct - a.pct || b.reward - a.reward || b.perMonth - a.perMonth || b.sentOnTime - a.sentOnTime || a.department.localeCompare(b.department));
+  // Mode 1: ผลที่ได้รับ (จัดอันดับเรื่อง Kaizen ตามผลตอบแทน / ชั่วโมงที่ลดได้ / เงินรางวัล)
+  const resultRows = [...sent].sort((a, b) =>
+    Number(b.return_month || 0) - Number(a.return_month || 0)
+    || Number(b.saved_baht || 0) - Number(a.saved_baht || 0)
+    || Number(b.saved_hours || 0) - Number(a.saved_hours || 0)
+    || Number(b.eval_reward || 0) - Number(a.eval_reward || 0)
+    || Number(b.scoreTotal || 0) - Number(a.scoreTotal || 0)
+    || String(a.reg_no || '').localeCompare(String(b.reg_no || ''))
+  );
 
-  // Build individual ranking rows
+  // Mode 2: จำนวนเรื่องต่อคน (จัดอันดับผู้เสนอตามจำนวนเรื่องที่ส่งทัน 15 พ.ย. → อนุมัติ → เงินรางวัลรวม → ผลตอบแทนรวม)
   const byPerson = {};
   sent.forEach((r) => {
     const k = String(r.employee_id || '-');
     byPerson[k] = byPerson[k] || {
       employee_id: k, name: r.name || k, department: r.department || '-',
-      sentTotal: 0, sentOnTime: 0, approved: 0, approvedOnTime: 0, perMonth: 0, reward: 0, grades: []
+      sentTotal: 0, sentOnTime: 0, approved: 0, perMonth: 0, reward: 0, grades: []
     };
     const p = byPerson[k];
-    const onTime = kzOnTime(r.submitted_on, a5Year);
     p.sentTotal += 1;
-    if (onTime) p.sentOnTime += 1;
+    if (kzOnTime(r.submitted_on, a5Year)) p.sentOnTime += 1;
     if (r.status === 'APPROVED') {
       p.approved += 1;
-      if (onTime) p.approvedOnTime += 1;
       p.perMonth += Number(r.return_month || 0);
       p.reward += Number(r.eval_reward || 0);
-      if (r.eval_grade && r.eval_grade !== '-') p.grades.push(r.eval_grade);
     }
+    if (r.eval_grade && r.eval_grade !== '-') p.grades.push(r.eval_grade);
   });
   const personRows = Object.values(byPerson)
-    .sort((a, b) => b.approvedOnTime - a.approvedOnTime || b.reward - a.reward || b.perMonth - a.perMonth || b.sentOnTime - a.sentOnTime || a.employee_id.localeCompare(b.employee_id));
+    .sort((a, b) => b.sentOnTime - a.sentOnTime || b.approved - a.approved || b.reward - a.reward || b.perMonth - a.perMonth || b.sentTotal - a.sentTotal || a.employee_id.localeCompare(b.employee_id));
 
-  const list = kzRankMode === 'person' ? personRows : deptRows;
+  const list = kzRankMode === 'person' ? personRows : resultRows;
+  const infoOf = (item) => {
+    if (!item) return { title: 'ยังไม่มีผู้ได้รับอันดับ', sub: '-', stat: 'รอผลประเมิน' };
+    if (kzRankMode === 'person') {
+      return {
+        title: item.name || item.employee_id,
+        sub: `${item.employee_id} · ${item.department}`,
+        stat: `${kzNum(item.sentOnTime, 0)} เรื่อง (อนุมัติ ${kzNum(item.approved, 0)}) · ${kzMoney(item.perMonth)} ฿/ด.`
+      };
+    }
+    return {
+      title: item.title,
+      sub: `${item.reg_no || ''} · ${item.name || item.employee_id} (${item.department || '-'})`,
+      stat: `${kzMoney(item.return_month)} ฿/ด.${item.eval_reward ? ` · รางวัล ${kzNum(item.eval_reward, 0)}฿` : ''}`
+    };
+  };
+
   const podiumSlot = (rank) => {
-    const item = list[rank - 1];
-    const title = item ? (kzRankMode === 'person' ? (item.name || item.employee_id) : item.department) : 'ยังไม่มีผู้ได้รับอันดับ';
-    const sub = item
-      ? (kzRankMode === 'person' ? `${item.employee_id} · ${item.department}` : ([...new Set(item.reps)].join(', ') || 'ตัวแทนแผนก'))
-      : '-';
-    const stat = item
-      ? (kzRankMode === 'person'
-        ? `อนุมัติ ${kzNum(item.approvedOnTime, 0)} เรื่อง · รางวัล ${kzNum(item.reward, 0)}฿`
-        : `สำเร็จ ${kzNum(item.pct, 1)}% (${kzNum(item.approvedOnTime, 0)}/${kzNum(item.target, 0)}) · รางวัล ${kzNum(item.reward, 0)}฿`)
-      : 'รอผลประเมิน';
+    const info = infoOf(list[rank - 1]);
     return `<div class="kz-pod-slot is-${rank}" data-x="">
       ${kzPodiumSvg(rank)}
-      <div class="kz-pod-name" title="${esc(title)}">${esc(title)}</div>
-      <div class="kz-pod-sub" title="${esc(sub)}">${esc(sub)}</div>
-      <div class="kz-pod-stat">${esc(stat)}</div>
+      <div class="kz-pod-name" title="${esc(info.title)}">${esc(info.title)}</div>
+      <div class="kz-pod-sub" title="${esc(info.sub)}">${esc(info.sub)}</div>
+      <div class="kz-pod-stat" title="${esc(info.stat)}">${esc(info.stat)}</div>
       <div class="kz-pod-step"></div>
     </div>`;
   };
 
-  const monthDots = (g) => {
-    let cum = 0;
-    return `<div class="kz-months">${g.monthSent.map((cnt, i) => {
-      cum += cnt;
-      const m = i + 1;
-      const met = (g.monthlyMin > 0 ? cnt >= g.monthlyMin : cnt > 0) || (g.target > 0 && cum >= g.target);
-      const due = m < curMonth || (m === 11 && pastCutoff);
-      const cls = met ? 'is-done' : (due && g.monthlyMin > 0 ? 'is-missing' : '');
-      const tip = `${ACT_MONTHS_SHORT[i]} ${a5Year}: ส่ง ${cnt} เรื่อง (ขั้นต่ำ ${g.monthlyMin} เรื่อง/เดือน · สะสม ${cum}/${g.target} เรื่อง)`;
-      return `<i class="${cls}" title="${esc(tip)}"></i>`;
-    }).join('')}</div>`;
-  };
+  const top3Rows = [1, 2, 3].map((rank) => {
+    const info = infoOf(list[rank - 1]);
+    return `<div class="kz-top3-row is-${rank}">
+      <span class="kz-rank-badge is-${rank}">${rank}</span>
+      <div class="kz-top3-main"><strong title="${esc(info.title)}">${esc(info.title)}</strong><small title="${esc(info.sub)}">${esc(info.sub)}</small></div>
+      <div class="kz-top3-val">${esc(info.stat)}</div>
+    </div>`;
+  }).join('');
 
   const rankCell = (i) => (i < 3 ? `<span class="kz-rank-badge is-${i + 1}">${i + 1}</span>` : `${i + 1}`);
 
   const tableHtml = kzRankMode === 'person'
-    ? chartCard(`ตารางจัดอันดับรายบุคคล ปี ${a5Year} (ส่งภายใน 15 พ.ย. ${a5Year})`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th class="cfo-c">อันดับ</th><th>รหัส</th><th>ชื่อผู้เสนอ</th><th>หน่วยงาน</th><th class="num">ส่งทัน 15 พ.ย. (ใบ)</th><th class="num">ส่งรวม (ใบ)</th><th class="num">อนุมัติทัน 15 พ.ย. (ใบ)</th><th>เกรดที่ได้</th><th class="num">ผลตอบแทน (บาท/เดือน)</th><th class="num">เงินรางวัลรวม (บาท)</th></tr></thead>
-      <tbody>${personRows.map((p, i) => `<tr><td class="cfo-c">${rankCell(i)}</td><td>${esc(p.employee_id)}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.department)}</td><td class="num">${kzNum(p.sentOnTime, 0)}</td><td class="num">${kzNum(p.sentTotal, 0)}</td><td class="num"><b>${kzNum(p.approvedOnTime, 0)}</b></td><td>${esc([...new Set(p.grades)].join(', ') || '-')}</td><td class="num">${kzMoney(p.perMonth)}</td><td class="num"><b>${kzNum(p.reward, 0)}</b></td></tr>`).join('') || '<tr><td colspan="10" class="empty">ยังไม่มีข้อมูลส่งเรื่อง Kaizen ปีนี้</td></tr>'}</tbody></table></div>`, 'ตัดสินจาก: เรื่องที่อนุมัติทัน 15 พ.ย. → เงินรางวัลรวม → ผลตอบแทน')
-    : chartCard(`ตารางจัดอันดับตามแผนก ปี ${a5Year} (ปิดจบส่งครบก่อน 15 พ.ย. ${a5Year})`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th class="cfo-c">อันดับ</th><th>หน่วยงาน</th><th>ตัวแทนสมาชิก</th><th class="num">เป้า/ปี (เรื่อง)</th><th class="num">ขั้นต่ำ/เดือน (เรื่อง)</th><th class="num">ส่งทัน 15 พ.ย.</th><th class="num">อนุมัติทัน 15 พ.ย.</th><th>ความสำเร็จเทียบเป้า</th><th>รายเดือน (ม.ค.–พ.ย.)</th><th class="num">ผลตอบแทน (บาท/เดือน)</th><th class="num">เงินรางวัลรวม (บาท)</th></tr></thead>
-      <tbody>${deptRows.map((g, i) => `<tr><td class="cfo-c">${rankCell(i)}</td><td><b>${esc(g.department)}</b></td><td>${esc([...new Set(g.reps)].join(', ') || '-')}</td><td class="num">${kzNum(g.target, 0)}</td><td class="num">${kzNum(g.monthlyMin, 0)}</td><td class="num">${kzNum(g.sentOnTime, 0)}${g.sentTotal > g.sentOnTime ? ` <small class="sum-meta">(+${g.sentTotal - g.sentOnTime} หลังกำหนด)</small>` : ''}</td><td class="num"><b>${kzNum(g.approvedOnTime, 0)}</b></td>
-        <td><div class="cfo-prog"><span><i style="width:${Math.min(100, g.pct)}%"></i></span><b>${kzNum(g.pct, 1)}%</b></div></td>
-        <td>${monthDots(g)}</td><td class="num">${kzMoney(g.perMonth)}</td><td class="num"><b>${kzNum(g.reward, 0)}</b></td></tr>`).join('') || '<tr><td colspan="11" class="empty">ยังไม่มีข้อมูลทีมหรือใบ Kaizen ปีนี้</td></tr>'}</tbody></table></div>`, 'ขั้นต่ำ/เดือน = ⌈เป้าต่อปี ÷ 11 เดือน⌉ · ตัดสินจาก: % อนุมัติทัน 15 พ.ย. → เงินรางวัลรวม → ผลตอบแทน');
+    ? chartCard(`ตารางจัดอันดับ Kaizen · วัดตามจำนวนเรื่องต่อคน ปี ${a5Year}`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th class="cfo-c">อันดับ</th><th>รหัส</th><th>ชื่อผู้เสนอ</th><th>หน่วยงาน</th><th class="num">ส่งทัน 15 พ.ย. (เรื่อง)</th><th class="num">ส่งรวม (เรื่อง)</th><th class="num">อนุมัติ (เรื่อง)</th><th class="num">ผลตอบแทนรวม (บาท/เดือน)</th><th class="num">เงินรางวัลรวม (บาท)</th></tr></thead>
+      <tbody>${personRows.map((p, i) => `<tr><td class="cfo-c">${rankCell(i)}</td><td>${esc(p.employee_id)}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.department)}</td><td class="num"><b>${kzNum(p.sentOnTime, 0)}</b></td><td class="num">${kzNum(p.sentTotal, 0)}</td><td class="num">${kzNum(p.approved, 0)}</td><td class="num">${kzMoney(p.perMonth)}</td><td class="num"><b>${kzNum(p.reward, 0)}</b></td></tr>`).join('') || '<tr><td colspan="9" class="empty">ยังไม่มีข้อมูลส่งเรื่อง Kaizen ปีนี้</td></tr>'}</tbody></table></div>`, 'ปิดจบส่งครบก่อน 15 พ.ย. · เรียงตามจำนวนเรื่อง → อนุมัติ → เงินรางวัล')
+    : chartCard(`ตารางจัดอันดับเรื่อง Kaizen · วัดตามผลที่ได้รับ ปี ${a5Year}`, `<div class="table-wrap"><table class="mo-data-table"><thead><tr><th class="cfo-c">อันดับ</th><th>เลขทะเบียน</th><th>เรื่อง Kaizen</th><th>ผู้เสนอ</th><th>หน่วยงาน</th><th class="num">ลดชั่วโมง (ชม./ปี)</th><th class="num">ผลตอบแทน (บาท/เดือน)</th><th>เกรด</th><th class="num">รางวัล (บาท)</th></tr></thead>
+      <tbody>${resultRows.map((r, i) => `<tr><td class="cfo-c">${rankCell(i)}</td><td>${esc(r.reg_no || '')}</td><td><b>${esc(r.title)}</b></td><td>${esc(r.name || r.employee_id)}</td><td>${esc(r.department || '-')}</td><td class="num">${kzNum(r.saved_hours || 0)}</td><td class="num"><b>${kzMoney(r.return_month)}</b></td><td>${esc(r.eval_grade || '-')}</td><td class="num"><b>${r.eval_reward ? kzNum(r.eval_reward, 0) : '-'}</b></td></tr>`).join('') || '<tr><td colspan="9" class="empty">ยังไม่มีข้อมูลใบ Kaizen ปีนี้</td></tr>'}</tbody></table></div>`, 'เรียงตามผลตอบแทน (บาท/เดือน) → ลดชั่วโมง → เงินรางวัล');
 
   body.innerHTML = `
-    <div class="toolbar a5-filters">${a5Seg('data-kzrank', { dept: 'ตามแผนก/หน่วยงาน', person: 'ตามบุคคล (ผู้เสนอ)' }, kzRankMode)}</div>
-    <div class="kz-podium">${[2, 1, 3].map(podiumSlot).join('')}</div>
-    ${tableHtml}`;
+    <div class="toolbar a5-filters">
+      ${field('หน่วยงาน', `<select id="kz-r-dept">${options(['', ...departments], kzRankDept, (v) => v || 'ทั้งหมด')}</select>`)}
+      ${a5Seg('data-kzrank', { result: 'ผลที่ได้รับ', person: 'จำนวนเรื่องต่อคน' }, kzRankMode)}
+    </div>
+    <div class="kz-rank-grid">
+      <section class="kz-rank-left">
+        <div class="plan-head"><div class="card-title">จัดลำดับ 1 – 3 · ${kzRankMode === 'person' ? 'จำนวนเรื่องต่อคน' : 'ผลที่ได้รับ'}</div><span class="sum-meta">ปี ${a5Year}${kzRankDept ? ` · ${esc(kzRankDept)}` : ''}</span></div>
+        <div class="kz-podium">${[2, 1, 3].map(podiumSlot).join('')}</div>
+        <div class="kz-top3">${top3Rows}</div>
+      </section>
+      <div class="kz-rank-right">${tableHtml}</div>
+    </div>`;
   a5Lift(body);
+  $('kz-r-dept').onchange = () => {
+    kzRankDept = $('kz-r-dept').value;
+    kzDrawRanking(body).catch(onErr);
+  };
   document.querySelectorAll('[data-kzrank]').forEach((node) => {
     node.onclick = () => {
       kzRankMode = node.dataset.kzrank;
