@@ -580,9 +580,8 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .kz-rank-grid{display:grid;grid-template-columns:minmax(320px,5fr) minmax(0,7fr);gap:10px;align-items:stretch;margin-bottom:8px}
 .kz-rank-left{display:flex;flex-direction:column;gap:10px;padding:12px 14px;background:var(--mo-surface);border:1px solid var(--mo-border);border-radius:var(--mo-radius);min-width:0}
 .kz-rank-right{min-width:0;display:flex;flex-direction:column}.kz-rank-right > .ch-card{flex:1;margin-bottom:0}
-.kz-podium{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));justify-content:center;align-items:end;gap:10px;padding:18px 12px 12px;border-radius:var(--mo-radius);background:linear-gradient(180deg,color-mix(in srgb,var(--ch-1) 7%,var(--mo-surface)) 0%,var(--mo-surface) 100%);color:var(--mo-text);overflow:hidden;border:1px solid color-mix(in srgb,var(--ch-1) 30%,var(--mo-border))}
-.kz-pod-slot{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;min-width:0}
-.kz-pod-slot.is-1::before{content:attr(data-x);position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:104%;height:108%;border-radius:110px 110px 0 0;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--ch-1) 9%,transparent) 0 4px,transparent 4px 8px);border:1px solid color-mix(in srgb,var(--ch-1) 28%,transparent);z-index:-1;pointer-events:none}
+.kz-podium{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));justify-content:center;align-items:end;gap:10px;padding:18px 12px 12px;border-radius:var(--mo-radius);background:var(--mo-surface);color:var(--mo-text);border:1px solid color-mix(in srgb,var(--ch-1) 25%,var(--mo-border))}
+.kz-pod-slot{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;min-width:0}
 .kz-pod-badge{width:88px;height:78px;display:block}
 .kz-pod-slot.is-1 .kz-pod-badge{width:104px;height:92px}
 .kz-pod-name{font-size:13px;font-weight:600;color:var(--mo-text);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

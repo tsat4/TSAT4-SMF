@@ -248,7 +248,7 @@ async function kzDrawRanking(body) {
 
   const podiumSlot = (rank) => {
     const info = infoOf(list[rank - 1]);
-    return `<div class="kz-pod-slot is-${rank}" data-x="">
+    return `<div class="kz-pod-slot is-${rank}">
       ${kzPodiumSvg(rank)}
       <div class="kz-pod-name" title="${esc(info.title)}">${esc(info.title)}</div>
       <div class="kz-pod-sub" title="${esc(info.sub)}">${esc(info.sub)}</div>
