@@ -4,7 +4,7 @@
 const QC = 'qcc';
 const QC_ROLE_LABEL = { chairman: 'ประธานคณะกรรมการ QCC', vice: 'รองประธาน', admin: 'ผู้ดูแล (เลขานุการ)' };
 const QC_DASH_TABS = { summary: 'Summary', schedule: 'Schedule', team: 'Team' };
-const QC_SET_TABS = { plan: 'แผนงาน', team: 'ทีม' };
+const QC_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' };
 const QC_STATUS = { DRAFT: ['ร่าง', ''], SUBMITTED: ['รอพิจารณา', 'badge-warning'], APPROVED: ['อนุมัติ', 'badge-success'], REJECTED: ['ไม่ผ่าน', 'badge-danger'] };
 const QC_FORMS = [
   ['022', 'ใบรายงานแผนดำเนินกิจกรรม QCC'],
@@ -26,7 +26,7 @@ const QC_STEPS = [['Plan', '1. กำหนดหัวข้อเรื่อ�
 const QC_CRITERIA = ['เป็นงานที่สมาชิกกลุ่มรับผิดชอบอยู่', 'เกี่ยวกับการสูญเสียเวลา', 'เป็นปัญหาด้านคุณภาพ', 'ผลผลิตต่ำ', 'ต้องอาศัยความร่วมมือจากบุคคลภายนอก', 'สมาชิกกลุ่มแก้ไขปัญหาได้เอง', 'อื่นๆ'];
 const QC_FISH = [['man', 'คน (Man)'], ['machine', 'เครื่องจักร (Machine)'], ['method', 'วิธีการ (Method)'], ['material', 'วัตถุดิบ (Material)'], ['environment', 'สภาพแวดล้อม (Environment)']];
 let qcDashTab = 'summary';
-let qcSetTab = 'plan';
+let qcSetTab = 'team';
 let qcFormCode = '022';
 const qcFilter = { status: '', q: '' };
 const qcHead = { sort: '', dir: 'asc', filters: {} };

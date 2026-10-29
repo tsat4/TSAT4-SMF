@@ -4,7 +4,7 @@
 const KZ = 'kaizen';
 const KZ_ROLE_LABEL = { chairman: 'ประธาน', vice: 'รองประธาน', admin: 'ผู้ดูแล (เลขานุการ)', member: 'ตัวแทนสมาชิก (ประจำแผนก)' };
 const KZ_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', team: 'Team' };
-const KZ_SET_TABS = { plan: 'แผนงาน', team: 'ทีม' };
+const KZ_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' };
 const KZ_KINDS = { person: 'บุคคล', team: 'ทีม', qcc: 'เป็นกิจกรรมที่มาจาก QCC' };
 const KZ_TYPES = [['Q', 'การปรับปรุงด้านคุณภาพ'], ['C', 'การลดต้นทุนการผลิต / ค่าใช้จ่าย'], ['D', 'การปรับปรุงด้านการส่งมอบ'],
   ['S', 'ความปลอดภัย'], ['M', 'ส่งเสริมด้านขวัญกำลังใจ'], ['E', 'ปรับปรุงสภาพแวดล้อม'], ['O', 'อื่นๆ']];
@@ -24,7 +24,7 @@ const KZ_CRITERIA = [
 // ต้องปิดจบส่งครบก่อน 15 พ.ย. ของทุกปี: นำจำนวนเรื่องต่อปีหาร 11 เดือน (ม.ค.–พ.ย.) ปัดเศษขึ้นเป็นจำนวนเรื่องขั้นต่ำที่ต้องส่งต่อเดือน
 const KZ_CUTOFF_MONTHS = 11;
 let kzDashTab = 'summary';
-let kzSetTab = 'plan';
+let kzSetTab = 'team';
 let kzRankMode = 'result';
 let kzRankDept = '';
 const kzFilter = { status: '', department: '', q: '' };

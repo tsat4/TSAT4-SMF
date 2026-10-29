@@ -9,10 +9,11 @@ const A5_TEAM_COLORS = { A: '#1f2937', B: '#ec4899', C: '#f97316', D: '#ca8a04',
 const A5_AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
 const A5_ROLE_LABEL = { admin: 'Admin', chairman: 'หัวหน้าทีม', auditor: 'ผู้ตรวจ' };
 const A5_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', audit: 'Audit Plan', team: 'Team Auditor' };
-const A5_SET_TABS = { gantt: 'แผนงาน', areas: 'พื้นที่', team: 'ทีม', checklist: 'หัวข้อตรวจ', plan: 'แผนตรวจ' };
+// Setting tabs: the activity's own tables first, then ทีม, then แผนงาน (ผู้ใช้กำหนด 2026-10-29)
+const A5_SET_TABS = { areas: 'พื้นที่', checklist: 'หัวข้อตรวจ', plan: 'แผนตรวจ', team: 'ทีม', gantt: 'แผนงาน' };
 let a5Year = new Date().getFullYear();
 let a5DashTab = 'summary';
-let a5SetTab = 'gantt';
+let a5SetTab = 'areas';
 let a5AreaType = A5_AREA_TYPES[0];
 const a5Summary = { type: '', areaType: '', area: '' };
 let a5RankMonth = new Date().getMonth() + 1;

@@ -371,8 +371,8 @@ const APL_DASH_TABS = [
   ['team', 'Team']
 ];
 const APL_SET_TABS = [
-  ['planner', 'แผนงาน'],
-  ['team', 'ทีม']
+  ['team', 'ทีม'],
+  ['planner', 'แผนงาน']
 ];
 const APL_ROLE_LABEL = {
   admin: 'Admin ผู้ดูแลกิจกรรม',
@@ -424,7 +424,7 @@ async function aplDrawTeam(body, activity, admin) {
 async function aplSetting(target, activity) {
   const me = await a5Api(activity, `me?year=${a5Year}`);
   const admin = me.access.admin;
-  const tab = aplSetTab[activity] || 'planner';
+  const tab = aplSetTab[activity] || 'team';
   target.innerHTML = `<div class="view-body"><section class="card">
     ${pageBar(a5Seg('data-aplset', APL_SET_TABS, tab), `<div class="a5-year">${a5YearSelect(me.years)}</div>`, 'a5')}
     <div id="a5-body"><div class="empty">กำลังโหลด...</div></div>
