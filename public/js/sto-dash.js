@@ -60,7 +60,7 @@ function stoDashRanks(rows, pick, digits) {
 
 function stoDashMonthTable(months) {
   const body = months.map((row) => `<tr><td>${row.label}</td><td>${stoDashNum(row.inQty, 2)}</td><td>${stoDashNum(row.outQty, 2)}</td><td>${stoDashNum(row.outValue, 2)}</td></tr>`).join('');
-  return `<div class="table-wrap mo-data-table sto-month-table"><table class="mo-data-table"><thead><tr><th>เดือน</th><th>รับเข้า</th><th>จ่ายออก</th><th>มูลค่าจ่ายออก</th></tr></thead><tbody>${body}</tbody></table></div>`;
+  return `<div class="table-wrap sto-month-table"><table class="mo-data-table"><thead><tr><th>เดือน</th><th>รับเข้า</th><th>จ่ายออก</th><th>มูลค่าจ่ายออก</th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
 function stoDashOverview(data) {

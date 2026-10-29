@@ -355,6 +355,9 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 .sto-legend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sto-legend em{color:var(--mo-text-muted);font-style:normal}
 .sto-month-table{margin:8px -8px -8px;border-radius:0}
+:where(body[data-dash]) .sto-month-table{margin:8px -10px -6px}
+.sto-month-table table{width:100%;table-layout:fixed}
+.sto-month-table th,.sto-month-table td{text-align:center;font-variant-numeric:tabular-nums}
 .sto-ranks{list-style:none;margin:0;padding:0}
 .sto-ranks li{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:6px;align-items:center;padding:4px 0;font-size:11.5px}
 .sto-ranks span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

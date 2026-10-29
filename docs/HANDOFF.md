@@ -29,6 +29,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-29 · Antigravity · Dashboard Store > Usage (แท็บ รับเข้า-จ่ายออก และ รายเดือน): ปรับตารางสรุปรายเดือน (`.sto-month-table`) ให้กึ่งกลาง (`text-align: center`) และกระจายคอลัมน์เต็มความกว้างเท่ากัน (`table-layout: fixed`) ตามที่ผู้ใช้สั่ง (`public/app.css`, `public/js/sto-dash.js`)
+
 - 2026-10-29 · Antigravity · สร้าง Table SQL (e-day, lean, safety) + Dashboard แผน (Schedule) และทีม (Team) ครบทุกกิจกรรม (`server/modules/act/planner.js`, `public/js/act-planner.js`, `db/act/`): ทุกกิจกรรมใน SMF ตอนนี้มีหน้า Dashboard (แท็บ Schedule ดูแผนงาน Gantt และแท็บ Team ผังองค์กรทีม) และหน้า Setting (แท็บ แผนงาน จัดการ Gantt และแท็บ ทีม จัดการรายชื่อทีม เพิ่ม/ลบ/คัดลอกปี) พร้อมรองรับตารางที่ยังไม่ได้รันโดยไม่พัง
 
 - 2026-10-29 · Antigravity · KAIZEN Ranking: ตัดฉากหลังซุ้มโค้งลายทางหลังแท่นอันดับ 1 ออกตามที่ผู้ใช้สั่ง (`public/app.css`, `public/js/act-kaizen.js`) เพื่อให้แท่นอันดับ 1–3 สะอาด คลีน บนพื้นขาวธีมเขียว
