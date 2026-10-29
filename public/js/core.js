@@ -220,7 +220,9 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
     const v = b.values[i];
     const parts = Array.isArray(v) ? v : [v];
     const total = sum(v);
-    return `<div class="ch-stack" style="height:${(total / yL) * 100}%">${total ? `<span class="ch-val">${chartNum(total, digits)}</span>` : ''}${total ? parts.map((p, k) => (p ? `<div style="flex:${p};--c:${(b.colors || CHART.series)[k]}"></div>` : '')).reverse().join('') : ''}</div>`;
+    // unit: suffix of the value on top (87%) · inner: a label per column shown in the middle of the bar (e.g. 33 ใบ)
+    const inner = b.inner?.[i] ? `<span class="ch-in">${esc(b.inner[i])}</span>` : '';
+    return `<div class="ch-stack" style="height:${(total / yL) * 100}%">${total ? `<span class="ch-val">${chartNum(total, digits)}${esc(b.unit || '')}</span>${inner}` : ''}${total ? parts.map((p, k) => (p ? `<div style="flex:${p};--c:${(b.colors || CHART.series)[k]}"></div>` : '')).reverse().join('') : ''}</div>`;
   };
   const scale = (l) => (l.axis === 'right' ? yR : yL);
   // Target line = dashed with one value all year (or target: true): drawn edge to edge across the plot, one label at the right end.
