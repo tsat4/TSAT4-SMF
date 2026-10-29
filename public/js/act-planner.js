@@ -407,6 +407,10 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
 const APL_DASH_TABS = { schedule: 'Schedule', team: 'Team' };
 const APL_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' };
 const APL_ROLE_LABEL = { ...ACT_TEAM_ROLES, auditor: 'ผู้ตรวจประเมิน' };
+// Team per activity (ผู้ใช้กำหนด 2026-10-29, docs/specs/act-teams.md); others use APL_ROLE_LABEL.
+// SMF = Smart Factory: Smart Team manages Setting (server accessOf), ที่ปรึกษา views.
+const APL_ROLE_LABELS = { smf: { chairman: 'ประธาน', vice: 'รองประธาน', advisor: 'ที่ปรึกษา', smart: 'Smart Team', member: 'ตัวแทนหน่วยงาน' } };
+const aplRolesOf = (activity) => APL_ROLE_LABELS[activity] || APL_ROLE_LABEL;
 const aplDashTab = {};
 const aplSetTab = {};
 
@@ -440,7 +444,7 @@ async function aplDrawTeam(body, activity, admin) {
   const actName = actLabel(activity);
   body.innerHTML = `
     ${admin ? `<div class="action-bar a5-actions">${button('apl-team-edit', 'แก้ไขทีม')}</div>` : ''}
-    <div class="a5-team-grid">${Object.entries(APL_ROLE_LABEL).map(([role, label], i) => {
+    <div class="a5-team-grid">${Object.entries(aplRolesOf(activity)).map(([role, label], i) => {
       const list = active.filter((m) => m.role === role);
       if (!list.length && (role === 'auditor' || (role === 'member' && !active.some((m) => m.role === 'member')))) return '';
       return `<div class="a5-team" style="--team:${CHART.series[i % CHART.series.length]}"><div class="a5-team-head">${esc(label)}<span>${list.length} คน</span></div>${list.map(person).join('') || '<div class="a5-person">-</div>'}</div>`;
@@ -469,7 +473,7 @@ async function aplSetting(target, activity) {
   const body = $('a5-body');
   if (tab === 'team') {
     try {
-      return await a5SetTeam(body, activity, admin, rerender, APL_ROLE_LABEL);
+      return await a5SetTeam(body, activity, admin, rerender, aplRolesOf(activity));
     } catch (err) {
       body.innerHTML = `<p class="empty">${esc(err.message)}</p>`;
       return;

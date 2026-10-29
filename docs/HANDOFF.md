@@ -25,6 +25,7 @@
 - `db/08_employee_level.sql` ใน **Mx Data** (level M1–M3 / G1–G3 รองรับทั้ง enum และ text + check) **ต้องรันก่อนเพิ่มพนักงานระดับ M / G**
 - `db/act/<กิจกรรม>.sql` ที่มี Planner (kaizen, qcc, smf, 100p, 5s → `5s_task.sql`) ใน Tx Data อีกรอบ: เพิ่ม `mt_<act>_task.done_on` (ไม่รันก็ใช้ได้ แต่จะไม่รู้วันเสร็จ จึงไม่บอก "เสร็จก่อนแผน")
 - `db/act/cfo.sql` ใน Tx Data อีกรอบ: Fr-03.2 เกณฑ์ 6 ข้อเปลี่ยนจาก ✓ / × เป็นคะแนน % (✓ เดิม = 1.00) **ต้องรันก่อนบันทึก Fr-03.2**
+- `db/act/smf.sql` ใน Tx Data: ทีม SMF รับ role `advisor` (ที่ปรึกษา) และ `smart` (Smart Team) · กิจกรรมอื่นที่จะใช้ advisor ให้รัน `db/act/<กิจกรรม>.sql` ของตัวเอง
 - `db/07_sto_integrity.sql` ใน **Mx Data** (FK ผู้บันทึก Usage + check รับคืน ↔ ใบยืม แบบ NOT VALID + index) · ขั้นที่ 1 ตรวจ ขั้นที่ 3 VALIDATE ไม่บังคับ
 
 ## ข้อควรระวัง
@@ -33,6 +34,8 @@
 - หน้า PLANNING, PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-29 · Claude · ผู้ใช้ยืนยันโครงสร้างทีมทุกกิจกรรม (`docs/specs/act-teams.md`) · SMF ทีม = ประธาน · รองประธาน · ที่ปรึกษา · Smart Team · ตัวแทนหน่วยงาน (`APL_ROLE_LABELS.smf`) · role ใหม่ `smart` (แม่แบบ role check, `ROLES`, System Setting `actrole`) · `accessOf`: smart = admin · ที่ปรึกษาดูอย่างเดียว
 
 - 2026-10-29 · Claude · ตรวจและ deploy งานทีม 5S ของ Antigravity (ผู้ใช้สั่ง "ดำเนินการเลย") · แก้การ์ดตัวแทนพื้นที่: ป้ายเป็นไอคอน รหัส+ชื่อพื้นที่อยู่ข้างๆ (รหัสยาวเกินวงกลม) · `scripts/sync-act-sql.mjs` ว่าง 0 byte ไม่ได้ commit · test:act / check ผ่าน
 

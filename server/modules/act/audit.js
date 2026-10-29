@@ -6,7 +6,7 @@ import { accessOf, actRoute, fetchAll, fetchIn, namesOf, requireAdmin, roundTo, 
 // Checklist audits (5S and similar): Dashboard reads for everyone, Setting writes for the year's admins.
 // Tables (Tx Data, one set per activity): db/act/<activity>.sql via tablesOf() · rules: docs/specs/act-5s.md
 const AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
-const ROLES = ['admin', 'chairman', 'vice', 'advisor', 'auditor', 'owner', 'member'];
+const ROLES = ['admin', 'chairman', 'vice', 'advisor', 'smart', 'auditor', 'owner', 'member'];
 const AUDIT_TYPES = ['SELF', 'COMMITTEE'];
 
 const round1 = (n) => roundTo(n, 1);

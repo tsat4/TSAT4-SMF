@@ -127,7 +127,8 @@ export async function accessOf(req, activity, year) {
   if (team.error) throw team.error;
   const roles = team.data || [];
   const access = {
-    admin: lead || roles.some((r) => r.role === 'admin'),
+    // smart = SMF Smart Team, which runs Smart Factory's Setting (docs/specs/act-smf.md)
+    admin: lead || roles.some((r) => r.role === 'admin' || r.role === 'smart'),
     chairman: executive || roles.some((r) => r.role === 'chairman' || r.role === 'vice'),
     advisor: roles.some((r) => r.role === 'advisor'),
     auditor: roles.some((r) => r.role === 'auditor'),

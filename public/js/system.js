@@ -7,7 +7,7 @@ const CHOICES = {
   prefix: ['นาย', 'นาง', 'นางสาว', 'Mr.', 'Mrs.', 'Ms.'],
   req: Object.keys(STATUS),
   areatype: ['โรงงาน', 'สำนักงาน'],
-  actrole: ['admin', 'chairman', 'vice', 'auditor', 'owner', 'member']
+  actrole: ['admin', 'chairman', 'vice', 'advisor', 'smart', 'auditor', 'owner', 'member']
 };
 
 TITLES.system = ['Setting', 'ตารางทั้งระบบ'];

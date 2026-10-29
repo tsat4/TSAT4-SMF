@@ -14,7 +14,7 @@ const CHOICES = {
   usage: ['viewer', 'user', 'admin'],
   req: ['cart', 'submitted', 'accepted', 'preparing', 'ready', 'received', 'cancelled'],
   areatype: ['โรงงาน', 'สำนักงาน'],
-  actrole: ['admin', 'chairman', 'vice', 'auditor', 'owner', 'member']
+  actrole: ['admin', 'chairman', 'vice', 'advisor', 'smart', 'auditor', 'owner', 'member']
 };
 
 // Department names come from mt_main_costcenter (there is no department master table on purpose).

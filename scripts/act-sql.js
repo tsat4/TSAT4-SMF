@@ -379,7 +379,7 @@ create table if not exists public.mt_${k}_team (
 alter table public.mt_${k}_team add column if not exists department text;
 alter table public.mt_${k}_team
   drop constraint if exists mt_${k}_team_role_check,
-  add constraint mt_${k}_team_role_check check (role in ('admin', 'chairman', 'vice', 'advisor', 'auditor', 'owner', 'member')),
+  add constraint mt_${k}_team_role_check check (role in ('admin', 'chairman', 'vice', 'advisor', 'smart', 'auditor', 'owner', 'member')),
   drop constraint if exists mt_${k}_team_member_has_dept,
   add constraint mt_${k}_team_member_has_dept check ((role = 'member') = (department is not null)),
   drop constraint if exists mt_${k}_team_unique,
