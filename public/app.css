@@ -641,7 +641,7 @@ td.cfo-ref{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:no
 .cfo-inv .cfo-group td{background:var(--mo-surface-2);font-weight:600}.cfo-inv .cfo-sub-total td{font-weight:600;background:color-mix(in srgb,var(--mo-text-muted) 7%,var(--mo-surface))}
 .cfo-inv .cfo-total td{font-weight:600;background:color-mix(in srgb,var(--mo-text-muted) 14%,var(--mo-surface))}
 #cfo-rev-rows table{width:100%}.cfo-rev-detail{white-space:normal;min-width:260px;max-width:520px;line-height:1.35;padding-top:4px;padding-bottom:4px}
-.cfo-report-page .ch-card{padding:10px 12px}.cfo-report-page .ch-head{margin-bottom:4px}.cfo-report-page .ch-plot{grid-template-rows:auto 130px auto}.cfo-report-page .ch-legend{margin-top:6px}
+.cfo-report-page .ch-card{padding:10px 12px}.cfo-report-page .ch-head{margin-bottom:4px}.cfo-report-page .ch-plot{grid-template-rows:auto 130px auto}
 .cfo-report table.mo-data-table thead th{height:auto;padding:3px 6px;font-size:11px}.cfo-report td{height:22px;padding:0 6px;font-size:12px}
 .cfo-report-page .a5-two .ch-card{padding:8px 10px}.cfo-report-page .a5-two .card-title{font-size:13px}
 .cfo-report table{width:100%}.cfo-report th{white-space:normal;line-height:1.3;vertical-align:bottom}.cfo-report td:first-child{white-space:nowrap}.cfo-report td.sum-meta{white-space:nowrap;font-size:11px}
@@ -677,10 +677,10 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-pill.is-good{color:#15803d;border-color:#16a34a;background:color-mix(in srgb,#16a34a 15%,transparent)}
 .ch-pill.is-bad{color:#b91c1c;border-color:#dc2626;background:color-mix(in srgb,#dc2626 12%,transparent)}
 .ch-card{margin-bottom:8px;padding:12px 14px;min-width:0}
-.ch-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:8px}.ch-head.is-meta{justify-content:flex-end;align-items:center}.ch-head .ch-legend{margin:0;justify-content:flex-end}
+.ch-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:8px}.ch-head.is-meta{justify-content:flex-end;align-items:center}
 /* Same width left and right of the plot (an empty right column when there is no right axis) — ผู้ใช้กำหนด 2026-10-29 */
 .ch-plot{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;grid-template-rows:auto 280px auto;column-gap:6px}
-.ch-titles{grid-column:1 / -1;display:flex;justify-content:space-between;font-size:11px;color:var(--mo-text-muted);padding-bottom:8px}
+.ch-titles{grid-column:1 / -1;display:flex;justify-content:space-between;align-items:center;gap:4px 12px;font-size:11px;color:var(--mo-text-muted);padding-bottom:8px}
 .ch-yaxis{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:11px;color:var(--mo-text-muted);margin:-7px 0;font-variant-numeric:tabular-nums}.ch-yaxis.is-right{align-items:flex-start}
 .ch-area{position:relative;border-left:1px solid var(--mo-line)}.ch-plot.has-right .ch-area{border-right:1px solid var(--mo-line)}
 .ch-grid{position:absolute;left:0;right:0;height:0;border-top:1px solid var(--mo-line)}
@@ -703,7 +703,9 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-tip-row{display:flex;justify-content:space-between;gap:12px}.ch-tip-row span{color:var(--mo-text-muted)}
 .ch-tip .ch-pill{align-self:center}.ch-tip-note .ch-pill{border:0;background:none;font-weight:500;font-size:11px;color:var(--mo-text-muted)}
 .ch-xaxis{grid-column:2;display:grid;font-size:11px;color:var(--mo-text-muted);text-align:center;padding-top:6px}
-.ch-legend{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:6px 14px;margin-top:10px;font-size:11.5px;color:var(--mo-text-muted)}
+/* Legend sits in the axis-title row, centred between the left and right axis titles (ผู้ใช้กำหนด 2026-10-29) */
+.ch-titles > span{flex:1 1 0;min-width:max-content}.ch-titles > span:last-child{text-align:right}
+.ch-legend{flex:0 1 auto;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:4px 14px;font-size:11.5px;color:var(--mo-text-muted)}
 .ch-legend span{display:inline-flex;align-items:center;gap:6px}.ch-legend b{color:var(--mo-text);font-weight:600;margin-left:8px}
 .ch-legend i.ln{width:18px;height:0;border-top:2.5px solid var(--c)}.ch-legend i.ln.is-dash{border-top-style:dashed}
 .ch-legend i.sq{width:11px;height:11px;border-radius:2px;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 40%,transparent)}
@@ -723,7 +725,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 :where(body[data-dash]) .ch-card{padding:6px 10px}
 :where(body[data-dash]) .ch-plot{grid-template-rows:auto 180px auto}
 :where(body[data-dash]) .ch-titles,:where(body[data-dash]) .ch-yaxis,:where(body[data-dash]) .ch-xaxis{font-size:9.5px}
-:where(body[data-dash]) .ch-legend{font-size:10px;margin-top:4px}
+:where(body[data-dash]) .ch-legend{font-size:10px}
 :where(body[data-dash]) .ch-val,:where(body[data-dash]) .ch-lv{font-size:8.5px}
 :where(body[data-dash]) .card-title{font-size:12px}
 :where(body[data-dash]) td{height:22px;font-size:11px;padding:0 7px}

@@ -199,10 +199,7 @@ function chartKpi({ label, value, unit = '', pill = '', note = '', color = CHART
 // Table cards keep their title.
 function chartCard(title, body, meta = '') {
   const chart = /class="(ch-plot|sto-donut-wrap)/.test(body);
-  // The chart's legend moves to the top-right corner, beside the meta text (ผู้ใช้กำหนด 2026-10-29).
-  let legend = '';
-  if (chart) body = body.replace(/<div class="ch-legend">[\s\S]*?<\/div>/, (m) => { legend = m; return ''; });
-  const head = chart ? (meta || legend ? `<div class="ch-head is-meta">${legend}${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>` : '') : `<div class="ch-head"><div class="card-title">${title}</div>${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>`;
+  const head = chart ? (meta ? `<div class="ch-head is-meta"><div class="sum-meta">${meta}</div></div>` : '') : `<div class="ch-head"><div class="card-title">${title}</div>${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>`;
   return `<section class="card ch-card"${chart ? ` aria-label="${esc(String(title).replace(/<[^>]*>/g, ''))}"` : ''}>${head}${body}</section>`;
 }
 
@@ -245,7 +242,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
   };
   const key = (item) => (item.head ? `<b>${esc(item.head)}</b>` : item.line ? `<span><i class="ln${item.dash ? ' is-dash' : ''}" style="--c:${item.line}"></i>${esc(item.label)}</span>` : `<span><i class="sq" style="--c:${item.box}"></i>${esc(item.label)}</span>`);
   return `<div class="ch-plot${yR ? ' has-right' : ''}">
-      <div class="ch-titles"><span>${esc(left)}</span>${yR ? `<span>${esc(right)}</span>` : ''}</div>
+      <div class="ch-titles"><span>${esc(left)}</span>${legend.length ? `<div class="ch-legend">${legend.map(key).join('')}</div>` : ''}<span>${yR ? esc(right) : ''}</span></div>
       <div class="ch-yaxis">${ticks(yL)}</div>
       <div class="ch-area" id="${id}">
         ${[0, 1, 2, 3, 4].map((k) => `<i class="ch-grid" style="bottom:${k * 25}%"></i>`).join('')}
@@ -257,7 +254,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
       ${yR ? `<div class="ch-yaxis is-right">${ticks(yR)}</div>` : ''}
       <div class="ch-xaxis" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${labels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
     </div>
-    ${legend.length ? `<div class="ch-legend">${legend.map(key).join('')}</div>` : ''}`;
+    `;
 }
 
 // Every bar shows its total on top and every line point its value (AGENTS.md: chart rules).
