@@ -205,9 +205,9 @@ html[data-theme="dark"] .badge-warning{color:#fbbf24}
    Chrome/Edge use ::-webkit-scrollbar (track margin = header height); Firefox keeps a thin bar. */
 @supports not selector(::-webkit-scrollbar){.table-wrap,.apl-scroll{scrollbar-width:thin;scrollbar-color:#80868b var(--mo-surface-2)}}
 .table-wrap::-webkit-scrollbar,.apl-scroll::-webkit-scrollbar{height:12px;width:12px}
-.table-wrap::-webkit-scrollbar-thumb,.apl-scroll::-webkit-scrollbar-thumb-thumb{background:#80868b;border-radius:6px;border:2px solid var(--mo-surface)}
-.table-wrap::-webkit-scrollbar-track,.apl-scroll::-webkit-scrollbar-track-track{background:var(--mo-surface-2)}
-.table-wrap::-webkit-scrollbar-corner,.apl-scroll::-webkit-scrollbar-corner-corner{background:var(--mo-surface)}
+.table-wrap::-webkit-scrollbar-thumb,.apl-scroll::-webkit-scrollbar-thumb{background:#80868b;border-radius:6px;border:2px solid var(--mo-surface)}
+.table-wrap::-webkit-scrollbar-track,.apl-scroll::-webkit-scrollbar-track{background:var(--mo-surface-2)}
+.table-wrap::-webkit-scrollbar-corner,.apl-scroll::-webkit-scrollbar-corner{background:var(--mo-surface)}
 .table-wrap::-webkit-scrollbar-track:vertical{margin-top:var(--table-head,40px)}
 /* The gap above the vertical bar keeps the header colour and its bottom line (painted on the box, does not scroll). */
 .table-wrap{background:linear-gradient(var(--th-bg) calc(var(--table-head,40px) - 1px),var(--th-line) 0) right top/12px var(--table-head,40px) no-repeat border-box,var(--mo-surface)}
@@ -468,7 +468,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .apl-row:last-child{border-bottom:0}
 .apl-left{position:sticky;left:0;z-index:5;display:grid;grid-template-columns:36px 196px 100px 52px;align-items:center;background:var(--mo-surface);border-right:1px solid var(--mo-border)}
 .apl-left > div{padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.apl-head{position:sticky;top:0;z-index:4}
+.apl-head{position:sticky;top:0;z-index:6} /* above the sticky left cells (z 5) of the rows */
 .apl-head .apl-left,.apl-head .apl-track{background:var(--th-bg);color:var(--th-ink);font-size:11px}
 .apl-head .apl-track{height:auto}
 .apl-months,.apl-ticks{display:grid}

@@ -35,6 +35,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-29 · Claude · แก้ scrollbar มองไม่เห็นทุกตาราง + Planner: CSS พิมพ์ผิด `::-webkit-scrollbar-thumb-thumb` / `-track-track` / `-corner-corner` ทำให้ Chrome ทิ้งทั้งกฎ thumb ไม่มีสี · Planner หัวคอลัมน์ซ้าย (ลำดับ / รายการ / ผู้รับผิดชอบ / %) หลุดตอนเลื่อน: `.apl-head` z-index 4 → 6 (อยู่เหนือเซลล์ซ้ายของแถว z 5)
+
 - 2026-10-29 · Claude · ผู้ใช้ยืนยันโครงสร้างทีมทุกกิจกรรม (`docs/specs/act-teams.md`) · SMF ทีม = ประธาน · รองประธาน · ที่ปรึกษา · Smart Team · ตัวแทนหน่วยงาน (`APL_ROLE_LABELS.smf`) · role ใหม่ `smart` (แม่แบบ role check, `ROLES`, System Setting `actrole`) · `accessOf`: smart = admin · ที่ปรึกษาดูอย่างเดียว
 
 - 2026-10-29 · Claude · ตรวจและ deploy งานทีม 5S ของ Antigravity (ผู้ใช้สั่ง "ดำเนินการเลย") · แก้การ์ดตัวแทนพื้นที่: ป้ายเป็นไอคอน รหัส+ชื่อพื้นที่อยู่ข้างๆ (รหัสยาวเกินวงกลม) · `scripts/sync-act-sql.mjs` ว่าง 0 byte ไม่ได้ commit · test:act / check ผ่าน
