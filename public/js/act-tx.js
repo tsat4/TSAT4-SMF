@@ -221,7 +221,7 @@ async function atxForm(body, activity, me, editId = 0) {
         ${state.type === 'COMMITTEE' ? field('ทีม', `<select id="atx-team">${options(form.teams.map((t) => t.team), state.team, (t) => `ทีม ${t}`)}</select>`) : ''}
       </div>
       ${state.type === 'COMMITTEE' ? `<div class="atx-people"><span class="sum-meta">ผู้ตรวจ:</span>${teamMembers().map((m) => `<label class="atx-check"><input type="checkbox" data-part="${esc(m.employeeId)}"${state.participated.has(m.employeeId) ? ' checked' : ''}> ${esc(m.employeeId)} ${esc(m.name)}</label>`).join('') || '<span class="sum-meta">ทีมนี้ยังไม่มีรายชื่อ</span>'}</div>` : ''}
-      <div class="atx-people"><span class="sum-meta">ผู้รับตรวจ:</span>${state.receivers.map((p, i) => `<span class="atx-chip">${esc(p.employeeId)} ${esc(p.name)} <button type="button" data-unrecv="${i}" aria-label="เอาออก">×</button></span>`).join('')}${button('atx-recv', '+ เพิ่ม')}</div>
+      <div class="atx-people"><span class="sum-meta">ผู้รับตรวจ:</span>${state.receivers.map((p, i) => `<span class="atx-chip">${esc(p.employeeId)} ${esc(p.name)} <button type="button" data-unrecv="${i}" aria-label="เอาออก">×</button></span>`).join('')}<span class="atx-recv-pick">${a5EmpField('', '')}</span></div>
       ${state.type === 'COMMITTEE' && state.areaId && form.openIssues.length ? `<p class="atx-note">พื้นที่นี้มี Issue ค้าง ${form.openIssues.length} รายการ จะถูกยืนยันในการตรวจครั้งนี้ (ไม่มี Action = ข้อนั้นได้ 0 · มี Action และให้ ≥ 4 = ปิด)</p>` : ''}
       ${state.areaId ? groups.map((g) => `<section class="atx-group"><div class="card-title">${esc(a5GroupName(activity, g))}</div>${form.items.filter((i) => i.s_group === g).map(itemRow).join('')}</section>`).join('') : '<p class="empty">เลือกพื้นที่เพื่อเริ่มให้คะแนน</p>'}
       <div class="atx-foot">
@@ -239,14 +239,11 @@ async function atxForm(body, activity, me, editId = 0) {
     if ($('atx-team')) $('atx-team').onchange = () => { state.team = $('atx-team').value; resetParticipants(); draw(); };
     body.querySelectorAll('[data-part]').forEach((node) => { node.onchange = () => { if (node.checked) state.participated.add(node.dataset.part); else state.participated.delete(node.dataset.part); }; });
     body.querySelectorAll('[data-unrecv]').forEach((node) => { node.onclick = () => { state.receivers.splice(Number(node.dataset.unrecv), 1); draw(); }; });
-    $('atx-recv').onclick = () => {
-      openPopup('เพิ่มผู้รับตรวจ', A5_EMP_FIELDS, () => closePopup(), 'เสร็จ');
-      a5EmployeeSearch(activity, (p) => {
-        if (!state.receivers.some((r) => r.employeeId === p.employeeId)) state.receivers.push(p);
-        closePopup();
-        draw();
-      });
-    };
+    // Add a receiver: search in the field next to the chips, pick from the list under it (no popup).
+    a5EmployeeSearch(activity, (p) => {
+      if (!state.receivers.some((r) => r.employeeId === p.employeeId)) state.receivers.push(p);
+      setTimeout(draw, 0);
+    });
     body.querySelectorAll('[data-score]').forEach((node) => {
       node.onclick = () => {
         const [id, n] = node.dataset.score.split(':').map(Number);

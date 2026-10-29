@@ -321,8 +321,10 @@ function qcProject(body, d, row, reload) {
         ${field('จดทะเบียนกิจกรรมเรื่อง', `<input id="qc-topic" maxlength="300" value="${esc(row?.topic || '')}"${off}>`, 'qc-s6')}
         ${field('ระยะเวลา ตั้งแต่', `<input id="qc-start" type="month" value="${esc(qcMonth(row?.start_month))}"${off}>`, 'qc-s3')}
         ${field('ถึง', `<input id="qc-end" type="month" value="${esc(qcMonth(row?.end_month))}"${off}>`, 'qc-s3')}
-        ${field('หัวหน้ากลุ่ม', `<div class="qc-pick"><input id="qc-leader" readonly value="${esc(`${leader.employeeId} · ${leader.name || ''}`)}">${editable && d.admin ? button('qc-leader-pick', 'เลือก') : ''}</div>`, 'qc-s4')}
-        ${field('ผู้จัดการต้นสังกัด', `<div class="qc-pick"><input id="qc-manager" readonly value="${esc(manager ? `${manager.employeeId} · ${manager.name || ''}` : '')}" placeholder="ยังไม่ระบุ">${editable ? button('qc-manager-pick', 'เลือก') : ''}</div>`, 'qc-s4')}
+        ${editable && d.admin ? `<div class="qc-s4">${searchBlock(searchSlot('หัวหน้ากลุ่ม', 'qc-leader-q', 'qc-leader-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน', value: `${leader.employeeId} · ${leader.name || ''}` }), 'qc-leader-list')}</div>`
+          : field('หัวหน้ากลุ่ม', `<input id="qc-leader" readonly value="${esc(`${leader.employeeId} · ${leader.name || ''}`)}">`, 'qc-s4')}
+        ${editable ? `<div class="qc-s4">${searchBlock(searchSlot('ผู้จัดการต้นสังกัด', 'qc-manager-q', 'qc-manager-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน · ลบข้อความ = ไม่ระบุ', value: manager ? `${manager.employeeId} · ${manager.name || ''}` : '' }), 'qc-manager-list')}</div>`
+          : field('ผู้จัดการต้นสังกัด', `<input id="qc-manager" readonly value="${esc(manager ? `${manager.employeeId} · ${manager.name || ''}` : '')}" placeholder="ยังไม่ระบุ">`, 'qc-s4')}
         ${field('สมาชิกกลุ่ม', `<input id="qc-members" maxlength="1000" placeholder="ชื่อสมาชิก คั่นด้วย ," value="${esc(row?.members || '')}"${off}>`, 'qc-s4')}
       </section>
       <section class="card qc-form-card">
@@ -391,19 +393,20 @@ function qcProject(body, d, row, reload) {
   ['qc-start', 'qc-end'].forEach((id) => { $(id).onchange = () => { if (qcFormCode === '022') drawForm(); }; });
   drawForm();
 
-  const pickPerson = (title, onPick) => {
-    openPopup(title, searchBlock(searchSlot('ค้นพนักงาน', 'qc-p-q', 'qc-p-search', { placeholder: 'รหัส ชื่อ หรือหน่วยงาน' }), 'qc-p-list'), closePopup);
-    $('popup-save').hidden = true; // picking a row closes it
+  // Leader / manager: one search field each, the list drops down under it (core.js SEARCH_BOXES).
+  const personSearch = (key, onPick) => {
+    if (!$(`qc-${key}-q`)) return;
     const run = async () => {
-      const r = await a5Api(QC, `qcc/people?q=${encodeURIComponent($('qc-p-q').value.trim())}`);
-      fillTable('qc-p-list', ['รหัส', 'ชื่อ', 'หน่วยงาน'], r.people.map((p) => `<tr data-pick="${esc(p.employeeId)}" data-name="${esc(p.name)}"><td>${esc(p.employeeId)}</td><td>${esc(p.name)}</td><td>${esc(p.department)}</td></tr>`).join(''), 'ไม่พบพนักงาน');
-      bindRowSelect($('qc-p-list'), (id, tr) => { onPick({ employeeId: id, name: tr.dataset.name }); closePopup(); });
+      const r = await a5Api(QC, `qcc/people?q=${encodeURIComponent($(`qc-${key}-q`).value.trim().split(' · ')[0])}`);
+      fillTable(`qc-${key}-list`, ['รหัส', 'ชื่อ', 'หน่วยงาน'], r.people.map((p) => `<tr data-pick="${esc(p.employeeId)}" data-name="${esc(p.name)}"><td>${esc(p.employeeId)}</td><td>${esc(p.name)}</td><td>${esc(p.department)}</td></tr>`).join(''), 'ไม่พบพนักงาน');
+      bindRowSelect($(`qc-${key}-list`), (id, tr) => onPick({ employeeId: id, name: tr.dataset.name }));
     };
-    $('qc-p-search').onclick = () => run().catch(onErr);
-    onEnter('qc-p-q', () => run().catch(onErr));
+    $(`qc-${key}-search`).onclick = () => run().catch(onErr);
+    onEnter(`qc-${key}-q`, () => run().catch(onErr));
   };
-  if ($('qc-leader-pick')) $('qc-leader-pick').onclick = () => pickPerson('เลือกหัวหน้ากลุ่ม', (p) => { leader = p; $('qc-leader').value = `${p.employeeId} · ${p.name}`; });
-  if ($('qc-manager-pick')) $('qc-manager-pick').onclick = () => pickPerson('เลือกผู้จัดการต้นสังกัด', (p) => { manager = p; $('qc-manager').value = `${p.employeeId} · ${p.name}`; });
+  personSearch('leader', (p) => { leader = p; });
+  personSearch('manager', (p) => { manager = p; });
+  $('qc-manager-q')?.closest('.search-block').addEventListener('pick-clear', () => { manager = null; });
   $('qc-back').onclick = reload;
   if ($('qc-p-review')) $('qc-p-review').onclick = () => qcReview(row, reload);
   const save = async (send) => {

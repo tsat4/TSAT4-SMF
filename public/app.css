@@ -778,7 +778,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .qc-s3{grid-column:span 3}.qc-s4{grid-column:span 4}.qc-s6{grid-column:span 6}
 .qc-title{grid-column:1 / -1;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--mo-line)}
 .qc-title .card-title{margin:0;color:var(--mo-text-muted);font-size:12px}.qc-title strong{font-size:15px;font-weight:600}
-.qc-pick{display:flex;gap:8px}.qc-pick input{flex:1;min-width:0}.qc-pick .btn{flex:0 0 auto}
+.atx-recv-pick{flex:1 1 220px;max-width:320px}.atx-recv-pick .search-slot .field{margin:0}
 .qc-form-card{padding:16px 18px;display:flex;flex-direction:column;gap:16px}
 .qc-form-bar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--mo-line)}.qc-form-bar .field{flex:1 1 320px;max-width:560px}.qc-form-bar .action-bar{margin-left:auto}
 #qc-form-body{display:flex;flex-direction:column;gap:16px}#qc-form-body > .action-bar{justify-content:flex-end;margin-top:-6px}
