@@ -12,6 +12,7 @@
 
 ## SQL ที่รอผู้ใช้รัน
 
+- `db/09_planning_user.sql` ใน **Mx Data** (สิทธิ์ผู้ใช้งานหน่วยงาน Planning: mt_planning_user)
 - `db/act/e-day.sql` ใน Tx Data (ทีม + แผนงาน E-DAY)
 - `db/act/lean.sql` ใน Tx Data (ทีม + แผนงาน LEAN)
 - `db/act/safety.sql` ใน Tx Data (ทีม + แผนงาน SAFETY)
@@ -28,9 +29,11 @@
 ## ข้อควรระวัง
 
 - ห้ามสร้างตาราง department master กลับมา ผู้ใช้ตัดทิ้งเองโดยตั้งใจ ชื่อหน่วยงานเก็บไว้ที่ `mt_main_costcenter.department`
-- หน้า PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
+- หน้า PLANNING, PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-29 · Antigravity · เพิ่มหน่วยงาน PLANNING ในระบบงาน (public/js/units.js, server/core/access.js, db/09_planning_user.sql, db/README.md): เมนู PLANNING พร้อมหน้า Dashboard / Transaction / Setting พื้นฐาน และตารางสิทธิ์ mt_planning_user ใน Mx Data
 
 - 2026-10-29 · Claude · CFO Fr-03.2 ตามไฟล์ผู้ใช้: เกณฑ์ 6 ข้อเป็นคะแนน % (0–100, 2 ตำแหน่ง) แทน ✓ / × · Dashboard แสดง 5.00% + แถบแดงตามสัดส่วนคะแนนสูงสุดในคอลัมน์ · Setting ช่องตัวเลข % · มีนัยสำคัญ = P และมีคะแนน > 0 อย่างน้อย 1 เกณฑ์ (กฎเดิม) · `mt_cfo_s3_assess` คอลัมน์ boolean → numeric(6,2) ในแม่แบบ (✓ = 1, × = 0) + test · server ตอบ 503 บอกให้รัน cfo.sql ถ้าฐานยังเป็น boolean
 

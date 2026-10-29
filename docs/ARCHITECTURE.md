@@ -4,7 +4,7 @@
 
 | ฐาน | client / env | เก็บอะไร |
 |---|---|---|
-| **Mx Data** (ezhyitqznflvjnwuuchn) | `mx` / `MX_SUPABASE_*` | ตารางกลาง `mt_main_*` (พนักงาน, costcenter, login) + ระบบงาน `mt_sto_*` / `tx_sto_*` (และ PD/MTN ในอนาคต) |
+| **Mx Data** (ezhyitqznflvjnwuuchn) | `mx` / `MX_SUPABASE_*` | ตารางกลาง `mt_main_*` (พนักงาน, costcenter, login) + ระบบงาน `mt_sto_*` / `tx_sto_*` (และ Planning/PD/MTN ในอนาคต) |
 | **Tx Data** (loeyrgavlpdnrbczjxpl) | `tx` / `TX_SUPABASE_*` | ระบบกิจกรรม ตารางแยกต่อกิจกรรม `mt_5s_*` / `tx_5s_*` / `v_5s_*` และที่เก็บรูป `img_5s` (สร้างจาก scripts/act-sql.js) |
 
 ชื่อพนักงานในหน้ากิจกรรมดึงจาก Mx Data แยกอีกครั้ง (`namesOf`) เพราะคนละฐาน
