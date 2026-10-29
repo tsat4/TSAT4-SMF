@@ -504,7 +504,7 @@ async function cfoDrawCompany(body, admin, rerender) {
     const fields = CFO_COMPANY.filter(([key]) => key.startsWith('company_') && !key.startsWith('company_photo'))
       .map(([key, label]) => field(label, `<input id="cfo-s-${key}" maxlength="1000" value="${esc(s[key] ?? '')}"${['company_updated', 'company_register'].includes(key) ? ' type="date"' : ''}>`)).join('');
     openPopup('แก้ไข Fr-01 รายละเอียดขององค์กร', `${fields}
-      ${field('รูปองค์กร (เต็มกรอบ 16:9)', '<input id="cfo-s-photo2" type="file" accept="image/*">')}
+      ${field('รูปองค์กร (แสดงเต็มกว้าง ตามสัดส่วนที่อัปโหลด)', '<input id="cfo-s-photo2" type="file" accept="image/*">')}
       <p class="sum-meta">ไม่เลือกรูป = ใช้รูปเดิม · ผลผลิตและปีฐานแก้ที่ Setting > บริษัท</p>`, async () => {
       if (picked[2]) await a5Api(CFO, 'cfo/photo', { method: 'POST', body: { slot: 2, image: picked[2] } });
       const values = Object.fromEntries(CFO_COMPANY.filter(([key]) => $(`cfo-s-${key}`)).map(([key]) => [key, $(`cfo-s-${key}`).value]));
