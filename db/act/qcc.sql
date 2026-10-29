@@ -1,5 +1,5 @@
 -- กิจกรรม qcc — รันใน **Tx Data** (รันซ้ำได้) · สร้างจาก scripts/act-sql.js ห้ามแก้มือ
--- spec: docs/specs/act-5s.md · ทดสอบ: npm run test:act
+-- spec: docs/specs/act-qcc.md · ทดสอบ: npm run test:act
 
 -- ===== qcc: team, settings, photo bucket =====
 

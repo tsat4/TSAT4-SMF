@@ -1,7 +1,7 @@
 import { mx, tx } from '../../core/db.js';
 import { fail } from '../../core/http.js';
 import { nameOf } from '../../core/users.js';
-import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, namesOf, yearOf } from './common.js';
+import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, namesOf, statusMove, yearOf } from './common.js';
 
 // Kaizen: the Kaizen sheet (FM-QSM-039 ด้านหน้า + ด้านหลัง) — department representative (or proposer) submits,
 // assigned department manager / chairman / vice / admin evaluates and approves.
@@ -89,7 +89,7 @@ export function mountKaizen(app) {
       manager_name: r.manager_id ? empMap.get(String(r.manager_id))?.name || '' : ''
     }));
     const canEditRow = (r) => access.admin || ((own(req, r) || myDepartments.includes(r.department)) && r.status !== 'APPROVED');
-    const canReviewRow = (r) => access.admin || access.chairman || managedDepartments.includes(r.department);
+    const canReviewRow = (r) => access.admin || ((access.chairman || managedDepartments.includes(r.department)) && r.employee_id !== me);
     res.json({
       year,
       me,
@@ -220,9 +220,12 @@ export function mountKaizen(app) {
     if (missing) return fail(res, ...missing);
     const status = STATUSES.includes(req.body?.status) ? req.body.status : '';
     if (!status) return fail(res, 400, 'สถานะไม่ถูกต้อง');
-    const reviewer = access.admin || access.chairman || isManager;
-    const send = status === 'SUBMITTED' && ['DRAFT', 'REJECTED'].includes(row.status) && (mine || inDept || access.admin);
-    if (!send && !reviewer) return fail(res, 403, 'ประเมินและอนุมัติได้เฉพาะผู้จัดการประจำแผนก ประธาน รองประธาน หรือผู้ดูแลของปีนี้');
+    // self = the proposer: a manager may key a sheet in for staff and still evaluate it, but not their own Kaizen.
+    const refused = statusMove(row.status, status, {
+      owner: mine || inDept, reviewer: access.admin || access.chairman || isManager, admin: access.admin, self: row.employee_id === req.user.employeeId,
+      denied: status === 'SUBMITTED' ? 'ส่งพิจารณาได้เฉพาะผู้เสนอ ตัวแทนแผนก หรือผู้ดูแล' : 'ประเมินและอนุมัติได้เฉพาะผู้จัดการประจำแผนก ประธาน รองประธาน หรือผู้ดูแลของปีนี้'
+    });
+    if (refused) return fail(res, ...refused);
     const patch = { status, updated_by: req.user.employeeId, updated_at: new Date().toISOString() };
     if (['APPROVED', 'REJECTED'].includes(status)) {
       const saved_hours = req.body?.saved_hours !== undefined ? money(req.body.saved_hours) : Number(row.saved_hours || 0);

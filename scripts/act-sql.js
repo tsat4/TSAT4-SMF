@@ -511,7 +511,7 @@ group by s.audit_id, c.s_group;
     ? [`mt_${k}_area`, `mt_${k}_checklist`, `mt_${k}_audit_plan`, `tx_${k}_audit`, `tx_${k}_audit_score`, `tx_${k}_issue`]
     : []);
   return `-- กิจกรรม ${activity} — รันใน **Tx Data** (รันซ้ำได้) · สร้างจาก scripts/act-sql.js ห้ามแก้มือ
--- spec: docs/specs/act-5s.md · ทดสอบ: npm run test:act
+-- ${fs.existsSync(path.join(ROOT, 'docs', 'specs', `act-${activity}.md`)) ? `spec: docs/specs/act-${activity}.md · ` : ''}ทดสอบ: npm run test:act
 
 ${core}${planner ? taskTableSql(activity, k) : ''}${extra ? cfoSql(k) : ''}${kaizen ? kaizenSql(k) : ''}${qcc ? qccSql(k) : ''}${audit ? auditPart : ''}
 -- server ใช้ service key ซึ่งข้าม RLS ได้ เปิด RLS ไว้กันการเข้าถึงด้วย anon key

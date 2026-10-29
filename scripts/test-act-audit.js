@@ -268,5 +268,21 @@ ok(qccCost(qf) === 130000 && qf['030'].perMonth === 0, 'QCC 030: cost = labour +
 ok(qf['022'].steps.length === 11 && JSON.stringify(qf['022'].steps[1].actual) === '[]' && qccProgress(qf) === 9, 'QCC 022: 11 steps, weeks outside the 5-month period dropped, progress = 1 of 11 steps = 9%');
 ok(!('hack' in qf), 'QCC forms keep only the known FM-QMR forms');
 
+// Sheet status flow (Kaizen + QCC), QCC month input, search text for PostgREST or()
+const { statusMove } = await import('../server/modules/act/common.js');
+const { monthOf } = await import('../server/modules/act/qcc.js');
+const { cleanTerm } = await import('../server/core/http.js');
+const who = (o) => ({ owner: false, reviewer: false, admin: false, self: false, denied: 'no', ...o });
+ok(statusMove('DRAFT', 'SUBMITTED', who({ owner: true })) === null && statusMove('REJECTED', 'SUBMITTED', who({ owner: true })) === null, 'owner sends a draft or a rejected sheet');
+ok(statusMove('APPROVED', 'SUBMITTED', who({ owner: true }))?.[0] === 409, 'an approved sheet cannot be sent again');
+ok(statusMove('DRAFT', 'SUBMITTED', who({ reviewer: true }))?.[0] === 403, 'a reviewer who is not the owner cannot send');
+ok(statusMove('SUBMITTED', 'APPROVED', who({ reviewer: true })) === null && statusMove('APPROVED', 'REJECTED', who({ reviewer: true })) === null, 'reviewer decides a sent sheet and may change the decision');
+ok(statusMove('DRAFT', 'APPROVED', who({ reviewer: true }))?.[0] === 409, 'a draft cannot be approved before it is sent');
+ok(statusMove('APPROVED', 'DRAFT', who({ reviewer: true, admin: true }))?.[0] === 400, 'nobody moves a sheet back to DRAFT');
+ok(statusMove('SUBMITTED', 'APPROVED', who({ reviewer: true, self: true }))?.[0] === 403 && statusMove('SUBMITTED', 'APPROVED', who({ reviewer: true, admin: true, self: true })) === null, 'no self-approval except the admin');
+ok(statusMove('SUBMITTED', 'APPROVED', who({ owner: true }))?.[0] === 403, 'the owner cannot approve');
+ok(monthOf('2026-03') === '2026-03-01' && monthOf('2026-03-01') === '2026-03-01' && monthOf('2026-13') === null && monthOf('2026-00') === null && monthOf('2026-03-15') === null, 'QCC month: 01–12 only');
+ok(cleanTerm(' นาย (A), 50%_x*"\\ ') === 'นาย A 50x', 'search text drops % _ * , ( ) " \\');
+
 console.log(failed ? `\n${failed} FAILED` : '\nall passed');
 process.exit(failed ? 1 : 0);

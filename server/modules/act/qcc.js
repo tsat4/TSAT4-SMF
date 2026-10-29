@@ -1,6 +1,6 @@
 import { mx, tx } from '../../core/db.js';
 import { cleanTerm, fail } from '../../core/http.js';
-import { accessOf, actRoute, fetchAll, imageBytes, must, namesOf, yearOf } from './common.js';
+import { accessOf, actRoute, fetchAll, imageBytes, must, namesOf, statusMove, yearOf } from './common.js';
 
 // QCC: one project per group and topic, with the 10 report forms FM-QMR-022…031 (inbox/QCC.xlsx) in `forms`.
 // The group leader (or whoever made it) fills the forms and sends it; the year's committee (admin / chairman / vice) approves.
@@ -20,7 +20,11 @@ const num = (v) => {
 const pick13 = (v) => (Number(v) >= 1 && Number(v) <= 3 ? Math.floor(Number(v)) : 0);
 const list = (v, max, each) => (Array.isArray(v) ? v.slice(0, max).map(each) : []);
 const weeks = (v, max) => [...new Set(list(v, max, Number).filter((i) => Number.isInteger(i) && i >= 0 && i < max))].sort((a, b) => a - b);
-const monthOf = (v) => (/^\d{4}-\d{2}$/.test(String(v || '')) ? `${v}-01` : /^\d{4}-\d{2}-01$/.test(String(v || '')) ? String(v) : null);
+// 'YYYY-MM' or 'YYYY-MM-01' with month 01–12 -> 'YYYY-MM-01'; anything else -> null.
+export const monthOf = (v) => {
+  const m = /^(\d{4})-(0[1-9]|1[0-2])(-01)?$/.exec(String(v || ''));
+  return m ? `${m[1]}-${m[2]}-01` : null;
+};
 
 // Every form's shape, so only known fields reach the database (the page sends the whole `forms` object).
 export function qccForms(raw, monthsCount = 12) {
@@ -102,7 +106,8 @@ export function mountQcc(app) {
         const mine = own(req, r);
         return {
           ...r, leader_name: nameOf(r.leader_id), manager_name: nameOf(r.manager_id), progress: qccProgress(r.forms), mine,
-          canEdit: access.admin || (mine && r.status !== 'APPROVED'), canReview: reviewerOf(access)
+          canEdit: access.admin || (mine && r.status !== 'APPROVED'),
+          canReview: reviewerOf(access) && (access.admin || r.leader_id !== req.user.employeeId)
         };
       })
     });
@@ -128,12 +133,19 @@ export function mountQcc(app) {
     if (!row.group_name) return { error: 'ระบุชื่อกลุ่ม' };
     if (!row.topic) return { error: 'ระบุเรื่องที่จดทะเบียนกิจกรรม' };
     if (!row.leader_id) return { error: 'เลือกหัวหน้ากลุ่ม' };
+    if ((b.start_month && !start) || (b.end_month && !end)) return { error: 'เดือนไม่ถูกต้อง' };
     if (start && end && (end < start || monthsBetween(start, end) > 12)) return { error: 'ระยะเวลาดำเนินกิจกรรม 1–12 เดือน และเดือนสิ้นสุดต้องไม่ก่อนเดือนเริ่ม' };
     if (start && Number(start.slice(0, 4)) !== year) return { error: `เดือนเริ่มต้องอยู่ในปี ${year}` };
     row.forms = qccForms(b.forms, monthsBetween(start, end));
     row.cost_total = qccCost(row.forms);
     row.return_month = row.forms['030'].perMonth;
     return { row };
+  };
+
+  const unknownPeople = async (row) => {
+    const ids = [row.leader_id, row.manager_id].filter(Boolean);
+    const found = await namesOf(ids);
+    return ids.some((id) => !found.has(String(id))) ? 'ไม่พบรหัสพนักงานหัวหน้ากลุ่ม หรือผู้จัดการ' : null;
   };
 
   route('post', '/api/act/:activity/qcc', async (req, res, activity, t) => {
@@ -143,6 +155,8 @@ export function mountQcc(app) {
     if (error) return fail(res, 400, error);
     const access = await accessOf(req, activity, year);
     if (!access.admin && row.leader_id !== req.user.employeeId) return fail(res, 403, 'สร้างได้เฉพาะหัวหน้ากลุ่มเอง หรือผู้ดูแล');
+    const unknown = await unknownPeople(row);
+    if (unknown) return fail(res, 400, unknown);
     const data = must(await tx.from(t.project).insert({ ...row, year, created_by: req.user.employeeId, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }).select('id').single());
     res.status(201).json(data);
   });
@@ -161,6 +175,8 @@ export function mountQcc(app) {
     const { row, error } = input({ leader_id: current.leader_id, ...(req.body || {}) }, current.year);
     if (error) return fail(res, 400, error);
     if (!access.admin) row.leader_id = current.leader_id;
+    const unknown = await unknownPeople(row);
+    if (unknown) return fail(res, 400, unknown);
     must(await tx.from(t.project).update({ ...row, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }).eq('id', current.id));
     res.json({ ok: true, id: current.id });
   });
@@ -195,8 +211,11 @@ export function mountQcc(app) {
     if (missing) return fail(res, ...missing);
     const status = STATUSES.includes(req.body?.status) ? req.body.status : '';
     if (!status) return fail(res, 400, 'สถานะไม่ถูกต้อง');
-    const send = status === 'SUBMITTED' && ['DRAFT', 'REJECTED'].includes(row.status) && (mine || access.admin);
-    if (!send && !reviewerOf(access)) return fail(res, 403, 'อนุมัติได้เฉพาะคณะกรรมการ QCC ของปีนี้');
+    const refused = statusMove(row.status, status, {
+      owner: mine, reviewer: reviewerOf(access), admin: access.admin, self: row.leader_id === req.user.employeeId,
+      denied: status === 'SUBMITTED' ? 'ส่งพิจารณาได้เฉพาะหัวหน้ากลุ่ม หรือผู้ดูแล' : 'อนุมัติได้เฉพาะคณะกรรมการ QCC ของปีนี้'
+    });
+    if (refused) return fail(res, ...refused);
     const patch = { status, updated_by: req.user.employeeId, updated_at: new Date().toISOString() };
     if (['APPROVED', 'REJECTED'].includes(status)) Object.assign(patch, { review_note: text(req.body?.note, 1000) || null, reviewed_by: req.user.employeeId, reviewed_at: new Date().toISOString() });
     must(await tx.from(t.project).update(patch).eq('id', row.id));

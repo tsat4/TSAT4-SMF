@@ -135,6 +135,21 @@ export async function accessOf(req, activity, year) {
   return access;
 }
 
+// Sheet status flow (Kaizen, QCC): the owner sends DRAFT / REJECTED -> SUBMITTED; a reviewer decides APPROVED / REJECTED
+// on a sent sheet (and may change that decision), never on a draft, and never on their own sheet unless admin.
+// -> null when allowed, else [http status, message].
+export function statusMove(from, to, { owner, reviewer, admin, self, denied }) {
+  if (to === 'SUBMITTED') {
+    if (!owner && !admin) return [403, denied];
+    return ['DRAFT', 'REJECTED'].includes(from) ? null : [409, 'ส่งพิจารณาได้เฉพาะใบร่าง หรือใบที่ไม่ผ่าน'];
+  }
+  if (!['APPROVED', 'REJECTED'].includes(to)) return [400, 'สถานะไม่ถูกต้อง'];
+  if (!reviewer) return [403, denied];
+  if (from === 'DRAFT') return [409, 'ยังไม่ได้ส่งพิจารณา'];
+  if (self && !admin) return [403, 'พิจารณาใบของตนเองไม่ได้'];
+  return null;
+}
+
 export async function requireAdmin(req, res, activity, year) {
   const access = await accessOf(req, activity, year);
   if (access.admin) return access;

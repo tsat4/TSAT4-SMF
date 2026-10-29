@@ -24,8 +24,9 @@ export function amountOf(value) {
   return Math.round(n * 1000) / 1000;
 }
 
+// Search text for ilike / PostgREST or(): drop wildcards (% _ *) and the characters that break or() syntax (, ( ) " \).
 export function cleanTerm(value) {
-  return String(value || '').trim().replace(/[%_,]/g, '').slice(0, 40);
+  return String(value || '').trim().replace(/[%_*,()"\\]/g, '').slice(0, 40);
 }
 
 // Column filter + A–Z sort for paged tables. `fields` maps an allowed column to 'text' or 'num'.
