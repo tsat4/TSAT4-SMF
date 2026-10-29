@@ -223,19 +223,25 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
     return `<div class="ch-stack" style="height:${(total / yL) * 100}%">${total ? `<span class="ch-val">${chartNum(total, digits)}</span>` : ''}${total ? parts.map((p, k) => (p ? `<div style="flex:${p};--c:${(b.colors || CHART.series)[k]}"></div>` : '')).reverse().join('') : ''}</div>`;
   };
   const scale = (l) => (l.axis === 'right' ? yR : yL);
+  // Target line = dashed with one value all year (or target: true): drawn edge to edge across the plot, one label at the right end.
+  const targetOf = (l) => {
+    const shown = l.values.filter((v) => v != null);
+    return l.target || (l.dash && shown.length > 1 && shown.every((v) => v === shown[0])) ? shown[shown.length - 1] : null;
+  };
+  const targetLine = (l) => (targetOf(l) == null ? '' : `<i class="ch-target-line" style="bottom:${(targetOf(l) / scale(l)) * 100}%;--c:${l.color}"></i>`);
   const poly = (l) => {
+    if (targetOf(l) != null) return '';
     const pts = l.values.map((v, i) => (v == null ? null : `${x(i) * 12},${1000 - (v / scale(l)) * 1000}`)).filter(Boolean);
     return pts.length ? `<polyline points="${pts.join(' ')}" fill="none" stroke="${l.color}" stroke-width="2.5"${l.dash ? ' stroke-dasharray="7 5"' : ''} vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/>` : '';
   };
-  const dots = (l) => (l.dots === false ? '' : l.values.map((v, i) => (v == null ? '' : `<i class="ch-pt" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}"></i>`)).join(''));
+  const dots = (l) => (l.dots === false || targetOf(l) != null ? '' : l.values.map((v, i) => (v == null ? '' : `<i class="ch-pt" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}"></i>`)).join(''));
   // Value above each point (below for a dashed line, so a target under its base line does not collide); labels: 'last' = only the latest point (lines that sit close to another line), false = none.
   // A target line (dashed, one value all year, or target: true) gets one label "Target : 80%" on the line at the right end (ผู้ใช้กำหนด 2026-10-29).
   const values = (l) => {
     if (l.labels === false) return '';
-    const shown = l.values.filter((v) => v != null);
-    if (l.target || (l.dash && shown.length > 1 && shown.every((v) => v === shown[0]))) {
-      const v = shown[shown.length - 1];
-      return v == null ? '' : `<span class="ch-target" style="bottom:${(v / scale(l)) * 100}%;--c:${l.color}">Target : ${chartNum(v, digits)}${esc(l.unit || '')}</span>`;
+    const v = targetOf(l);
+    if (v != null) {
+      return `<span class="ch-target" style="bottom:${(v / scale(l)) * 100}%;--c:${l.color}">Target : ${chartNum(v, digits)}${esc(l.unit || '')}</span>`;
     }
     const last = l.values.reduce((k, v, i) => (v == null ? k : i), -1);
     return l.values.map((v, i) => (v == null || (l.labels === 'last' && i !== last) ? '' : `<span class="ch-lv${l.dash ? ' is-below' : ''}" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}">${chartNum(v, digits)}</span>`)).join('');
@@ -248,7 +254,7 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
         ${[0, 1, 2, 3, 4].map((k) => `<i class="ch-grid" style="bottom:${k * 25}%"></i>`).join('')}
         <div class="ch-cols" style="grid-template-columns:repeat(${n},minmax(0,1fr))">${labels.map((_, i) => `<div class="ch-col" data-i="${i}"><div class="ch-pair">${bars.map((b) => bar(b, i)).join('')}</div></div>`).join('')}</div>
         <svg class="ch-lines" viewBox="0 0 1200 1000" preserveAspectRatio="none" aria-hidden="true">${lines.map(poly).join('')}</svg>
-        ${lines.map(dots).join('')}${lines.map(values).join('')}
+        ${lines.map(targetLine).join('')}${lines.map(dots).join('')}${lines.map(values).join('')}
         <div class="ch-tip" hidden></div>
       </div>
       ${yR ? `<div class="ch-yaxis is-right">${ticks(yR)}</div>` : ''}

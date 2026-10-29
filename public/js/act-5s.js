@@ -90,7 +90,7 @@ async function a5DrawSummary(body, activity) {
   const areas = data.areas.filter((a) => !a5Summary.areaType || a.areaType === a5Summary.areaType);
   const months = data.months;
   const pass = data.pass || 80; // pass_percent setting
-  const row = (m) => `<tr><td>${ACT_MONTHS_SHORT[m.month - 1]}</td><td>${m.percent}%</td><td>${m.audits}</td></tr>`;
+  const row = (m) => `<tr><td>${ACT_MONTHS[m.month - 1]}</td><td>${m.percent}%</td><td>${m.audits}</td></tr>`;
   body.innerHTML = `
     <div class="toolbar a5-filters">
       ${field('ประเภท', `<select id="a5-type">${options(['', 'SELF', 'COMMITTEE'], a5Summary.type, (v) => ({ '': 'ทั้งหมด', SELF: 'Self Audit', COMMITTEE: 'Committee' }[v]))}</select>`)}

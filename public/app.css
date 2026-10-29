@@ -423,12 +423,12 @@ body[data-zone] .plan-col.is-today .plan-col-head{color:var(--zone-ink)}
 body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 
 /* Page toolbar (core.js pageBar): left = tabs + search, right = filters + year + buttons, one row that wraps on small screens */
-.page-bar{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px;margin-bottom:8px}
-.page-bar-left,.page-bar-right{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px;min-width:0}
+.page-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.page-bar-left,.page-bar-right{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
 .page-bar-left{flex-wrap:nowrap}
 .page-bar-right{margin-left:auto;justify-content:flex-end}
 .page-bar-slot{display:contents}
-.page-bar .field{width:auto;flex:0 1 auto;min-width:92px;max-width:170px}
+.page-bar .field{width:auto;flex:0 1 auto;min-width:0;max-width:260px;flex-direction:row;align-items:center;gap:6px;white-space:nowrap}.page-bar .field > select,.page-bar .field > input{min-width:84px;max-width:190px}
 .page-bar .field select{padding-right:22px}
 .page-bar .search-slot{flex:0 1 200px;min-width:150px;width:auto}
 .page-bar .search-slot .btn{padding:0 8px}
@@ -691,6 +691,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-stack{position:relative;flex:1;max-width:44px;display:flex;flex-direction:column;min-height:0}
 .ch-val,.ch-lv{position:absolute;font-size:10px;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
 .ch-val{bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:3px;color:var(--mo-text)}
+.ch-target-line{position:absolute;left:0;right:0;height:0;border-top:2.5px dashed var(--c);pointer-events:none;z-index:1}
 .ch-target{position:absolute;right:4px;transform:translateY(-4px);font-size:10.5px;font-weight:600;line-height:1;white-space:nowrap;color:var(--c);text-shadow:0 0 2px var(--mo-surface),0 0 2px var(--mo-surface),0 0 3px var(--mo-surface);pointer-events:none;z-index:2}
 .ch-lv{transform:translate(-50%,-9px);margin-bottom:0;color:var(--c);font-weight:600;text-shadow:0 0 2px var(--mo-surface),0 0 2px var(--mo-surface)}.ch-lv.is-below{transform:translate(-50%,calc(100% + 6px))}
 .ch-stack > div{min-height:1px;background:color-mix(in srgb,var(--c) 40%,transparent);border:1px solid var(--c);border-bottom-width:0}
