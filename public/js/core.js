@@ -232,8 +232,14 @@ function chartPlot({ id, labels, bars = [], lines = [], left = '', right = '', l
   };
   const dots = (l) => (l.dots === false ? '' : l.values.map((v, i) => (v == null ? '' : `<i class="ch-pt" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}"></i>`)).join(''));
   // Value above each point (below for a dashed line, so a target under its base line does not collide); labels: 'last' = only the latest point (lines that sit close to another line), false = none.
+  // A target line (dashed, one value all year, or target: true) gets one label "Target : 80%" on the line at the right end (ผู้ใช้กำหนด 2026-10-29).
   const values = (l) => {
     if (l.labels === false) return '';
+    const shown = l.values.filter((v) => v != null);
+    if (l.target || (l.dash && shown.length > 1 && shown.every((v) => v === shown[0]))) {
+      const v = shown[shown.length - 1];
+      return v == null ? '' : `<span class="ch-target" style="bottom:${(v / scale(l)) * 100}%;--c:${l.color}">Target : ${chartNum(v, digits)}${esc(l.unit || '')}</span>`;
+    }
     const last = l.values.reduce((k, v, i) => (v == null ? k : i), -1);
     return l.values.map((v, i) => (v == null || (l.labels === 'last' && i !== last) ? '' : `<span class="ch-lv${l.dash ? ' is-below' : ''}" style="left:${x(i)}%;bottom:${(v / scale(l)) * 100}%;--c:${l.color}">${chartNum(v, digits)}</span>`)).join('');
   };

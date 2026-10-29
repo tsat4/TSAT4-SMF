@@ -634,7 +634,7 @@ body[data-zone] .plan-col.is-today{border-color:var(--zone)}
 .cfo-s3 table{width:100%}.cfo-s3 th{white-space:normal;line-height:1.25}.cfo-s3 td{white-space:normal}.cfo-s3 td:last-child{min-width:140px}.cfo-s3 td:last-child input{width:100%;height:26px}
 .cfo-s3 input[type=checkbox]{width:16px;height:16px;margin:0;vertical-align:middle;accent-color:var(--ch-1)}.cfo-s3 tr.is-significant td{background:color-mix(in srgb,var(--ch-1) 8%,transparent)}
 .cfo-inv{max-height:calc(100vh - 260px)}.cfo-inv table{font-size:12px}.cfo-inv td,.cfo-inv th{padding:0 6px}.cfo-inv td{height:26px}
-.cfo-inv thead tr:first-child th{height:30px;top:0}.cfo-inv thead tr:nth-child(2) th{height:28px;top:30px}.cfo-inv thead th{white-space:normal;line-height:1.25;font-size:11px}
+.table-wrap.cfo-inv{--table-head:58px}.cfo-inv thead tr:first-child th{height:30px;top:0}.cfo-inv thead tr:nth-child(2) th{height:28px;top:30px}.cfo-inv thead th{white-space:normal;line-height:1.25;font-size:11px}
 .cfo-inv tbody td:first-child,.cfo-inv thead tr:first-child th:first-child{position:sticky;left:0;z-index:2;background:var(--mo-surface);min-width:220px;max-width:280px;white-space:normal}
 .cfo-inv thead tr:first-child th:first-child{z-index:6;background:var(--th-bg)}
 td.cfo-ref{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -678,8 +678,8 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-pill.is-bad{color:#b91c1c;border-color:#dc2626;background:color-mix(in srgb,#dc2626 12%,transparent)}
 .ch-card{margin-bottom:8px;padding:12px 14px;min-width:0}
 .ch-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:8px}.ch-head.is-meta{justify-content:flex-end;align-items:center}.ch-head .ch-legend{margin:0;justify-content:flex-end}
-.ch-plot{display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto 280px auto;column-gap:6px}
-.ch-plot.has-right{grid-template-columns:44px minmax(0,1fr) 44px}
+/* Same width left and right of the plot (an empty right column when there is no right axis) — ผู้ใช้กำหนด 2026-10-29 */
+.ch-plot{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;grid-template-rows:auto 280px auto;column-gap:6px}
 .ch-titles{grid-column:1 / -1;display:flex;justify-content:space-between;font-size:11px;color:var(--mo-text-muted);padding-bottom:8px}
 .ch-yaxis{display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;font-size:11px;color:var(--mo-text-muted);margin:-7px 0;font-variant-numeric:tabular-nums}.ch-yaxis.is-right{align-items:flex-start}
 .ch-area{position:relative;border-left:1px solid var(--mo-line)}.ch-plot.has-right .ch-area{border-right:1px solid var(--mo-line)}
@@ -691,6 +691,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-stack{position:relative;flex:1;max-width:44px;display:flex;flex-direction:column;min-height:0}
 .ch-val,.ch-lv{position:absolute;font-size:10px;line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
 .ch-val{bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:3px;color:var(--mo-text)}
+.ch-target{position:absolute;right:4px;transform:translateY(-4px);font-size:10.5px;font-weight:600;line-height:1;white-space:nowrap;color:var(--c);text-shadow:0 0 2px var(--mo-surface),0 0 2px var(--mo-surface),0 0 3px var(--mo-surface);pointer-events:none;z-index:2}
 .ch-lv{transform:translate(-50%,-9px);margin-bottom:0;color:var(--c);font-weight:600;text-shadow:0 0 2px var(--mo-surface),0 0 2px var(--mo-surface)}.ch-lv.is-below{transform:translate(-50%,calc(100% + 6px))}
 .ch-stack > div{min-height:1px;background:color-mix(in srgb,var(--c) 40%,transparent);border:1px solid var(--c);border-bottom-width:0}
 .ch-stack > div:last-child{border-bottom-width:1px}
@@ -708,7 +709,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-legend i.sq{width:11px;height:11px;border-radius:2px;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 40%,transparent)}
 #cfo-rows .cfo-group td,.cfo-scope-table .cfo-group td{background:var(--mo-surface-2);font-weight:600}
 .sto-track i{background:color-mix(in srgb,var(--ch-1) 40%,transparent);box-shadow:inset 0 0 0 1px var(--ch-1)}
-@media(max-width:700px){.ch-plot{grid-template-columns:36px minmax(0,1fr)}.ch-plot.has-right{grid-template-columns:36px minmax(0,1fr) 36px}.ch-pair{width:86%;gap:2px}}
+@media(max-width:700px){.ch-plot{grid-template-columns:36px minmax(0,1fr) 36px}.ch-pair{width:86%;gap:2px}}
 /* System > Setting: mt_main_user ผู้ดูแลระบบ (admin_of) checklist */
 .sys-scope-field{grid-column:1/-1}.sys-scopes{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:4px 12px;margin-top:4px}
 .sys-scopes .check{display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer}.sys-scopes .check input{width:auto;height:auto;margin:0}
@@ -727,6 +728,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 :where(body[data-dash]) .card-title{font-size:12px}
 :where(body[data-dash]) td{height:22px;font-size:11px;padding:0 7px}
 :where(body[data-dash]) table.mo-data-table thead th{height:26px;font-size:10px}
+:where(body[data-dash]) .table-wrap{--table-head:26px}
 :where(body[data-dash]) .seg-btn{min-height:26px;padding:0 10px;font-size:11.5px}
 :where(body[data-dash]) .page-bar select,:where(body[data-dash]) .page-bar input{min-height:28px;height:28px;font-size:12px}
 :where(body[data-dash]) .page-bar label{font-size:10.5px}
