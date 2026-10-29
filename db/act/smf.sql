@@ -1,5 +1,5 @@
 -- กิจกรรม smf — รันใน **Tx Data** (รันซ้ำได้) · สร้างจาก scripts/act-sql.js ห้ามแก้มือ
--- ทดสอบ: npm run test:act
+-- spec: docs/specs/act-smf.md · ทดสอบ: npm run test:act
 
 -- ===== smf: team, settings, photo bucket =====
 
@@ -21,7 +21,7 @@ create table if not exists public.mt_smf_team (
 alter table public.mt_smf_team add column if not exists department text;
 alter table public.mt_smf_team
   drop constraint if exists mt_smf_team_role_check,
-  add constraint mt_smf_team_role_check check (role in ('admin', 'chairman', 'vice', 'auditor', 'owner', 'member')),
+  add constraint mt_smf_team_role_check check (role in ('admin', 'chairman', 'vice', 'advisor', 'auditor', 'owner', 'member')),
   drop constraint if exists mt_smf_team_member_has_dept,
   add constraint mt_smf_team_member_has_dept check ((role = 'member') = (department is not null)),
   drop constraint if exists mt_smf_team_unique,

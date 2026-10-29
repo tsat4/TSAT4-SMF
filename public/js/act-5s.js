@@ -7,8 +7,8 @@ const A5_GROUPS = { '5s': ['สะสาง', 'สะดวก', 'สะอา�
 const A5_TEAMS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 const A5_TEAM_COLORS = { A: '#1f2937', B: '#ec4899', C: '#f97316', D: '#ca8a04', E: '#0d9488', F: '#2563eb', G: '#9333ea', H: '#06b6d4', I: '#9ca3af' };
 const A5_AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
-const A5_ROLE_LABEL = { ...ACT_TEAM_ROLES, auditor: 'ผู้ตรวจ' };
-const A5_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', audit: 'Audit Plan', team: 'Team Auditor' };
+const A5_ROLE_LABEL = { chairman: 'ประธาน', vice: 'รองประธาน', advisor: 'ที่ปรึกษา', admin: 'เลขา', auditor: 'ผู้ตรวจประเมิน', owner: 'ตัวแทนพื้นที่' };
+const A5_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', audit: 'Audit Plan', team: 'Team' };
 // Setting tabs: ทีม, แผนงาน, then the activity's own tables (ผู้ใช้กำหนด 2026-10-29)
 const A5_SET_TABS = { team: 'ทีม', gantt: 'แผนงาน', areas: 'พื้นที่', checklist: 'หัวข้อตรวจ', plan: 'แผนตรวจ' };
 let a5Year = new Date().getFullYear();
@@ -183,23 +183,34 @@ async function a5DrawSchedule(body, activity) {
 }
 
 async function a5DrawTeam(body, activity) {
-  const data = await a5Api(activity, `team?year=${a5Year}`);
+  const [data, areasData] = await Promise.all([
+    a5Api(activity, `team?year=${a5Year}`),
+    a5Api(activity, `areas?year=${a5Year}`).catch(() => ({ areas: [] }))
+  ]);
+  const areasList = (areasData.areas || []).filter((a) => a.status === 'Active');
   const active = data.members.filter((m) => m.status === 'Active');
   const person = (m) => `<div class="a5-person">${esc(m.employee_id)} · ${esc(m.name || '-')}<span>${esc(m.department || '')}</span></div>`;
-  // Top: ประธาน · รองประธาน · เลขา · สมาชิก (ACT_TEAM_ROLES), then the auditor teams A–Z.
+  // Top: ประธาน · รองประธาน · ที่ปรึกษา · เลขา
+  const topRoles = { chairman: 'ประธาน', vice: 'รองประธาน', advisor: 'ที่ปรึกษา', admin: 'เลขา' };
+  const owners = active.filter((m) => m.role === 'owner');
   const teams = A5_TEAMS.filter((t) => active.some((m) => m.team === t)).concat([...new Set(active.filter((m) => m.team && !A5_TEAMS.includes(m.team)).map((m) => m.team))]);
-  const tones = { chairman: '#475569', vice: '#64748b', admin: 'var(--mo-primary)', member: '#0f766e' };
+  const tones = { chairman: '#475569', vice: '#64748b', advisor: '#7c3aed', admin: 'var(--mo-primary)' };
   // icons, not letters: this Thai font draws ร / ล like s / a
-  const badges = { chairman: 'workspace_premium', vice: 'military_tech', admin: 'edit_note', member: 'groups' };
+  const badges = { chairman: 'workspace_premium', vice: 'military_tech', advisor: 'school', admin: 'edit_note' };
   body.innerHTML = `
-    <div class="a5-team-grid a5-team-top">${Object.entries(ACT_TEAM_ROLES).map(([role, label]) => {
+    <div class="a5-team-grid a5-team-top">${Object.entries(topRoles).map(([role, label]) => {
       const list = active.filter((m) => m.role === role);
       return `<div class="a5-team" style="--team:${tones[role]}"><div class="a5-team-head"><span class="a5-badge"><span class="material-symbols-rounded" style="font-size:15px">${badges[role]}</span></span>${esc(label)}<span>${list.length}</span></div>${list.map(person).join('') || '<div class="a5-person">-</div>'}</div>`;
     }).join('')}</div>
+    <div style="margin:20px 0 10px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px"><span class="material-symbols-rounded" style="font-size:18px">fact_check</span>คณะผู้ตรวจประเมิน</div>
     <div class="a5-team-grid">${teams.map((t) => {
       const list = active.filter((m) => m.role === 'auditor' && m.team === t);
       return `<div class="a5-team" style="--team:${a5TeamColor(t)}"><div class="a5-team-head"><span class="a5-badge">${esc(t)}</span>ทีม ${esc(t)}<span>${list.length} คน</span></div>${list.map(person).join('')}</div>`;
-    }).join('') || '<p class="empty">ยังไม่มีทีมตรวจประเมินปีนี้</p>'}</div>`;
+    }).join('') || '<p class="empty">ยังไม่มีทีมผู้ตรวจประเมินปีนี้</p>'}</div>
+    <div style="margin:20px 0 10px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px"><span class="material-symbols-rounded" style="font-size:18px">location_on</span>ตัวแทนพื้นที่ (${owners.length} พื้นที่)</div>
+    <div class="a5-team-grid">${owners.length ? owners.map((m) => `
+      <div class="a5-team" style="--team:#0284c7"><div class="a5-team-head"><span class="a5-badge"><span class="material-symbols-rounded" style="font-size:15px">location_on</span></span>${esc([m.area_code, m.area_name].filter(Boolean).join(' ') || 'พื้นที่')}<span></span></div>
+      <div class="a5-person">${esc(m.employee_id)} · ${esc(m.name || '-')}<span>${esc(m.department || '')}</span></div></div>`).join('') : '<p class="empty">ยังไม่ได้กำหนดตัวแทนพื้นที่ปีนี้</p>'}</div>`;
   a5Lift(body);
 }
 
@@ -288,28 +299,34 @@ async function a5SetAreas(body, activity, admin, rerender) {
 
 // roles: { role: label } this activity uses (5S: admin / chairman / auditor + team · CFO: + vice / member + department).
 async function a5SetTeam(body, activity, admin, rerender, roles = A5_ROLE_LABEL) {
-  const data = await a5Api(activity, `team?year=${a5Year}`);
+  const [data, areasData] = await Promise.all([
+    a5Api(activity, `team?year=${a5Year}`),
+    a5Api(activity, `areas?year=${a5Year}`).catch(() => ({ areas: [] }))
+  ]);
+  const areasList = (areasData.areas || []).filter((a) => a.status === 'Active');
   let picked = null;
   const keys = Object.keys(roles);
   const hasTeam = keys.includes('auditor');
-  const rows = listQuery([...data.members].sort((a, b) => keys.indexOf(a.role) - keys.indexOf(b.role) || String(a.team || '').localeCompare(String(b.team || '')) || String(a.employee_id).localeCompare(String(b.employee_id))), a5Heads.team, (m, key) => (key === 'role' ? roles[m.role] || m.role : m[key] || ''));
+  const rows = listQuery([...data.members].sort((a, b) => keys.indexOf(a.role) - keys.indexOf(b.role) || String(a.team || '').localeCompare(String(b.team || '')) || String(a.area_code || '').localeCompare(String(b.area_code || '')) || String(a.employee_id).localeCompare(String(b.employee_id))), a5Heads.team, (m, key) => (key === 'role' ? roles[m.role] || m.role : m[key] || ''));
   body.innerHTML = `
     ${admin ? `<div class="action-bar a5-actions">${button('a5-add', 'เพิ่มรายชื่อ', 'primary')}${button('a5-del', 'ลบ', 'danger', 'disabled')}${button('a5-copy', `คัดลอกจากปี ${a5Year - 1}`)}</div>` : ''}
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${rows.length} รายชื่อ</p>`;
-  const teamCell = (m) => (hasTeam ? `<td>${m.team ? `<span class="a5-dot is-done" style="--team:${a5TeamColor(m.team)}"></span> ${esc(m.team)}` : ''}</td>` : '');
-  fillTable('a5-rows', [{ label: 'บทบาท', key: 'role' }, ...(hasTeam ? [{ label: 'ทีม', key: 'team' }] : []), { label: 'รหัส', key: 'employee_id' }, { label: 'ชื่อ', key: 'name' }, { label: 'หน่วยงาน', key: 'department' }, { label: 'สถานะ', key: 'status' }], rows.map((m) => `<tr data-pick="${m.id}"><td>${esc(roles[m.role] || m.role)}</td>${teamCell(m)}<td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td>${esc(m.department)}</td><td>${esc(m.status)}</td></tr>`).join(''), `ยังไม่มีทีมปี ${a5Year}`, headFor(a5Heads.team, () => a5SetTeam(body, activity, admin, rerender, roles).catch(onErr)));
+  const teamCell = (m) => (hasTeam ? `<td>${m.team ? `<span class="a5-dot is-done" style="--team:${a5TeamColor(m.team)}"></span> ทีม ${esc(m.team)}` : (m.area_code ? `<span class="sum-meta">[${esc(m.area_code)}]</span> ${esc(m.area_name || '')}` : '')}</td>` : '');
+  fillTable('a5-rows', [{ label: 'บทบาท', key: 'role' }, ...(hasTeam ? [{ label: 'ทีม / พื้นที่', key: 'team' }] : []), { label: 'รหัส', key: 'employee_id' }, { label: 'ชื่อ', key: 'name' }, { label: 'หน่วยงาน', key: 'department' }, { label: 'สถานะ', key: 'status' }], rows.map((m) => `<tr data-pick="${m.id}"><td>${esc(roles[m.role] || m.role)}</td>${teamCell(m)}<td>${esc(m.employee_id)}</td><td>${esc(m.name)}</td><td>${esc(m.department)}</td><td>${esc(m.status)}</td></tr>`).join(''), `ยังไม่มีทีมปี ${a5Year}`, headFor(a5Heads.team, () => a5SetTeam(body, activity, admin, rerender, roles).catch(onErr)));
   a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => { picked = rows.find((m) => String(m.id) === id); $('a5-del').disabled = !picked; });
   $('a5-add').onclick = () => {
     let chosen = null;
     openPopup(`เพิ่มรายชื่อปี ${a5Year}`, `${a5EmpField('พนักงาน')}
-      ${field('บทบาท', `<select id="a5-role">${options(keys, keys.at(-1), (v) => roles[v])}</select>`)}
-      ${hasTeam ? field('ทีม (เฉพาะผู้ตรวจ)', `<select id="a5-team">${options(A5_TEAMS, 'A')}</select>`, '') : ''}
+      ${field('บทบาท', `<select id="a5-role">${options(keys, keys[0], (v) => roles[v])}</select>`)}
+      ${hasTeam ? field('ทีม (เฉพาะผู้ตรวจประเมิน)', `<select id="a5-team">${options(A5_TEAMS, 'A')}</select>`, '') : ''}
+      ${keys.includes('owner') && areasList.length ? field('พื้นที่ (เฉพาะตัวแทนพื้นที่)', `<select id="a5-owner-area">${options(areasList.map((a) => a.id), areasList[0]?.id, (id) => { const a = areasList.find((x) => x.id === id); return a ? `${a.code} - ${a.name}` : id; })}</select>`, '') : ''}
       ${keys.includes('member') ? field('หน่วยงาน (เฉพาะสมาชิก)', '<input id="a5-dept" maxlength="80" placeholder="เช่น PD1">') : ''}`, async () => {
       if (!chosen) throw new Error('เลือกพนักงานจากรายชื่อก่อน');
-      await a5Api(activity, 'team', { method: 'POST', body: { year: a5Year, employeeId: chosen.employeeId, role: $('a5-role').value, team: $('a5-team')?.value, department: $('a5-dept')?.value.trim() } });
+      const r = $('a5-role').value;
+      await a5Api(activity, 'team', { method: 'POST', body: { year: a5Year, employeeId: chosen.employeeId, role: r, team: r === 'auditor' ? $('a5-team')?.value : null, areaId: r === 'owner' ? Number($('a5-owner-area')?.value) : null, department: r === 'member' ? $('a5-dept')?.value.trim() : null } });
       toast('เพิ่มแล้ว');
       closePopup();
       rerender();
@@ -319,8 +336,10 @@ async function a5SetTeam(body, activity, admin, rerender, roles = A5_ROLE_LABEL)
       if ($('a5-dept') && !$('a5-dept').value && p.department) $('a5-dept').value = p.department; // สมาชิก: the employee's own department
     });
     const syncTeam = () => {
-      if ($('a5-team')) $('a5-team').disabled = $('a5-role').value !== 'auditor';
-      if ($('a5-dept')) $('a5-dept').disabled = $('a5-role').value !== 'member';
+      const r = $('a5-role').value;
+      if ($('a5-team')) $('a5-team').closest('.field').style.display = r === 'auditor' ? '' : 'none';
+      if ($('a5-owner-area')) $('a5-owner-area').closest('.field').style.display = r === 'owner' ? '' : 'none';
+      if ($('a5-dept')) $('a5-dept').closest('.field').style.display = r === 'member' ? '' : 'none';
     };
     $('a5-role').onchange = syncTeam;
     syncTeam();

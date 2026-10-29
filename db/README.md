@@ -12,5 +12,6 @@ AI ไม่มีสิทธิ์เข้าฐานข้อมูล ผ�
 | `09_planning_user.sql` | **Mx Data** | สิทธิ์ผู้ใช้งานหน่วยงาน Planning (`mt_planning_user`) ในระบบงาน · รันซ้ำได้ |
 | `act/<กิจกรรม>.sql` | **Tx Data** | ตารางของแต่ละกิจกรรม สร้างจาก `scripts/act-sql.js` เท่านั้น ห้ามแก้มือ (ดู AGENTS.md) |
 | `act/5s_task.sql` | **Tx Data** | เพิ่ม Project Planner ให้ 5S ที่ใช้งานอยู่ และคัดลอกแผน Gantt เดิมครั้งเดียว |
+| `act/5s_team_roles.sql` | **Tx Data** | ปรับบทบาททีม 5S เพิ่ม `advisor` (ที่ปรึกษา) ใน `mt_5s_team` · รันซ้ำได้ |
 
 แก้ `03_receive_rpc.sql` แล้วต้องรัน `npm run test:db` ให้ผ่าน · แก้แม่แบบกิจกรรมแล้วรัน `npm run test:act`

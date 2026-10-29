@@ -6,7 +6,7 @@ import { accessOf, actRoute, fetchAll, fetchIn, namesOf, requireAdmin, roundTo, 
 // Checklist audits (5S and similar): Dashboard reads for everyone, Setting writes for the year's admins.
 // Tables (Tx Data, one set per activity): db/act/<activity>.sql via tablesOf() · rules: docs/specs/act-5s.md
 const AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
-const ROLES = ['admin', 'chairman', 'vice', 'auditor', 'member'];
+const ROLES = ['admin', 'chairman', 'vice', 'advisor', 'auditor', 'owner', 'member'];
 const AUDIT_TYPES = ['SELF', 'COMMITTEE'];
 
 const round1 = (n) => roundTo(n, 1);
@@ -166,13 +166,30 @@ export function mountAudit(app) {
   route('get', '/api/act/:activity/team', async (req, res, activity) => {
     const year = yearOf(req.query.year);
     if (!year) return fail(res, 400, 'ปีไม่ถูกต้อง');
-    const [rows, empDepts] = await Promise.all([
-      fetchAll(() => tx.from(tablesOf(activity).team).select('*').eq('year', year).neq('role', 'owner').order('role').order('team').order('employee_id')),
-      mx.from('mt_main_employee').select('department').eq('status', 'Active')
+    const t = tablesOf(activity);
+    const [rows, empDepts, areas] = await Promise.all([
+      fetchAll(() => tx.from(t.team).select('*').eq('year', year).order('role').order('team').order('employee_id')),
+      mx.from('mt_main_employee').select('department').eq('status', 'Active'),
+      t.area ? fetchAll(() => tx.from(t.area).select('id,code,name,area_type')) : []
     ]);
+    const areaMap = new Map((areas || []).map((a) => [Number(a.id), a]));
     const departments = [...new Set([...(empDepts.data || []).map((r) => String(r.department || '').trim()), ...rows.map((r) => String(r.department || '').trim())].filter(Boolean))].sort();
     const names = await namesOf([...rows.map((r) => r.employee_id), ...rows.map((r) => r.manager_id).filter(Boolean)]);
-    res.json({ year, departments, members: rows.map((r) => ({ ...r, name: names.get(String(r.employee_id))?.name || '', department: r.department || names.get(String(r.employee_id))?.department || '', manager_name: r.manager_id ? names.get(String(r.manager_id))?.name || '' : '' })) });
+    res.json({
+      year,
+      departments,
+      members: rows.map((r) => {
+        const area = r.area_id ? areaMap.get(Number(r.area_id)) : null;
+        return {
+          ...r,
+          name: names.get(String(r.employee_id))?.name || '',
+          department: r.department || names.get(String(r.employee_id))?.department || '',
+          manager_name: r.manager_id ? names.get(String(r.manager_id))?.name || '' : '',
+          area_code: area?.code || '',
+          area_name: area?.name || ''
+        };
+      })
+    });
   });
 
   route('get', '/api/act/:activity/checklist', async (req, res, activity) => {
@@ -283,13 +300,18 @@ export function mountAudit(app) {
     const employeeId = String(req.body?.employeeId || '').trim();
     const role = ROLES.includes(req.body?.role) ? req.body.role : '';
     const team = role === 'auditor' ? String(req.body?.team || '').trim().toUpperCase() : null;
+    const areaId = role === 'owner' && req.body?.areaId ? Number(req.body.areaId) : null;
     const department = role === 'member' ? String(req.body?.department || '').trim().slice(0, 80) : '';
     const targetCount = role === 'member' && req.body?.targetCount != null && req.body.targetCount !== '' ? Math.max(0, Math.floor(Number(req.body.targetCount) || 0)) : undefined;
     const managerId = role === 'member' && req.body?.managerId ? String(req.body.managerId).trim().slice(0, 20) || null : undefined;
     if (!employeeId || !role) return fail(res, 400, 'เลือกพนักงานและบทบาท');
     if (role === 'auditor' && !/^[A-Z]$/.test(team)) return fail(res, 400, 'ผู้ตรวจต้องเลือกทีม A–Z');
+    if (role === 'owner' && !areaId) return fail(res, 400, 'ตัวแทนพื้นที่ต้องระบุพื้นที่');
     if (role === 'member' && !department) return fail(res, 400, 'ตัวแทนหน่วยงานต้องระบุหน่วยงาน');
-    const extra = { ...(department ? { department } : {}), ...(targetCount !== undefined ? { target_count: targetCount } : {}), ...(managerId !== undefined ? { manager_id: managerId } : {}) };
+    if (role === 'owner') {
+      await tx.from(tablesOf(activity).team).delete().eq('year', year).eq('area_id', areaId).eq('role', 'owner');
+    }
+    const extra = { ...(areaId ? { area_id: areaId } : {}), ...(department ? { department } : {}), ...(targetCount !== undefined ? { target_count: targetCount } : {}), ...(managerId !== undefined ? { manager_id: managerId } : {}) };
     const { error } = await tx.from(tablesOf(activity).team).insert({ year, employee_id: employeeId, role, team, ...extra, status: 'Active' });
     if (error?.code === '23505') return fail(res, 400, 'คนนี้มีบทบาทนี้อยู่แล้ว');
     throwIf(error);

@@ -13,6 +13,7 @@
 ## SQL ที่รอผู้ใช้รัน
 
 - `db/09_planning_user.sql` ใน **Mx Data** (สิทธิ์ผู้ใช้งานหน่วยงาน Planning: mt_planning_user)
+- `db/act/5s_team_roles.sql` ใน **Tx Data** (ปรับบทบาททีม 5S เพิ่มที่ปรึกษา advisor ใน mt_5s_team)
 - `db/act/e-day.sql` ใน Tx Data (ทีม + แผนงาน E-DAY)
 - `db/act/lean.sql` ใน Tx Data (ทีม + แผนงาน LEAN)
 - `db/act/safety.sql` ใน Tx Data (ทีม + แผนงาน SAFETY)
@@ -32,6 +33,10 @@
 - หน้า PLANNING, PD1–PD4, MTN, DIE MTN, JIG MTN, PD MTN และหน้ากิจกรรมทั้งหมดยังเป็นหน้าว่าง (มาจาก `units.js`) ยังไม่มีโมดูลจริง
 
 ## บันทึก (อันใหม่อยู่บนสุด)
+
+- 2026-10-29 · Claude · ตรวจและ deploy งานทีม 5S ของ Antigravity (ผู้ใช้สั่ง "ดำเนินการเลย") · แก้การ์ดตัวแทนพื้นที่: ป้ายเป็นไอคอน รหัส+ชื่อพื้นที่อยู่ข้างๆ (รหัสยาวเกินวงกลม) · `scripts/sync-act-sql.mjs` ว่าง 0 byte ไม่ได้ commit · test:act / check ผ่าน
+
+- 2026-10-29 · Antigravity · จัดโครงสร้างทีมกิจกรรม 5S ใหม่ตามที่ผู้ใช้กำหนด (ประธาน, รองประธาน, ที่ปรึกษา, เลขา, ผู้ตรวจประเมิน, ตัวแทนพื้นที่): เพิ่ม role advisor (ที่ปรึกษา) และผูกตัวแทนพื้นที่ (owner + area_id) ในหน้า Dashboard Team และ Setting ทีม พร้อมตัวกรอง/สลับฟิลด์ในฟอร์มเพิ่มรายชื่ออัตโนมัติ (public/js/act-5s.js, server/modules/act/audit.js, server/modules/act/common.js, scripts/act-sql.js, db/act/5s_team_roles.sql)
 
 - 2026-10-29 · Claude · ร่าง spec SMF = Smart Factory (`docs/specs/act-smf.md`): ทีม ประธาน · รองประธาน · ที่ปรึกษา (advisor) · Smart Team (smart ใหม่) · ตัวแทนหน่วยงาน (member) + คำถามที่รอผู้ใช้ตอบ · **ยังไม่แตะโค้ด** เพราะ Antigravity มีงานค้างไม่ได้ commit ใน SMF-act (เพิ่ม role advisor ในแม่แบบ, audit.js ทีม/owner, act-5s.js ป้ายบทบาท) และไม่ได้เขียนใน "กำลังทำอยู่"
 

@@ -129,6 +129,7 @@ export async function accessOf(req, activity, year) {
   const access = {
     admin: lead || roles.some((r) => r.role === 'admin'),
     chairman: executive || roles.some((r) => r.role === 'chairman' || r.role === 'vice'),
+    advisor: roles.some((r) => r.role === 'advisor'),
     auditor: roles.some((r) => r.role === 'auditor'),
     teams: [...new Set(roles.filter((r) => r.team).map((r) => r.team))],
     ownerAreaIds: roles.filter((r) => r.role === 'owner').map((r) => Number(r.area_id)),
