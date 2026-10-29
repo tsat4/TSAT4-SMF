@@ -61,8 +61,8 @@ export function adminWriteError(error, fallback) {
   const message = String(error?.message || '');
   if (code === '23505') return 'ข้อมูลนี้มีอยู่แล้ว';
   if (code === '23503') return fallback.includes('ลบ') ? 'แถวนี้ถูกใช้อยู่ ลบไม่ได้' : 'ค่านี้ขัดกับตารางที่เชื่อมอยู่';
-  // check constraint / enum value the database does not accept yet (e.g. level G1–G3 before db/08_employee_level.sql)
-  if (code === '23514' || code === '22P02') return /level|"G[1-3]"/i.test(message) ? 'ฐานข้อมูลยังไม่รองรับ level นี้ ต้องรัน db/08_employee_level.sql ใน Mx Data ก่อน' : 'ฐานข้อมูลยังไม่รองรับค่านี้';
+  // check constraint / enum value the database does not accept yet (e.g. level M1–M3, G1–G3 before db/08_employee_level.sql)
+  if (code === '23514' || code === '22P02') return /level|"[MG][1-3]"/i.test(message) ? 'ฐานข้อมูลยังไม่รองรับ level นี้ ต้องรัน db/08_employee_level.sql ใน Mx Data ก่อน' : 'ฐานข้อมูลยังไม่รองรับค่านี้';
   if (message.includes('cannot change employee')) return 'เปลี่ยนรหัสพนักงานไม่ได้';
   if (message.includes('must be Active')) return 'สถานะที่เชื่อมอยู่ต้องเป็น Active';
   return fallback;
