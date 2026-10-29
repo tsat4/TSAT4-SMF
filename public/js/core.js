@@ -199,7 +199,10 @@ function chartKpi({ label, value, unit = '', pill = '', note = '', color = CHART
 // Table cards keep their title.
 function chartCard(title, body, meta = '') {
   const chart = /class="(ch-plot|sto-donut-wrap)/.test(body);
-  const head = chart ? (meta ? `<div class="ch-head is-meta"><div class="sum-meta">${meta}</div></div>` : '') : `<div class="ch-head"><div class="card-title">${title}</div>${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>`;
+  // The chart's legend moves to the top-right corner, beside the meta text (ผู้ใช้กำหนด 2026-10-29).
+  let legend = '';
+  if (chart) body = body.replace(/<div class="ch-legend">[\s\S]*?<\/div>/, (m) => { legend = m; return ''; });
+  const head = chart ? (meta || legend ? `<div class="ch-head is-meta">${legend}${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>` : '') : `<div class="ch-head"><div class="card-title">${title}</div>${meta ? `<div class="sum-meta">${meta}</div>` : ''}</div>`;
   return `<section class="card ch-card"${chart ? ` aria-label="${esc(String(title).replace(/<[^>]*>/g, ''))}"` : ''}>${head}${body}</section>`;
 }
 

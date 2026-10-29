@@ -29,6 +29,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-29 · Claude · สัญลักษณ์กราฟ (legend) ย้ายไปมุมบนขวาของการ์ดกราฟทุกอัน (`chartCard` ย้ายให้เอง) · Usage Dashboard ตารางรายเดือน: ขอบมนเหมือนตารางอื่น (เดิมเหลี่ยม ชนขอบการ์ด) เดือนชิดซ้าย ตัวเลขชิดขวา
+
 - 2026-10-29 · Antigravity · Dashboard Store > Usage (แท็บ รับเข้า-จ่ายออก และ รายเดือน): ปรับตารางสรุปรายเดือน (`.sto-month-table`) ให้กึ่งกลาง (`text-align: center`) และกระจายคอลัมน์เต็มความกว้างเท่ากัน (`table-layout: fixed`) ตามที่ผู้ใช้สั่ง (`public/app.css`, `public/js/sto-dash.js`)
 
 - 2026-10-29 · Antigravity · สร้าง Table SQL (e-day, lean, safety) + Dashboard แผน (Schedule) และทีม (Team) ครบทุกกิจกรรม (`server/modules/act/planner.js`, `public/js/act-planner.js`, `db/act/`): ทุกกิจกรรมใน SMF ตอนนี้มีหน้า Dashboard (แท็บ Schedule ดูแผนงาน Gantt และแท็บ Team ผังองค์กรทีม) และหน้า Setting (แท็บ แผนงาน จัดการ Gantt และแท็บ ทีม จัดการรายชื่อทีม เพิ่ม/ลบ/คัดลอกปี) พร้อมรองรับตารางที่ยังไม่ได้รันโดยไม่พัง

@@ -354,10 +354,8 @@ html[data-theme="dark"] .table-wrap::-webkit-scrollbar-thumb,html[data-theme="da
 .sto-legend i{width:10px;height:10px;border-radius:50%;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 40%,transparent)}
 .sto-legend span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sto-legend em{color:var(--mo-text-muted);font-style:normal}
-.sto-month-table{margin:8px -8px -8px;border-radius:0}
-:where(body[data-dash]) .sto-month-table{margin:8px -10px -6px}
-.sto-month-table table{width:100%;table-layout:fixed}
-.sto-month-table th,.sto-month-table td{text-align:center;font-variant-numeric:tabular-nums}
+.sto-month-table{margin-top:10px}
+.sto-month-table table{width:100%;table-layout:fixed}.sto-month-table .sto-month-col{width:22%}
 .sto-ranks{list-style:none;margin:0;padding:0}
 .sto-ranks li{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto;gap:6px;align-items:center;padding:4px 0;font-size:11.5px}
 .sto-ranks span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -679,7 +677,7 @@ body[data-zone="work"]{--ch-1:#ea580c}
 .ch-pill.is-good{color:#15803d;border-color:#16a34a;background:color-mix(in srgb,#16a34a 15%,transparent)}
 .ch-pill.is-bad{color:#b91c1c;border-color:#dc2626;background:color-mix(in srgb,#dc2626 12%,transparent)}
 .ch-card{margin-bottom:8px;padding:12px 14px;min-width:0}
-.ch-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:8px}.ch-head.is-meta{justify-content:flex-end}
+.ch-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:8px}.ch-head.is-meta{justify-content:flex-end;align-items:center}.ch-head .ch-legend{margin:0;justify-content:flex-end}
 .ch-plot{display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto 280px auto;column-gap:6px}
 .ch-plot.has-right{grid-template-columns:44px minmax(0,1fr) 44px}
 .ch-titles{grid-column:1 / -1;display:flex;justify-content:space-between;font-size:11px;color:var(--mo-text-muted);padding-bottom:8px}
