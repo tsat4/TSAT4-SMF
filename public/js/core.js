@@ -524,10 +524,26 @@ const DASH_FIT_MAX = 520;
   const view = document.getElementById('app-view');
   if (!view) return;
   let timer;
+  // Long tables scroll inside their own frame so the column header (sticky th) and the page bar stay in view
+  // (ผู้ใช้กำหนด 2026-10-29): a table whose top is on screen gets the height left down to the bottom of the page.
+  const fitTables = (box) => {
+    if (!box) return;
+    const bottom = box.getBoundingClientRect().bottom - 8;
+    box.querySelectorAll('.table-wrap').forEach((wrap) => {
+      if (wrap.parentElement.closest('.table-wrap')) return;
+      wrap.style.removeProperty('max-height');
+      // keep what follows the table (totals line, pager, card padding) on screen too
+      const rect = wrap.getBoundingClientRect();
+      const after = Math.max(0, (box.lastElementChild || wrap).getBoundingClientRect().bottom - rect.bottom);
+      const room = bottom - rect.top - after;
+      if (room >= 240 && wrap.scrollHeight > room + 2) wrap.style.maxHeight = `${Math.floor(room)}px`;
+    });
+  };
   const fit = () => {
     const box = view.querySelector(':scope > .view-body');
     const plots = box ? [...box.querySelectorAll('.ch-plot')].filter((p) => p.offsetParent && !p.closest('.cfo-report-page')) : [];
     plots.forEach((p) => p.style.removeProperty('grid-template-rows'));
+    fitTables(box);
     if (!document.body.dataset.dash || !plots.length) return;
     const card = box.lastElementChild;
     const last = card.lastElementChild || card;
