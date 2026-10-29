@@ -588,12 +588,20 @@ const DASH_ROW_MAX = 44;
     plots.forEach((p) => p.style.removeProperty('grid-template-rows'));
     const dashTables = box ? [...box.querySelectorAll('.table-wrap table')].filter((t) => t.offsetParent) : [];
     dashTables.forEach((t) => t.style.removeProperty('--row-h'));
+    const sheet = box?.querySelector('.table-wrap.sheet');
+    sheet?.style.removeProperty('min-height');
     fitTables(box);
-    if (!document.body.dataset.dash || (!plots.length && !dashTables.length)) return;
+    if (!box?.lastElementChild) return;
     const card = box.lastElementChild;
     const last = card.lastElementChild || card;
     const free = box.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - parseFloat(getComputedStyle(card).paddingBottom) - 10;
     if (free < 24) return;
+    // Other pages (Transaction / Setting lists): the main table frame reaches the bottom of the page.
+    if (!document.body.dataset.dash) {
+      if (sheet && sheet.offsetParent) sheet.style.minHeight = `${Math.floor(sheet.getBoundingClientRect().height + free)}px`;
+      return;
+    }
+    if (!plots.length && !dashTables.length) return;
     // A Dashboard of tables only (e.g. 5S Ranking): taller rows fill the card, up to DASH_ROW_MAX px; tables side by
     // side share the row height of the longest one.
     if (!plots.length) {
