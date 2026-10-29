@@ -135,6 +135,17 @@ export async function accessOf(req, activity, year) {
   return access;
 }
 
+// Sheets the owner may still edit (Kaizen, QCC): once sent they are locked until decided; admins edit any time.
+export const SHEET_OPEN = ['DRAFT', 'REJECTED'];
+export const sheetEditable = (status, { owner, admin }) => admin || (owner && SHEET_OPEN.includes(status));
+
+// Write to a sheet only while its status is still the one that was read (like STO move()): two people pressing at
+// once cannot overwrite each other. -> false when the status changed meanwhile (answer 409, reload).
+export async function sheetWrite(table, row, patch) {
+  return must(await tx.from(table).update(patch).eq('id', row.id).eq('status', row.status).select('id')).length > 0;
+}
+export const SHEET_STALE = [409, 'สถานะของใบนี้เปลี่ยนไปแล้ว โหลดหน้าใหม่แล้วลองอีกครั้ง'];
+
 // Sheet status flow (Kaizen, QCC): the owner sends DRAFT / REJECTED -> SUBMITTED; a reviewer decides APPROVED / REJECTED
 // on a sent sheet (and may change that decision), never on a draft, and never on their own sheet unless admin.
 // -> null when allowed, else [http status, message].

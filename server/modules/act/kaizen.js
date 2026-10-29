@@ -1,7 +1,7 @@
 import { mx, tx } from '../../core/db.js';
 import { fail } from '../../core/http.js';
 import { nameOf } from '../../core/users.js';
-import { accessOf, actRoute, dateOf, fetchAll, imageBytes, must, namesOf, statusMove, yearOf } from './common.js';
+import { SHEET_STALE, accessOf, actRoute, dateOf, fetchAll, imageBytes, must, namesOf, sheetEditable, sheetWrite, statusMove, yearOf } from './common.js';
 
 // Kaizen: the Kaizen sheet (FM-QSM-039 ด้านหน้า + ด้านหลัง) — department representative (or proposer) submits,
 // assigned department manager / chairman / vice / admin evaluates and approves.
@@ -88,7 +88,7 @@ export function mountKaizen(app) {
       manager_id: r.manager_id ? String(r.manager_id) : null,
       manager_name: r.manager_id ? empMap.get(String(r.manager_id))?.name || '' : ''
     }));
-    const canEditRow = (r) => access.admin || ((own(req, r) || myDepartments.includes(r.department)) && r.status !== 'APPROVED');
+    const canEditRow = (r) => sheetEditable(r.status, { owner: own(req, r) || myDepartments.includes(r.department), admin: access.admin });
     const canReviewRow = (r) => access.admin || ((access.chairman || managedDepartments.includes(r.department)) && r.employee_id !== me);
     res.json({
       year,
@@ -176,7 +176,7 @@ export function mountKaizen(app) {
   route('patch', '/api/act/:activity/kaizen/:id', async (req, res, activity, t) => {
     const { row: current, access, mine, inDept, error: missing } = await loadFor(req, activity, t, req.params.id);
     if (missing) return fail(res, ...missing);
-    if (!access.admin && !((mine || inDept) && current.status !== 'APPROVED')) return fail(res, 403, 'แก้ได้เฉพาะผู้เสนอ ตัวแทนแผนก (ก่อนอนุมัติ) หรือผู้ดูแล');
+    if (!sheetEditable(current.status, { owner: mine || inDept, admin: access.admin })) return fail(res, 403, 'แก้ได้เฉพาะผู้เสนอ ตัวแทนแผนก (ใบร่าง / ไม่ผ่าน) หรือผู้ดูแล');
     const { row, error } = input(req.body || {});
     if (error) return fail(res, 400, error);
     if (Number(row.submitted_on.slice(0, 4)) !== current.year) row.submitted_on = current.submitted_on;
@@ -186,7 +186,7 @@ export function mountKaizen(app) {
       row.employee_id = proposer.employeeId;
       row.department = proposer.department;
     }
-    must(await tx.from(t.entry).update({ ...row, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }).eq('id', current.id));
+    if (!(await sheetWrite(t.entry, current, { ...row, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }))) return fail(res, ...SHEET_STALE);
     res.json({ ok: true, id: current.id });
   });
 
@@ -194,7 +194,7 @@ export function mountKaizen(app) {
     const { row, access, mine, inDept, error: missing } = await loadFor(req, activity, t, req.params.id);
     if (missing) return fail(res, ...missing);
     if (!access.admin && !((mine || inDept) && row.status === 'DRAFT')) return fail(res, 403, 'ลบได้เฉพาะใบร่างของตนเอง ตัวแทนแผนก หรือผู้ดูแล');
-    must(await tx.from(t.entry).delete().eq('id', row.id));
+    must(await tx.from(t.entry).delete().eq('id', row.id).eq('status', row.status));
     res.json({ ok: true });
   });
 
@@ -202,7 +202,7 @@ export function mountKaizen(app) {
   route('post', '/api/act/:activity/kaizen/:id/photo', async (req, res, activity, t) => {
     const { row, access, mine, inDept, error: missing } = await loadFor(req, activity, t, req.params.id);
     if (missing) return fail(res, ...missing);
-    if (!access.admin && !((mine || inDept) && row.status !== 'APPROVED')) return fail(res, 403, 'เปลี่ยนรูปได้เฉพาะผู้เสนอ ตัวแทนแผนก (ก่อนอนุมัติ) หรือผู้ดูแล');
+    if (!sheetEditable(row.status, { owner: mine || inDept, admin: access.admin })) return fail(res, 403, 'เปลี่ยนรูปได้เฉพาะผู้เสนอ ตัวแทนแผนก (ใบร่าง / ไม่ผ่าน) หรือผู้ดูแล');
     const side = req.body?.side === 'after' ? 'after' : req.body?.side === 'before' ? 'before' : '';
     const bytes = imageBytes(req.body?.image);
     if (!side || !bytes) return fail(res, 400, 'รูปต้องเป็น JPEG ไม่เกิน 700 KB');
@@ -245,7 +245,7 @@ export function mountKaizen(app) {
         reviewed_at: new Date().toISOString()
       });
     }
-    must(await tx.from(t.entry).update(patch).eq('id', row.id));
+    if (!(await sheetWrite(t.entry, row, patch))) return fail(res, ...SHEET_STALE);
     res.json({ ok: true });
   });
 }

@@ -1,6 +1,6 @@
 import { mx, tx } from '../../core/db.js';
 import { cleanTerm, fail } from '../../core/http.js';
-import { accessOf, actRoute, fetchAll, imageBytes, must, namesOf, statusMove, yearOf } from './common.js';
+import { SHEET_STALE, accessOf, actRoute, fetchAll, imageBytes, must, namesOf, sheetEditable, sheetWrite, statusMove, yearOf } from './common.js';
 
 // QCC: one project per group and topic, with the 10 report forms FM-QMR-022…031 (inbox/QCC.xlsx) in `forms`.
 // The group leader (or whoever made it) fills the forms and sends it; the year's committee (admin / chairman / vice) approves.
@@ -106,7 +106,7 @@ export function mountQcc(app) {
         const mine = own(req, r);
         return {
           ...r, leader_name: nameOf(r.leader_id), manager_name: nameOf(r.manager_id), progress: qccProgress(r.forms), mine,
-          canEdit: access.admin || (mine && r.status !== 'APPROVED'),
+          canEdit: sheetEditable(r.status, { owner: mine, admin: access.admin }),
           canReview: reviewerOf(access) && (access.admin || r.leader_id !== req.user.employeeId)
         };
       })
@@ -171,13 +171,13 @@ export function mountQcc(app) {
   route('patch', '/api/act/:activity/qcc/:id', async (req, res, activity, t) => {
     const { row: current, access, mine, error: missing } = await loadFor(req, activity, t, req.params.id);
     if (missing) return fail(res, ...missing);
-    if (!access.admin && !(mine && current.status !== 'APPROVED')) return fail(res, 403, 'แก้ได้เฉพาะหัวหน้ากลุ่ม (ก่อนอนุมัติ) หรือผู้ดูแล');
+    if (!sheetEditable(current.status, { owner: mine, admin: access.admin })) return fail(res, 403, 'แก้ได้เฉพาะหัวหน้ากลุ่ม (ใบร่าง / ไม่ผ่าน) หรือผู้ดูแล');
     const { row, error } = input({ leader_id: current.leader_id, ...(req.body || {}) }, current.year);
     if (error) return fail(res, 400, error);
     if (!access.admin) row.leader_id = current.leader_id;
     const unknown = await unknownPeople(row);
     if (unknown) return fail(res, 400, unknown);
-    must(await tx.from(t.project).update({ ...row, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }).eq('id', current.id));
+    if (!(await sheetWrite(t.project, current, { ...row, updated_by: req.user.employeeId, updated_at: new Date().toISOString() }))) return fail(res, ...SHEET_STALE);
     res.json({ ok: true, id: current.id });
   });
 
@@ -185,7 +185,7 @@ export function mountQcc(app) {
     const { row, access, mine, error: missing } = await loadFor(req, activity, t, req.params.id);
     if (missing) return fail(res, ...missing);
     if (!access.admin && !(mine && row.status === 'DRAFT')) return fail(res, 403, 'ลบได้เฉพาะโครงการร่างของตนเอง หรือผู้ดูแล');
-    must(await tx.from(t.project).delete().eq('id', row.id));
+    must(await tx.from(t.project).delete().eq('id', row.id).eq('status', row.status));
     res.json({ ok: true });
   });
 
@@ -193,7 +193,7 @@ export function mountQcc(app) {
   route('post', '/api/act/:activity/qcc/:id/photo', async (req, res, activity, t) => {
     const { row, access, mine, error: missing } = await loadFor(req, activity, t, req.params.id);
     if (missing) return fail(res, ...missing);
-    if (!access.admin && !(mine && row.status !== 'APPROVED')) return fail(res, 403, 'เปลี่ยนรูปได้เฉพาะหัวหน้ากลุ่ม (ก่อนอนุมัติ) หรือผู้ดูแล');
+    if (!sheetEditable(row.status, { owner: mine, admin: access.admin })) return fail(res, 403, 'เปลี่ยนรูปได้เฉพาะหัวหน้ากลุ่ม (ใบร่าง / ไม่ผ่าน) หรือผู้ดูแล');
     const slot = PHOTO_SLOTS.includes(req.body?.slot) ? req.body.slot : '';
     const bytes = imageBytes(req.body?.image);
     if (!slot || !bytes) return fail(res, 400, 'รูปต้องเป็น JPEG ไม่เกิน 700 KB');
@@ -218,7 +218,7 @@ export function mountQcc(app) {
     if (refused) return fail(res, ...refused);
     const patch = { status, updated_by: req.user.employeeId, updated_at: new Date().toISOString() };
     if (['APPROVED', 'REJECTED'].includes(status)) Object.assign(patch, { review_note: text(req.body?.note, 1000) || null, reviewed_by: req.user.employeeId, reviewed_at: new Date().toISOString() });
-    must(await tx.from(t.project).update(patch).eq('id', row.id));
+    if (!(await sheetWrite(t.project, row, patch))) return fail(res, ...SHEET_STALE);
     res.json({ ok: true });
   });
 }

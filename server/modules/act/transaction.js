@@ -392,7 +392,8 @@ export function mountTransaction(app) {
     if (!(found.issue.photo_after || []).length) return fail(res, 400, 'แนบรูปหลังแก้ก่อนส่ง Action');
     const today = todayIso();
     const status = !found.issue.due_date || today <= found.issue.due_date ? 'ON_PLAN' : 'WAIT_VERIFY';
-    must(await tx.from(t.issue).update({ action_description: description, action_date: today, status }).eq('id', found.issue.id));
+    const sent = must(await tx.from(t.issue).update({ action_description: description, action_date: today, status }).eq('id', found.issue.id).neq('status', 'CLOSED').select('id'));
+    if (!sent.length) return fail(res, 409, 'Issue นี้ปิดไปแล้ว โหลดหน้าใหม่');
     res.json({ ok: true, status });
   });
 

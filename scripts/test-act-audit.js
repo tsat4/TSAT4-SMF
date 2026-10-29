@@ -269,7 +269,9 @@ ok(qf['022'].steps.length === 11 && JSON.stringify(qf['022'].steps[1].actual) ==
 ok(!('hack' in qf), 'QCC forms keep only the known FM-QMR forms');
 
 // Sheet status flow (Kaizen + QCC), QCC month input, search text for PostgREST or()
-const { statusMove } = await import('../server/modules/act/common.js');
+const { statusMove, sheetEditable } = await import('../server/modules/act/common.js');
+ok(sheetEditable('DRAFT', { owner: true }) && sheetEditable('REJECTED', { owner: true }) && !sheetEditable('SUBMITTED', { owner: true }) && !sheetEditable('APPROVED', { owner: true }), 'owner edits only a draft or a rejected sheet (sent = locked)');
+ok(sheetEditable('APPROVED', { admin: true }) && !sheetEditable('DRAFT', {}), 'admin edits any sheet, others none');
 const { monthOf } = await import('../server/modules/act/qcc.js');
 const { cleanTerm } = await import('../server/core/http.js');
 const who = (o) => ({ owner: false, reviewer: false, admin: false, self: false, denied: 'no', ...o });
