@@ -6,7 +6,7 @@ const CFO = 'cfo';
 // Scope 1/2/3 colours = the shared chart palette (core.js CHART, green here): this year greens, the base year slate.
 const CFO_SCOPE_COLORS = CHART_THEMES.cool.series.slice(0, 3);
 const CFO_BASE_COLORS = CHART_THEMES.cool.base;
-const CFO_ROLE_LABEL = { admin: 'ผู้จัดทำ', chairman: 'ประธาน', vice: 'รองประธาน', member: 'ตัวแทนหน่วยงาน' };
+const CFO_ROLE_LABEL = { ...ACT_TEAM_ROLES, admin: 'เลขา (ผู้จัดทำ)' }; // TGO forms call the secretary ผู้จัดทำ
 const CFO_DASH_TABS = { summary: 'Summary', scope: 'Scope', company: 'Fr-01', team: 'Fr-03.1', fr032: 'Fr-03.2', fr041: 'Fr-04.1', revision: 'บันทึกการปรับปรุง' };
 const CFO_SET_TABS = { team: 'ทีม', activities: 'กิจกรรม', ef: 'Emission Factor', s3: 'Scope 3 (Fr-03.2)', company: 'บริษัท' };
 // TGO Fr-03.2 criteria (server S3_CRITERIA) and their explanation from the form (หัวข้อ 12 ข้อกำหนด CFO)

@@ -1,6 +1,9 @@
 // ระบบตั้งค่า > ปฏิทิน: every activity's plan with week / month / year views, read-only (server: server/modules/act).
 // Shared date helpers (actIso, actDate, actShort ...) are also used by act-planner.js.
 // One color per activity, in ACTIVITIES order (units.js).
+// Team roles every activity has, in this order (ผู้ใช้กำหนด 2026-10-29); เลขา = admin (manages Setting).
+// Activities add their own after these (5S ผู้ตรวจ ...). Server roles: server/modules/act/audit.js ROLES.
+const ACT_TEAM_ROLES = { chairman: 'ประธาน', vice: 'รองประธาน', admin: 'เลขา', member: 'สมาชิก' };
 const ACT_COLORS = ['#ff6b6b', '#ff9f43', '#f7c948', '#2ed573', '#1dd1a1', '#54a0ff', '#5f6dff', '#a55eea', '#ee5a9b'];
 const ACT_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const ACT_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];

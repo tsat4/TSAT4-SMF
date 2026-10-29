@@ -2,7 +2,7 @@
 // เลือกด้วย dropdown), Setting (แผนงาน = Planner, ทีมคณะกรรมการ).
 // Server: server/modules/act/qcc.js · spec: docs/specs/act-qcc.md · uses a5Year (act-5s.js) and kzPhoto169 / .kz-photo (act-kaizen.js).
 const QC = 'qcc';
-const QC_ROLE_LABEL = { chairman: 'ประธานคณะกรรมการ QCC', vice: 'รองประธาน', admin: 'ผู้ดูแล (เลขานุการ)' };
+const QC_ROLE_LABEL = { ...ACT_TEAM_ROLES };
 const QC_DASH_TABS = { summary: 'Summary', schedule: 'Schedule', team: 'Team' };
 const QC_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' };
 const QC_STATUS = { DRAFT: ['ร่าง', ''], SUBMITTED: ['รอพิจารณา', 'badge-warning'], APPROVED: ['อนุมัติ', 'badge-success'], REJECTED: ['ไม่ผ่าน', 'badge-danger'] };

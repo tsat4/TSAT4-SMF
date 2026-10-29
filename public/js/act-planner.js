@@ -407,13 +407,7 @@ function aplOpenForm(activity, tasks, task, parentId, rerender) {
 
 const APL_DASH_TABS = { schedule: 'Schedule', team: 'Team' };
 const APL_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' };
-const APL_ROLE_LABEL = {
-  admin: 'Admin ผู้ดูแลกิจกรรม',
-  chairman: 'ประธาน',
-  vice: 'รองประธาน',
-  member: 'ตัวแทนหน่วยงาน',
-  auditor: 'ผู้ตรวจประเมิน'
-};
+const APL_ROLE_LABEL = { ...ACT_TEAM_ROLES, auditor: 'ผู้ตรวจประเมิน' };
 const aplDashTab = {};
 const aplSetTab = {};
 

@@ -7,7 +7,7 @@ const A5_GROUPS = { '5s': ['สะสาง', 'สะดวก', 'สะอา�
 const A5_TEAMS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
 const A5_TEAM_COLORS = { A: '#1f2937', B: '#ec4899', C: '#f97316', D: '#ca8a04', E: '#0d9488', F: '#2563eb', G: '#9333ea', H: '#06b6d4', I: '#9ca3af' };
 const A5_AREA_TYPES = ['โรงงาน', 'สำนักงาน'];
-const A5_ROLE_LABEL = { admin: 'Admin', chairman: 'หัวหน้าทีม', auditor: 'ผู้ตรวจ' };
+const A5_ROLE_LABEL = { ...ACT_TEAM_ROLES, auditor: 'ผู้ตรวจ' };
 const A5_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', audit: 'Audit Plan', team: 'Team Auditor' };
 // Setting tabs: ทีม, แผนงาน, then the activity's own tables (ผู้ใช้กำหนด 2026-10-29)
 const A5_SET_TABS = { team: 'ทีม', gantt: 'แผนงาน', areas: 'พื้นที่', checklist: 'หัวข้อตรวจ', plan: 'แผนตรวจ' };
@@ -186,14 +186,16 @@ async function a5DrawTeam(body, activity) {
   const data = await a5Api(activity, `team?year=${a5Year}`);
   const active = data.members.filter((m) => m.status === 'Active');
   const person = (m) => `<div class="a5-person">${esc(m.employee_id)} · ${esc(m.name || '-')}<span>${esc(m.department || '')}</span></div>`;
-  const admins = active.filter((m) => m.role === 'admin');
-  const chairs = active.filter((m) => m.role === 'chairman');
+  // Top: ประธาน · รองประธาน · เลขา · สมาชิก (ACT_TEAM_ROLES), then the auditor teams A–Z.
   const teams = A5_TEAMS.filter((t) => active.some((m) => m.team === t)).concat([...new Set(active.filter((m) => m.team && !A5_TEAMS.includes(m.team)).map((m) => m.team))]);
+  const tones = { chairman: '#475569', vice: '#64748b', admin: 'var(--mo-primary)', member: '#0f766e' };
+  // icons, not letters: this Thai font draws ร / ล like s / a
+  const badges = { chairman: 'workspace_premium', vice: 'military_tech', admin: 'edit_note', member: 'groups' };
   body.innerHTML = `
-    <div class="a5-team-grid a5-team-top">
-      <div class="a5-team" style="--team:var(--mo-primary)"><div class="a5-team-head"><span class="a5-badge">A</span>Admin ผู้ดูแลกิจกรรม<span>${admins.length}</span></div>${admins.map(person).join('') || '<div class="a5-person">-</div>'}</div>
-      <div class="a5-team" style="--team:#475569"><div class="a5-team-head"><span class="a5-badge">H</span>หัวหน้าทีมตรวจประเมิน<span>${chairs.length}</span></div>${chairs.map(person).join('') || '<div class="a5-person">-</div>'}</div>
-    </div>
+    <div class="a5-team-grid a5-team-top">${Object.entries(ACT_TEAM_ROLES).map(([role, label]) => {
+      const list = active.filter((m) => m.role === role);
+      return `<div class="a5-team" style="--team:${tones[role]}"><div class="a5-team-head"><span class="a5-badge"><span class="material-symbols-rounded" style="font-size:15px">${badges[role]}</span></span>${esc(label)}<span>${list.length}</span></div>${list.map(person).join('') || '<div class="a5-person">-</div>'}</div>`;
+    }).join('')}</div>
     <div class="a5-team-grid">${teams.map((t) => {
       const list = active.filter((m) => m.role === 'auditor' && m.team === t);
       return `<div class="a5-team" style="--team:${a5TeamColor(t)}"><div class="a5-team-head"><span class="a5-badge">${esc(t)}</span>ทีม ${esc(t)}<span>${list.length} คน</span></div>${list.map(person).join('')}</div>`;
@@ -303,14 +305,18 @@ async function a5SetTeam(body, activity, admin, rerender, roles = A5_ROLE_LABEL)
     openPopup(`เพิ่มรายชื่อปี ${a5Year}`, `${A5_EMP_FIELDS}${field('พนักงานที่เลือก', '<input id="a5-team-pick" readonly placeholder="เลือกจากรายชื่อ">')}
       ${field('บทบาท', `<select id="a5-role">${options(keys, keys.at(-1), (v) => roles[v])}</select>`)}
       ${hasTeam ? field('ทีม (เฉพาะผู้ตรวจ)', `<select id="a5-team">${options(A5_TEAMS, 'A')}</select>`, '') : ''}
-      ${keys.includes('member') ? field('หน่วยงาน (เฉพาะตัวแทนหน่วยงาน)', '<input id="a5-dept" maxlength="80" placeholder="เช่น PD1">') : ''}`, async () => {
+      ${keys.includes('member') ? field('หน่วยงาน (เฉพาะสมาชิก)', '<input id="a5-dept" maxlength="80" placeholder="เช่น PD1">') : ''}`, async () => {
       if (!chosen) throw new Error('เลือกพนักงานจากรายชื่อก่อน');
       await a5Api(activity, 'team', { method: 'POST', body: { year: a5Year, employeeId: chosen.employeeId, role: $('a5-role').value, team: $('a5-team')?.value, department: $('a5-dept')?.value.trim() } });
       toast('เพิ่มแล้ว');
       closePopup();
       rerender();
     });
-    a5EmployeeSearch(activity, (p) => { chosen = p; $('a5-team-pick').value = `${p.employeeId} · ${p.name}`; });
+    a5EmployeeSearch(activity, (p) => {
+      chosen = p;
+      $('a5-team-pick').value = `${p.employeeId} · ${p.name}`;
+      if ($('a5-dept') && !$('a5-dept').value && p.department) $('a5-dept').value = p.department; // สมาชิก: the employee's own department
+    });
     const syncTeam = () => {
       if ($('a5-team')) $('a5-team').disabled = $('a5-role').value !== 'auditor';
       if ($('a5-dept')) $('a5-dept').disabled = $('a5-role').value !== 'member';

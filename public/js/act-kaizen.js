@@ -2,7 +2,7 @@
 // Setting (แผนงาน = Planner, ทีมประจำปี + เป้าหมายเรื่องต่อปี + เป้าขั้นต่ำต่อเดือน ปิดจบก่อน 15 พ.ย. + ผู้จัดการประเมิน).
 // Server: server/modules/act/kaizen.js · spec: docs/specs/act-kaizen.md · uses the shared year (a5Year) of act-5s.js.
 const KZ = 'kaizen';
-const KZ_ROLE_LABEL = { chairman: 'ประธาน', vice: 'รองประธาน', admin: 'ผู้ดูแล (เลขานุการ)', member: 'ตัวแทนสมาชิก (ประจำแผนก)' };
+const KZ_ROLE_LABEL = { ...ACT_TEAM_ROLES };
 const KZ_DASH_TABS = { summary: 'Summary', ranking: 'Ranking', schedule: 'Schedule', team: 'Team' };
 const KZ_SET_TABS = { team: 'ทีม', plan: 'แผนงาน' };
 const KZ_KINDS = { person: 'บุคคล', team: 'ทีม', qcc: 'เป็นกิจกรรมที่มาจาก QCC' };
