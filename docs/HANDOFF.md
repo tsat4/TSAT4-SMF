@@ -35,6 +35,8 @@
 
 ## บันทึก (อันใหม่อยู่บนสุด)
 
+- 2026-10-29 · Claude · ขยายผลตารางแผนอื่น: 5S Audit Plan / Setting แผนตรวจ (`.a5-sched-wrap`) ได้ scrollbar แบบเดียวกัน + พอดีจอ (`fitTables`) · QCC 022 แผนดำเนินกิจกรรม (`.qc-gantt`): หัวเดือน/สัปดาห์ค้างบน คอลัมน์ขั้นตอนค้างซ้ายตอนเลื่อนขวา
+
 - 2026-10-29 · Claude · แก้ scrollbar มองไม่เห็นทุกตาราง + Planner: CSS พิมพ์ผิด `::-webkit-scrollbar-thumb-thumb` / `-track-track` / `-corner-corner` ทำให้ Chrome ทิ้งทั้งกฎ thumb ไม่มีสี · Planner หัวคอลัมน์ซ้าย (ลำดับ / รายการ / ผู้รับผิดชอบ / %) หลุดตอนเลื่อน: `.apl-head` z-index 4 → 6 (อยู่เหนือเซลล์ซ้ายของแถว z 5)
 
 - 2026-10-29 · Claude · ผู้ใช้ยืนยันโครงสร้างทีมทุกกิจกรรม (`docs/specs/act-teams.md`) · SMF ทีม = ประธาน · รองประธาน · ที่ปรึกษา · Smart Team · ตัวแทนหน่วยงาน (`APL_ROLE_LABELS.smf`) · role ใหม่ `smart` (แม่แบบ role check, `ROLES`, System Setting `actrole`) · `accessOf`: smart = admin · ที่ปรึกษาดูอย่างเดียว

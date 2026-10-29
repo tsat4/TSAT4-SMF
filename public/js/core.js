@@ -571,8 +571,8 @@ const DASH_FIT_MAX = 520;
   const fitTables = (box) => {
     if (!box) return;
     const bottom = box.getBoundingClientRect().bottom - 8;
-    box.querySelectorAll('.table-wrap').forEach((wrap) => {
-      if (wrap.parentElement.closest('.table-wrap')) return;
+    box.querySelectorAll('.table-wrap, .a5-sched-wrap').forEach((wrap) => {
+      if (wrap.parentElement.closest('.table-wrap, .a5-sched-wrap')) return;
       wrap.style.removeProperty('max-height');
       // keep what follows the table (totals line, pager, card padding) on screen too
       const rect = wrap.getBoundingClientRect();
