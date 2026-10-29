@@ -562,6 +562,7 @@ const SEARCH_BOXES = (() => {
 // resize, the free space below the card is shared between the chart rows (charts side by side get the same height),
 // up to DASH_FIT_MAX px of plot per chart. Report pages laid out for one sheet (.cfo-report-page) keep their size.
 const DASH_FIT_MAX = 520;
+const DASH_ROW_MAX = 44;
 (() => {
   const view = document.getElementById('app-view');
   if (!view) return;
@@ -585,12 +586,23 @@ const DASH_FIT_MAX = 520;
     const box = view.querySelector(':scope > .view-body');
     const plots = box ? [...box.querySelectorAll('.ch-plot')].filter((p) => p.offsetParent && !p.closest('.cfo-report-page')) : [];
     plots.forEach((p) => p.style.removeProperty('grid-template-rows'));
+    const dashTables = box ? [...box.querySelectorAll('.table-wrap table')].filter((t) => t.offsetParent) : [];
+    dashTables.forEach((t) => t.style.removeProperty('--row-h'));
     fitTables(box);
-    if (!document.body.dataset.dash || !plots.length) return;
+    if (!document.body.dataset.dash || (!plots.length && !dashTables.length)) return;
     const card = box.lastElementChild;
     const last = card.lastElementChild || card;
     const free = box.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom - parseFloat(getComputedStyle(card).paddingBottom) - 10;
     if (free < 24) return;
+    // A Dashboard of tables only (e.g. 5S Ranking): taller rows fill the card, up to DASH_ROW_MAX px; tables side by
+    // side share the row height of the longest one.
+    if (!plots.length) {
+      const rowsOf = (t) => t.tBodies[0]?.rows.length || 0;
+      const n = Math.max(0, ...dashTables.map(rowsOf));
+      const base = dashTables.find((t) => rowsOf(t) === n)?.tBodies[0]?.rows[0]?.getBoundingClientRect().height || 22;
+      if (n) dashTables.forEach((t) => t.style.setProperty('--row-h', `${Math.floor(Math.min(DASH_ROW_MAX, base + free / n))}px`));
+      return;
+    }
     const rows = new Set(plots.map((p) => Math.round(p.getBoundingClientRect().top)));
     const extra = free / rows.size;
     plots.forEach((p) => {
@@ -605,6 +617,38 @@ const DASH_FIT_MAX = 520;
   window.addEventListener('load', later);
   // Re-fit when the page content changes, not when a chart's hover tip does.
   new MutationObserver((list) => { if (list.some((m) => !m.target.closest?.('.ch-tip'))) later(); }).observe(view, { childList: true, subtree: true });
+})();
+
+// Text cut off with … shows in full on hover (ผู้ใช้กำหนด 2026-10-29): one floating box for the whole app, next to the
+// cut-off text. Elements with their own title keep the browser's tooltip.
+const OVERFLOW_TIP = (() => {
+  if (!window.matchMedia('(hover: hover)').matches) return null;
+  const tip = document.createElement('div');
+  tip.className = 'ov-tip';
+  tip.hidden = true;
+  document.body.append(tip);
+  let shown = null;
+  const clipped = (el) => {
+    for (let node = el, k = 0; node && k < 4 && node !== document.body; node = node.parentElement, k += 1) {
+      if (node.title || node.matches('input, select, textarea, .ov-tip')) return null;
+      const style = getComputedStyle(node);
+      const oneLine = style.textOverflow === 'ellipsis' || (style.overflow === 'hidden' && style.whiteSpace === 'nowrap');
+      if (oneLine && node.scrollWidth > node.clientWidth + 1 && node.textContent.trim() && node.textContent.length < 400) return node;
+    }
+    return null;
+  };
+  document.addEventListener('mouseover', (e) => {
+    const node = e.target instanceof Element ? clipped(e.target) : null;
+    if (node === shown) return;
+    shown = node;
+    tip.hidden = !node;
+    if (!node) return;
+    tip.textContent = node.textContent.trim().replace(/\s+/g, ' ').slice(0, 500);
+    const r = node.getBoundingClientRect();
+    tip.style.left = `${Math.max(8, Math.min(r.left, innerWidth - tip.offsetWidth - 8))}px`;
+    tip.style.top = `${r.bottom + 4 + tip.offsetHeight > innerHeight ? r.top - tip.offsetHeight - 4 : r.bottom + 4}px`;
+  });
+  return tip;
 })();
 
 // Every <input type="date"> is typed as วัน/เดือน/ปี (dd/mm/yyyy) whatever the browser language (ผู้ใช้กำหนด 2026-10-29).

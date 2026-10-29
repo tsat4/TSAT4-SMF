@@ -757,7 +757,9 @@ body[data-zone="work"]{--ch-1:#ea580c}
 :where(body[data-dash]) .ch-legend{font-size:10px}
 :where(body[data-dash]) .ch-val,:where(body[data-dash]) .ch-lv{font-size:8.5px}
 :where(body[data-dash]) .card-title{font-size:12px}
-:where(body[data-dash]) td{height:22px;font-size:11px;padding:0 7px}
+:where(body[data-dash]) td{height:var(--row-h,22px);font-size:11px;padding:0 7px}
+/* full text of a cut-off (…) cell on hover (core.js OVERFLOW_TIP) */
+.ov-tip{position:fixed;z-index:210;max-width:420px;padding:6px 9px;border-radius:6px;background:var(--mo-text);color:var(--mo-surface);font-size:12px;line-height:1.4;white-space:normal;box-shadow:0 6px 18px rgba(0,0,0,.2);pointer-events:none}.ov-tip[hidden]{display:none}
 :where(body[data-dash]) table.mo-data-table thead th{height:26px;font-size:10px}
 :where(body[data-dash]) .table-wrap{--table-head:26px}
 :where(body[data-dash]) .seg-btn{min-height:26px;padding:0 10px;font-size:11.5px}
