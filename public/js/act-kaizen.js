@@ -131,7 +131,7 @@ async function kzDrawSummary(body) {
   const top = Math.max(...byMonth(approved).map((v, i) => v + byMonth(waiting)[i]), 0);
   const chart = chartPlot({
     id: 'kz-plot', labels: ACT_MONTHS_SHORT, left: 'จำนวน (ใบ)', leftMax: Math.max(4, Math.ceil(top / 4) * 4),
-    bars: [{ values: byMonth(approved).map((v, i) => [v, byMonth(waiting)[i]]), colors: [CHART.series[0], CHART.series[1]] }],
+    bars: [{ values: byMonth(approved).map((v, i) => [v, byMonth(waiting)[i]]), colors: [CHART.series[0], CHART.series[1]], unit: ' ใบ' }],
     legend: [{ box: CHART.series[0], label: 'อนุมัติ' }, { box: CHART.series[1], label: 'รอพิจารณา' }]
   });
   const byDept = {};

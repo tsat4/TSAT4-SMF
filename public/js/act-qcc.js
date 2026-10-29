@@ -89,7 +89,7 @@ async function qcDrawSummary(body) {
   const shown = d.rows.slice(0, 12);
   const chart = shown.length ? chartPlot({
     id: 'qc-plot', labels: shown.map((r) => r.group_name), left: 'ความคืบหน้า (%)', leftMax: 100,
-    bars: [{ values: shown.map((r) => r.progress), colors: [CHART.series[0]] }],
+    bars: [{ values: shown.map((r) => r.progress), colors: [CHART.series[0]], unit: '%', inner: shown.map((r) => (r.progress ? `${Math.round((r.progress * QC_STEPS.length) / 100)}/${QC_STEPS.length} ขั้น` : '')) }],
     legend: [{ box: CHART.series[0], label: 'ขั้นตอนที่ดำเนินการแล้ว (จาก 11 ขั้น FM-QMR-022)' }]
   }) : '<p class="empty">ยังไม่มีกลุ่ม QCC ปีนี้</p>';
   body.innerHTML = `
@@ -250,7 +250,7 @@ function qcProject(body, d, row, reload) {
       if (!rows.length) return '<p class="empty">ตารางนี้คำนวณจาก FM-QMR-024 ให้เอง · กรอกรายการปัญหาและผลรวมในฟอร์ม 024 ก่อน</p>';
       const chart = chartPlot({
         id: 'qc-025', labels: rows.map((r) => r.name), left: st['024']?.unit || 'จำนวน', right: 'เปอร์เซ็นต์สะสม (%)', digits: 1,
-        bars: [{ values: rows.map((r) => r.value), colors: [CHART.series[0]] }],
+        bars: [{ values: rows.map((r) => r.value), colors: [CHART.series[0]], inner: rows.map((r) => `${qcNum(r.pct)}%`) }],
         lines: [{ values: rows.map((r) => Math.round(r.cumPct * 10) / 10), color: CHART.line, axis: 'right' }],
         legend: [{ box: CHART.series[0], label: 'จำนวน' }, { line: CHART.line, label: 'เปอร์เซ็นต์สะสม' }]
       });
