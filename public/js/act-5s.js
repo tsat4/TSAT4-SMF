@@ -365,7 +365,7 @@ async function a5SetChecklist(body, activity, admin, rerender) {
     <div class="table-wrap sheet" id="a5-rows"></div>
     <p class="sum-meta">${data.items.length} ข้อ · คะแนนเต็มรวม ${total} · หัวข้อแยกตามปี แก้ปีนี้ไม่กระทบผลตรวจปีก่อน</p>`;
   const items = listQuery(data.items, a5Heads.check, (i, key) => (key === 's_group' ? a5GroupName(activity, i.s_group) : i[key]));
-  fillTable('a5-rows', [{ label: 'ข้อที่', key: 'item_no' }, { label: 'หมวด', key: 's_group' }, { label: 'หัวข้อตรวจ', key: 'title' }, { label: 'คะแนนเต็ม', key: 'score_max' }, { label: 'สถานะ', key: 'status' }], items.map((i) => `<tr data-pick="${i.id}"><td>${i.item_no}</td><td>${esc(a5GroupName(activity, i.s_group))}</td><td>${esc(i.title)}</td><td>${i.score_max}</td><td>${esc(i.status)}</td></tr>`).join(''), `ยังไม่มีหัวข้อปี ${a5Year}`, headFor(a5Heads.check, () => a5SetChecklist(body, activity, admin, rerender).catch(onErr)));
+  fillTable('a5-rows', [{ label: 'ข้อที่', key: 'item_no' }, { label: 'หมวด', key: 's_group' }, { label: 'หัวข้อตรวจ', key: 'title' }, { label: 'คะแนนเต็ม', key: 'score_max' }, { label: 'สถานะ', key: 'status' }], items.map((i) => `<tr data-pick="${i.id}"><td>${i.item_no}</td><td>${esc(a5GroupName(activity, i.s_group))}</td><td>${esc(actNoLead(i.title))}</td><td>${i.score_max}</td><td>${esc(i.status)}</td></tr>`).join(''), `ยังไม่มีหัวข้อปี ${a5Year}`, headFor(a5Heads.check, () => a5SetChecklist(body, activity, admin, rerender).catch(onErr)));
   a5Lift(body);
   if (!admin) return;
   bindRowSelect($('a5-rows'), (id) => { picked = data.items.find((i) => String(i.id) === id); $('a5-edit').disabled = !picked; $('a5-del').disabled = !picked; });

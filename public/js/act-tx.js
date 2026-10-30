@@ -204,7 +204,7 @@ async function atxForm(body, activity, me, editId = 0) {
       const value = scoreOf(item);
       const needIssue = state.type === 'COMMITTEE' && !issue && !state.ownItems.has(item.id) && value != null && value <= form.settings.issue_score;
       return `<div class="atx-item${value == null ? '' : ' is-scored'}">
-        <div class="atx-item-title"><span>${item.item_no}.</span> ${esc(item.title)}${issue ? `<div class="atx-carry">Issue เดิม ${esc(issue.issue_no)}: ${esc(issue.description)} · ${locked ? '<b>ยังไม่มี Action → ข้อนี้ได้ 0</b>' : 'มี Action แล้ว ให้ ≥ 4 เพื่อปิด Issue'}</div>` : ''}</div>
+        <div class="atx-item-title"><span>${item.item_no}.</span> ${esc(actNoLead(item.title))}${issue ? `<div class="atx-carry">Issue เดิม ${esc(issue.issue_no)}: ${esc(issue.description)} · ${locked ? '<b>ยังไม่มี Action → ข้อนี้ได้ 0</b>' : 'มี Action แล้ว ให้ ≥ 4 เพื่อปิด Issue'}</div>` : ''}</div>
         <div class="atx-scores">${locked ? '<span class="atx-zero">0</span>' : Array.from({ length: item.score_max }, (_, i) => i + 1).map((n) => `<button type="button" class="atx-score${value === n ? ' is-on' : ''}${n <= form.settings.issue_score ? ' is-low' : ''}" data-score="${item.id}:${n}">${n}</button>`).join('')}</div>
         ${needIssue ? `<div class="atx-issue">
           ${field(`เปิด Issue (ได้ ≤ ${form.settings.issue_score}) รายละเอียดปัญหา`, `<textarea id="atx-text-${item.id}" rows="2" maxlength="2000" data-text="${item.id}">${esc(state.text[item.id] || '')}</textarea>`)}

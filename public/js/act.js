@@ -4,6 +4,9 @@
 // Team roles every activity has, in this order (ผู้ใช้กำหนด 2026-10-29); เลขา = admin (manages Setting).
 // Activities add their own after these (5S ผู้ตรวจ ...). Server roles: server/modules/act/audit.js ROLES.
 const ACT_TEAM_ROLES = { chairman: 'ประธาน', vice: 'รองประธาน', admin: 'เลขา', member: 'สมาชิก' };
+// A title that starts with its own number ("1.1 แต่งตั้ง…", from Excel) next to a number column shows without it
+// (ผู้ใช้แจ้ง 2026-10-30: เลขซ้ำ). Display only; the stored title is unchanged.
+const actNoLead = (title) => String(title ?? '').replace(/^\s*\d+(?:\.\d+)*\.?\s+(?=\S)/, '');
 const ACT_COLORS = ['#ff6b6b', '#ff9f43', '#f7c948', '#2ed573', '#1dd1a1', '#54a0ff', '#5f6dff', '#a55eea', '#ee5a9b'];
 const ACT_MONTHS = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 const ACT_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];

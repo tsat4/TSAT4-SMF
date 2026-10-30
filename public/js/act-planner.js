@@ -183,8 +183,8 @@ function aplRow(task, code, color, g, lines, canEdit, phase) {
     <div class="apl-act-pct" style="${act.b + 1 > g.cols * 0.95 ? 'right:4px' : `left:calc(${aplPct(act.b + 1, g)} + 4px)`}">${task.progress}%</div>` : ''}
     ${aplDatesLabel(pos, g, span)}` : '';
   const title = phase
-    ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(task.title)}</span></div>`
-    : `<div class="apl-title is-sub"><span>${esc(task.title)}</span></div>`;
+    ? `<div class="apl-title"><button class="apl-tog" type="button" data-tog="${task.id}" aria-expanded="${!aplCollapsed.has(task.id)}" aria-label="ย่อ/ขยาย">${phase.kids ? (aplCollapsed.has(task.id) ? '▸' : '▾') : ''}</button><span>${esc(actNoLead(task.title))}</span></div>`
+    : `<div class="apl-title is-sub"><span>${esc(actNoLead(task.title))}</span></div>`;
   return `<div class="apl-row${phase ? ' is-phase' : ''}${aplSelected === task.id ? ' is-selected' : ''}" data-task="${task.id}">
     <div class="apl-left"><div class="apl-code">${code}</div>${title}<div title="${esc(task.owner_name)}">${esc(aplOwner(task.owner_name))}</div><div class="apl-pct is-${plan.code}" title="${esc(plan.text)}">${task.progress}</div></div>
     <div class="apl-track">${lines}${bar}</div></div>`;
