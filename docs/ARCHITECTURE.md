@@ -4,7 +4,7 @@
 
 | ฐาน | client / env | เก็บอะไร |
 |---|---|---|
-| **Mx Data** (ezhyitqznflvjnwuuchn) | `mx` / `MX_SUPABASE_*` | ตารางกลาง `mt_main_*` (พนักงาน, costcenter, login) + ระบบงาน `mt_sto_*` / `tx_sto_*` (และ Planning/PD/MTN ในอนาคต) |
+| **Mx Data** (ezhyitqznflvjnwuuchn) | `mx` / `MX_SUPABASE_*` | ตารางกลาง `mt_main_*` (พนักงาน, costcenter, login) + ระบบงาน `mt_sto_*` / `tx_sto_*` (และหน่วยงานอื่นในอนาคต) |
 | **Tx Data** (loeyrgavlpdnrbczjxpl) | `tx` / `TX_SUPABASE_*` | ระบบกิจกรรม ตารางแยกต่อกิจกรรม `mt_5s_*` / `tx_5s_*` / `v_5s_*` และที่เก็บรูป `img_5s` (สร้างจาก scripts/act-sql.js) |
 
 ชื่อพนักงานในหน้ากิจกรรมดึงจาก Mx Data แยกอีกครั้ง (`namesOf`) เพราะคนละฐาน
@@ -91,7 +91,7 @@ scripts/
    Object.assign(VIEWS, { 'pd1-home': pd1RenderHome });
    Object.assign(ACCESS, { 'pd1-home': ['pd1', 1] });
    ```
-   ส่วน `TITLES` และเมนูของ `pd1-*` มีให้แล้วจาก `units.js` ถ้าหน้าไหนยังไม่ได้ลงทะเบียนใน VIEWS จะแสดงเป็นหน้าว่างไปก่อน
+   เพิ่ม `['pd1', 'PD1', 'factory']` ใน `PLANTS` ของ `units.js` (ได้ `TITLES` และเมนู `pd1-*`) และ `'pd1'` ใน `ADMIN_SCOPES` ของ `server/core/access.js` · หน้าที่ยังไม่ได้ลงทะเบียนใน VIEWS จะแสดงเป็นหน้าว่างไปก่อน
 5. ใส่ `<script src="/js/pd1.js"></script>` ใน index.html หลัง `units.js` และก่อน `boot.js`
 6. รัน `npm run check -- --update` แล้วตรวจ diff ของ snapshot จากนั้นรัน `npm run check`
 

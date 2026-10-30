@@ -1,14 +1,6 @@
 // Unit catalog: ระบบงาน (PLANTS) and ระบบกิจกรรม (ACTIVITIES). Each unit gets placeholder Dashboard / transaction / Setting pages until it has its own module.
 const PLANTS = [
-  ['planning', 'PLANNING', 'calendar_month'],
-  ['pd1', 'PD1', 'factory'],
-  ['pd2', 'PD2', 'factory'],
-  ['pd3', 'PD3', 'factory'],
-  ['pd4', 'PD4', 'factory'],
-  ['mtn', 'MTN', 'build'],
-  ['die-mtn', 'DIE MTN', 'build'],
-  ['jig-mtn', 'JIG MTN', 'build'],
-  ['pd-mtn', 'PD MTN', 'build']
+  ['planning', 'PLANNING', 'calendar_month']
 ];
 const ACTIVITIES = [
   ['100p', '100P', 'event'],
